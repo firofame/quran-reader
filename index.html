@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f8f7f2">
+    <meta name="description" content="A quiet space to read and reflect on Quran translations. Explore 114 chapters in English and Malayalam, and save the verses you want to return to.">
+    <title>The Quran — A space for reflection</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to reading</a>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
+    <aside id="sidebar" class="sidebar" aria-label="Chapter navigation">
+      <a class="brand" href="./" aria-label="The Quran home">
+        <span class="brand-icon" data-icon="book"></span>
+        <span>The Quran<span class="brand-caption">READ & REFLECT</span></span>
+      </a>
+      <button id="close-menu" class="icon-button close-menu" aria-label="Close chapters" data-icon="close"></button>
+      <div class="sidebar-intro">
+        <span class="eyebrow">YOUR DAILY COMPANION</span>
+        <p>A little reading.<br>A deeper understanding.</p>
+      </div>
+      <div class="chapter-search input-wrap">
+        <span data-icon="search"></span>
+        <input id="chapter-search" type="search" placeholder="Find a chapter…" aria-label="Find a chapter" autocomplete="off">
+        <kbd>/</kbd>
+      </div>
+      <div class="chapter-list-label"><span>CHAPTERS</span><span>114 SURAHS</span></div>
+      <nav id="chapter-list" class="chapter-list" aria-label="Chapters"></nav>
+      <div class="sidebar-bottom">
+        <span class="small-spark" aria-hidden="true">✧</span>
+        <p>One verse at a time.</p>
+        <span>No account. No distractions.</span>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="open-menu" class="icon-button open-menu" aria-label="Open chapters" aria-controls="sidebar" aria-expanded="false" data-icon="menu"></button>
+          <span class="topbar-label">A SPACE FOR REFLECTION</span>
+        </div>
+        <nav class="view-tabs" aria-label="Reader views">
+          <button id="read-tab" class="view-tab active" aria-current="page"><span data-icon="book"></span>Read</button>
+          <button id="saved-tab" class="view-tab"><span data-icon="bookmark"></span>Saved<span id="saved-count" class="count">0</span></button>
+        </nav>
+        <button id="theme-toggle" class="icon-button theme-toggle" aria-label="Switch to dark theme" data-icon="moon"></button>
+      </header>
+      <main id="main" tabindex="-1">
+        <div class="intro">
+          <div class="eyebrow"><span class="tiny-line"></span> READ. REFLECT. RETURN.</div>
+          <h1>Make room for reflection.</h1>
+          <p>One ayah at a time. Read slowly. Reflect deeply.</p>
+        </div>
+        <section class="reader" aria-label="Quran translation">
+          <div class="reading-toolbar">
+            <label class="translation-control">
+              <span data-icon="globe"></span>
+              <span class="sr-only">Translation</span>
+              <select id="translation">
+                <option value="en.itani">English · Talal Itani</option>
+                <option value="en.sahih">English · Saheeh International</option>
+                <option value="ml.abdulhameed">Malayalam · Abdul Hameed & Parappoor</option>
+              </select>
+            </label>
+            <div class="font-controls" role="group" aria-label="Reading text size">
+              <button id="font-down" aria-label="Decrease text size">A<span>−</span></button>
+              <span class="control-divider"></span>
+              <button id="font-up" aria-label="Increase text size">A<span>+</span></button>
+            </div>
+          </div>
+          <div id="chapter-heading" class="chapter-heading"></div>
+          <div class="verse-toolbar">
+            <div class="input-wrap verse-search">
+              <span data-icon="search"></span>
+              <input id="verse-search" type="search" placeholder="Search in this chapter…" aria-label="Search verses in this chapter" autocomplete="off">
+            </div>
+            <label id="jump-control" class="jump-control">Go to ayah
+              <select id="verse-jump" aria-label="Go to ayah"></select>
+            </label>
+            <span id="search-count" class="search-count" aria-live="polite" hidden></span>
+          </div>
+          <div id="ayah-status" class="ayah-status" role="status" hidden></div>
+          <div id="reading-content" aria-busy="true" aria-live="polite"></div>
+          <nav id="ayah-navigation" class="chapter-pagination" aria-label="Ayah navigation"></nav>
+          <p id="keyboard-hint" class="keyboard-hint">A little space to reflect. Use <kbd>←</kbd> <kbd>→</kbd> to continue.</p>
+          <progress id="chapter-progress" class="chapter-progress" aria-label="Chapter reading progress" max="7" value="1"></progress>
+          <footer class="reader-footer">
+            <span class="footer-flower" aria-hidden="true">✧</span>
+            <p>A translation of the meanings of the Quran.</p>
+            <p id="attribution"></p>
+            <p class="metadata-credit">Chapter metadata © Tanzil, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a>.</p>
+          </footer>
+        </section>
+        <p class="page-note">A quiet space. Just you and the words.</p>
+      </main>
+    </div>
+    <noscript><div class="noscript">Please enable JavaScript to load the local translations and use the reader.</div></noscript>
+    <script src="quran-data.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

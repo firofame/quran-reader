@@ -1,0 +1,76 @@
+# The Quran
+
+A minimal, responsive Quran translation reader with a focused, one-ayah-at-a-time
+reading view. No framework, dependencies,
+accounts, API keys, or external font requests.
+
+**Read online:** <https://firofame.github.io/quran-reader/>
+
+## Run
+
+Requires Node.js 22 or newer:
+
+```sh
+npm start
+```
+
+Open <http://localhost:3000>. Use `PORT=3001 npm start` to choose another port.
+The server listens on the local machine only. Alternatively, serve this directory
+with a static web server; opening the HTML directly with `file://` will not work
+because browsers restrict fetching local translation files.
+
+## Reading
+
+- Browse or search all 114 chapters by name, meaning, Arabic name, or number.
+- Read the supplied Talal Itani, Saheeh International, or Malayalam translation.
+- Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
+  to move through the Quran. Navigation continues across chapter boundaries.
+- Search the entire current chapter and move through matching ayahs one at a
+  time. Saved verses remain a browsable collection.
+- Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
+- Bookmark verses and revisit them in **Saved**. Click a saved verse number to
+  return to its chapter.
+- Adjust text size and switch between light and dark themes.
+- The exact selected ayah, bookmarks, and preferences are saved in this browser's local
+  storage. No reading data is sent to a server. Clearing browser data removes it.
+- Press `/` to find a chapter, and Escape to close the mobile chapter drawer or
+  clear a focused search.
+
+Translations are loaded from the supplied local files and retained in memory
+while the page is open. There are no external API calls. This is a translation
+reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
+
+## Validate
+
+```sh
+npm run check
+npm test
+```
+
+Tests verify all 6,236 verses in each translation, metadata alignment, malformed
+data handling, focused ayah selection, navigation across chapter boundaries,
+search, deep links, saved preferences, and static server routes.
+
+## Publish
+
+[GitHub Pages](https://firofame.github.io/quran-reader/) is deployed automatically
+by [the Pages workflow](.github/workflows/pages.yml) when changes are pushed to
+`main`. It can also be run manually from the repository's Actions tab.
+
+The workflow runs the checks and tests, then publishes only the HTML, CSS,
+browser JavaScript, favicon, metadata, and translation files. The local server,
+tests, and project configuration are not included in the published site.
+The repository's **Settings → Pages → Source** must be set to **GitHub Actions**.
+Relative asset URLs support the `/quran-reader/` project path and direct ayah
+links such as <https://firofame.github.io/quran-reader/#2:255>.
+
+## Sources
+
+The supplied translation files include their original source and translator
+attribution. English: Talal Itani and Saheeh International. Malayalam:
+Cheriyamundam Abdul Hameed and Kunhi Mohammed Parappoor. Source:
+[Tanzil translations](https://tanzil.net/trans/). These files remain unchanged;
+their respective translators' rights and terms continue to apply.
+
+Chapter metadata: copyright © 2008–2009 Tanzil.info, licensed under
+[Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/).

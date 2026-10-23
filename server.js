@@ -10,7 +10,7 @@ const files = new Map([
   ["/reader.js", ["reader.js", "text/javascript; charset=utf-8"]],
   ["/quran-data.js", ["quran-data.js", "text/javascript; charset=utf-8"]],
   ["/favicon.svg", ["favicon.svg", "image/svg+xml"]],
-  ...["en.itani", "en.sahih", "ml.abdulhameed"].map(id => [`/${id}.txt`, [`${id}.txt`, "text/plain; charset=utf-8"]]),
+  ...["en.sahih", "ml.abdulhameed"].map(id => [`/${id}.txt`, [`${id}.txt`, "text/plain; charset=utf-8"]]),
 ]);
 
 export function createReaderServer() {

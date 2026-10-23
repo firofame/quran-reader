@@ -26,10 +26,12 @@ because browsers restrict fetching local translation files.
   Short ayahs and their navigation fit on screen; longer ayahs scroll naturally
   without clipping or shrinking the text. Source credits sit below the reader.
 - Browse or search all 114 chapters by name, meaning, Arabic name, or number.
-- Read the supplied Talal Itani, Saheeh International, or Malayalam translation.
+- Read the supplied Saheeh International or Malayalam translation.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - On touchscreens, swipe left over the verse to continue or right to go back.
+  Each successful swipe turns the ayah like a book page, in the swipe direction.
+  The animation is skipped when your device requests reduced motion.
   Swipes follow search matches when searching, just like the navigation buttons.
   Vertical scrolling, pinch-to-zoom, text selection, and bookmark taps remain
   available; swiping does not navigate in **Saved**.
@@ -76,7 +78,7 @@ links such as <https://firofame.github.io/quran-reader/#2:255>.
 ## Sources
 
 The supplied translation files include their original source and translator
-attribution. English: Talal Itani and Saheeh International. Malayalam:
+attribution. English: Saheeh International. Malayalam:
 Cheriyamundam Abdul Hameed and Kunhi Mohammed Parappoor. Source:
 [Tanzil translations](https://tanzil.net/trans/). These files remain unchanged;
 their respective translators' rights and terms continue to apply.

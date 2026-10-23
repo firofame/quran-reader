@@ -16,6 +16,15 @@ test("metadata contains exactly 114 chapters and 6,236 verses", () => {
   assert.equal(chapters[113].verses, 6);
 });
 
+test("translation options match the supported English and Malayalam translations", async () => {
+  assert.deepEqual(Object.keys(TRANSLATIONS), ["en.sahih", "ml.abdulhameed"]);
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const select = /<select id="translation">([\s\S]*?)<\/select>/.exec(html);
+  assert.ok(select);
+  const options = Array.from(select[1].matchAll(/<option value="([^"]+)">/g), match => match[1]);
+  assert.deepEqual(options, Object.keys(TRANSLATIONS));
+});
+
 for (const [id, translation] of Object.entries(TRANSLATIONS)) {
   test(`${id}: every supplied verse maps to its chapter without modifying its text`, async () => {
     const source = await readFile(new URL(`../${translation.file}`, import.meta.url), "utf8");
@@ -120,7 +129,7 @@ test("saved preferences are validated, clamped, and deduplicated", () => {
     fontSize: 100,
     theme: "dark",
   }), chapters);
-  assert.equal(saved.translation, "en.itani");
+  assert.equal(saved.translation, "en.sahih");
   assert.deepEqual(saved.position, { chapter: 1, verse: 1 });
   assert.deepEqual(saved.bookmarks, [{ chapter: 1, verse: 2 }]);
   assert.equal(saved.fontSize, 29);
@@ -128,6 +137,21 @@ test("saved preferences are validated, clamped, and deduplicated", () => {
   assert.equal(decodeState(null, chapters).fontSize, 21);
   assert.throws(() => decodeState("{broken", chapters));
   assert.throws(() => decodeState("null", chapters));
+});
+
+test("new and removed translation preferences use Saheeh International without losing saved data", () => {
+  assert.equal(decodeState(null, chapters).translation, "en.sahih");
+  const saved = {
+    translation: "en.itani",
+    position: { chapter: 2, verse: 255 },
+    bookmarks: [{ chapter: 1, verse: 2 }],
+    fontSize: 25,
+    theme: "dark",
+  };
+  assert.deepEqual(decodeState(JSON.stringify(saved), chapters), { ...saved, translation: "en.sahih" });
+  for (const translation of Object.keys(TRANSLATIONS)) {
+    assert.equal(decodeState(JSON.stringify({ ...saved, translation }), chapters).translation, translation);
+  }
 });
 
 test("static server serves local assets and rejects unlisted paths and methods", async t => {
@@ -144,6 +168,7 @@ test("static server serves local assets and rejects unlisted paths and methods",
   assert.equal((await fetch(`${base}/package.json`)).status, 404);
   assert.equal((await fetch(`${base}/.DS_Store`)).status, 404);
   assert.equal((await fetch(`${base}/missing`)).status, 404);
+  assert.equal((await fetch(`${base}/en.itani.txt`)).status, 404);
   assert.equal((await fetch(base, { method: "POST" })).status, 405);
   const head = await fetch(base, { method: "HEAD" });
   assert.equal(head.status, 200);

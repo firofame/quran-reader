@@ -27,6 +27,14 @@ let noticeTimer;
 let storageFailed = false;
 let loading = false;
 let ayahTouch = null;
+let pageTurn = null;
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+function cancelPageTurn() {
+  pageTurn?.remove();
+  pageTurn = null;
+  $("reading-content").style.removeProperty("min-height");
+}
 
 function notify(message, persistent = false) {
   if (storageFailed && !persistent) {
@@ -138,6 +146,7 @@ function isBookmarked(chapter, verse) {
 
 function renderVerses() {
   ayahTouch = null;
+  cancelPageTurn();
   const data = cache.get(state.translation);
   if (!data) return;
   const query = $("verse-search").value.trim();
@@ -257,6 +266,7 @@ function renderPagination(selection) {
 
 async function loadReading({ scroll = false } = {}) {
   ayahTouch = null;
+  cancelPageTurn();
   const request = ++requestId;
   loading = true;
   updateTabs();
@@ -307,7 +317,7 @@ function showAyah(position) {
   $("reading-content").scrollIntoView({ block: "nearest", behavior: "instant" });
 }
 
-function moveAyah(direction) {
+function moveAyah(direction, { animate = false } = {}) {
   if (loading || view !== "read") return;
   const data = cache.get(state.translation);
   if (!data) return;
@@ -316,7 +326,30 @@ function moveAyah(direction) {
   const target = query
     ? selection.matches[selection.index + direction]
     : adjacentPosition(state.position, direction, chapters);
-  if (target) showAyah(target);
+  if (!target) return;
+  cancelPageTurn();
+  const content = $("reading-content");
+  const previous = animate && !reducedMotion.matches ? content.querySelector(".verse")?.cloneNode(true) : null;
+  const previousHeight = previous ? content.getBoundingClientRect().height : 0;
+  showAyah(target);
+  if (!previous) return;
+  previous.removeAttribute("id");
+  const sheet = document.createElement("div");
+  sheet.className = `page-turn ${direction === 1 ? "page-turn-forward" : "page-turn-backward"}`;
+  sheet.setAttribute("aria-hidden", "true");
+  sheet.inert = true;
+  sheet.append(previous);
+  // Keep a long outgoing ayah from collapsing before its page has turned.
+  content.style.minHeight = `${previousHeight}px`;
+  pageTurn = sheet;
+  const finish = () => { if (pageTurn === sheet) cancelPageTurn(); };
+  content.append(sheet);
+  for (const animation of sheet.getAnimations()) {
+    animation.finished.then(finish, error => {
+      if (error.name !== "AbortError") throw error;
+      finish();
+    });
+  }
 }
 
 function closeMenu() {
@@ -373,7 +406,7 @@ $("reading-content").addEventListener("touchend", event => {
   const touch = Array.from(event.changedTouches).find(item => item.identifier === start.id);
   if (!touch) return;
   const direction = swipeDirection(touch.clientX - start.x, touch.clientY - start.y);
-  if (direction) moveAyah(direction);
+  if (direction) moveAyah(direction, { animate: true });
 }, { passive: true });
 $("reading-content").addEventListener("touchcancel", () => { ayahTouch = null; }, { passive: true });
 $("chapter-search").addEventListener("input", renderChapters);
@@ -487,6 +520,7 @@ window.addEventListener("hashchange", () => {
 });
 window.addEventListener("pagehide", persist);
 matchMedia("(max-width: 760px)").addEventListener("change", closeMenu);
+reducedMotion.addEventListener("change", cancelPageTurn);
 
 applyPreferences();
 closeMenu();

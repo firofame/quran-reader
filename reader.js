@@ -1,5 +1,4 @@
 export const TRANSLATIONS = {
-  "en.itani": { name: "Talal Itani", language: "en", file: "en.itani.txt" },
   "en.sahih": { name: "Saheeh International", language: "en", file: "en.sahih.txt" },
   "ml.abdulhameed": {
     name: "Cheriyamundam Abdul Hameed & Kunhi Mohammed Parappoor",
@@ -91,7 +90,7 @@ export function matchesChapter(chapter, query) {
 
 export function decodeState(raw, chapters) {
   const defaults = {
-    translation: "en.itani",
+    translation: "en.sahih",
     position: { chapter: 1, verse: 1 },
     bookmarks: [],
     fontSize: 21,

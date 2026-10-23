@@ -79,6 +79,11 @@ export function adjacentPosition(position, direction, chapters) {
   return next ? { chapter: next.id, verse: direction === 1 ? 1 : next.verses } : null;
 }
 
+export function swipeDirection(deltaX, deltaY) {
+  if (Math.abs(deltaX) < 50 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return 0;
+  return deltaX < 0 ? 1 : -1;
+}
+
 export function matchesChapter(chapter, query) {
   const haystack = `${chapter.id} ${chapter.name} ${chapter.meaning} ${chapter.arabic}`;
   return normalizeSearch(haystack).includes(normalizeSearch(query.trim()));

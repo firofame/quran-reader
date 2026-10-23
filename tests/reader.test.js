@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
-import { TRANSLATIONS, createChapters, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition } from "../reader.js";
+import { TRANSLATIONS, createChapters, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition, swipeDirection } from "../reader.js";
 import { createReaderServer } from "../server.js";
 
 const context = vm.createContext({});
@@ -85,6 +85,22 @@ test("ayah navigation crosses chapter boundaries without skipping any of the 6,2
   assert.deepEqual(position, { chapter: 114, verse: 6 });
   assert.throws(() => adjacentPosition({ chapter: 1, verse: 8 }, 1, chapters), /invalid/);
   assert.throws(() => adjacentPosition({ chapter: 1, verse: 1 }, 0, chapters), /invalid/);
+});
+
+test("horizontal swipes move forward on the left and backward on the right", () => {
+  assert.equal(swipeDirection(-120, 10), 1);
+  assert.equal(swipeDirection(120, -10), -1);
+  assert.equal(swipeDirection(-50, 0), 1);
+  assert.equal(swipeDirection(50, 0), -1);
+  assert.equal(swipeDirection(-75, 50), 1);
+  assert.equal(swipeDirection(75, -50), -1);
+});
+
+test("taps, short drags, vertical scrolling, and diagonal gestures do not navigate", () => {
+  for (const [deltaX, deltaY] of [[0, 0], [49, 0], [-49, 0], [0, 150], [0, -150],
+    [60, 100], [-60, -100], [100, 100], [-100, 100], [74, 50], [-74, -50]]) {
+    assert.equal(swipeDirection(deltaX, deltaY), 0, `${deltaX}, ${deltaY}`);
+  }
 });
 
 test("chapter search supports names, punctuation, meaning, Arabic, and numbers", () => {

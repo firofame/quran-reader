@@ -21,10 +21,18 @@ because browsers restrict fetching local translation files.
 
 ## Reading
 
+- The verse takes priority in a viewport-filling reader with a compact chapter
+  header. Open **Controls** for translation, text size, search, and ayah jump.
+  Short ayahs and their navigation fit on screen; longer ayahs scroll naturally
+  without clipping or shrinking the text. Source credits sit below the reader.
 - Browse or search all 114 chapters by name, meaning, Arabic name, or number.
 - Read the supplied Talal Itani, Saheeh International, or Malayalam translation.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
+- On touchscreens, swipe left over the verse to continue or right to go back.
+  Swipes follow search matches when searching, just like the navigation buttons.
+  Vertical scrolling, pinch-to-zoom, text selection, and bookmark taps remain
+  available; swiping does not navigate in **Saved**.
 - Search the entire current chapter and move through matching ayahs one at a
   time. Saved verses remain a browsable collection.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
@@ -33,8 +41,8 @@ because browsers restrict fetching local translation files.
 - Adjust text size and switch between light and dark themes.
 - The exact selected ayah, bookmarks, and preferences are saved in this browser's local
   storage. No reading data is sent to a server. Clearing browser data removes it.
-- Press `/` to find a chapter, and Escape to close the mobile chapter drawer or
-  clear a focused search.
+- Press `/` to find a chapter, and Escape to clear a focused search or close
+  the controls or mobile chapter drawer.
 
 Translations are loaded from the supplied local files and retained in memory
 while the page is open. There are no external API calls. This is a translation
@@ -49,7 +57,8 @@ npm test
 
 Tests verify all 6,236 verses in each translation, metadata alignment, malformed
 data handling, focused ayah selection, navigation across chapter boundaries,
-search, deep links, saved preferences, and static server routes.
+swipe thresholds and directions, search, deep links, saved preferences, and
+static server routes.
 
 ## Publish
 

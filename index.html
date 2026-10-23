@@ -49,52 +49,56 @@
         <button id="theme-toggle" class="icon-button theme-toggle" aria-label="Switch to dark theme" data-icon="moon"></button>
       </header>
       <main id="main" tabindex="-1">
-        <div class="intro">
-          <div class="eyebrow"><span class="tiny-line"></span> READ. REFLECT. RETURN.</div>
-          <h1>Make room for reflection.</h1>
-          <p>One ayah at a time. Read slowly. Reflect deeply.</p>
-        </div>
         <section class="reader" aria-label="Quran translation">
-          <div class="reading-toolbar">
-            <label class="translation-control">
-              <span data-icon="globe"></span>
-              <span class="sr-only">Translation</span>
-              <select id="translation">
-                <option value="en.itani">English · Talal Itani</option>
-                <option value="en.sahih">English · Saheeh International</option>
-                <option value="ml.abdulhameed">Malayalam · Abdul Hameed & Parappoor</option>
-              </select>
-            </label>
-            <div class="font-controls" role="group" aria-label="Reading text size">
-              <button id="font-down" aria-label="Decrease text size">A<span>−</span></button>
-              <span class="control-divider"></span>
-              <button id="font-up" aria-label="Increase text size">A<span>+</span></button>
-            </div>
+          <div class="reader-header">
+            <div id="chapter-heading" class="chapter-heading"></div>
+            <details id="reading-controls" class="reading-controls">
+              <summary><span data-icon="settings"></span>Controls</summary>
+              <div class="reading-options">
+                <div class="reading-toolbar">
+                  <label class="translation-control">
+                    <span data-icon="globe"></span>
+                    <span class="sr-only">Translation</span>
+                    <select id="translation">
+                      <option value="en.itani">English · Talal Itani</option>
+                      <option value="en.sahih">English · Saheeh International</option>
+                      <option value="ml.abdulhameed">Malayalam · Abdul Hameed & Parappoor</option>
+                    </select>
+                  </label>
+                  <div class="font-controls" role="group" aria-label="Reading text size">
+                    <button id="font-down" aria-label="Decrease text size">A<span>−</span></button>
+                    <span class="control-divider"></span>
+                    <button id="font-up" aria-label="Increase text size">A<span>+</span></button>
+                  </div>
+                </div>
+                <div class="verse-toolbar">
+                  <div class="input-wrap verse-search">
+                    <span data-icon="search"></span>
+                    <input id="verse-search" type="search" placeholder="Search in this chapter…" aria-label="Search verses in this chapter" autocomplete="off">
+                  </div>
+                  <label id="jump-control" class="jump-control">Go to ayah
+                    <select id="verse-jump" aria-label="Go to ayah"></select>
+                  </label>
+                  <span id="search-count" class="search-count" aria-live="polite" hidden></span>
+                </div>
+              </div>
+            </details>
           </div>
-          <div id="chapter-heading" class="chapter-heading"></div>
-          <div class="verse-toolbar">
-            <div class="input-wrap verse-search">
-              <span data-icon="search"></span>
-              <input id="verse-search" type="search" placeholder="Search in this chapter…" aria-label="Search verses in this chapter" autocomplete="off">
-            </div>
-            <label id="jump-control" class="jump-control">Go to ayah
-              <select id="verse-jump" aria-label="Go to ayah"></select>
-            </label>
-            <span id="search-count" class="search-count" aria-live="polite" hidden></span>
+          <div id="ayah-status" class="sr-only" role="status" hidden></div>
+          <div id="active-search" class="active-search" hidden>
+            <span id="active-search-label"></span>
+            <button id="clear-search" type="button">Clear search</button>
           </div>
-          <div id="ayah-status" class="ayah-status" role="status" hidden></div>
           <div id="reading-content" aria-busy="true" aria-live="polite"></div>
           <nav id="ayah-navigation" class="chapter-pagination" aria-label="Ayah navigation"></nav>
-          <p id="keyboard-hint" class="keyboard-hint">A little space to reflect. Use <kbd>←</kbd> <kbd>→</kbd> to continue.</p>
+          <p id="navigation-hint" class="navigation-hint"><span class="keyboard-instructions">Use <kbd>←</kbd> <kbd>→</kbd> to continue.</span><span class="swipe-instructions">Swipe left to continue, right to go back.</span></p>
           <progress id="chapter-progress" class="chapter-progress" aria-label="Chapter reading progress" max="7" value="1"></progress>
-          <footer class="reader-footer">
-            <span class="footer-flower" aria-hidden="true">✧</span>
-            <p>A translation of the meanings of the Quran.</p>
-            <p id="attribution"></p>
-            <p class="metadata-credit">Chapter metadata © Tanzil, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a>.</p>
-          </footer>
         </section>
-        <p class="page-note">A quiet space. Just you and the words.</p>
+        <footer class="reader-footer">
+          <p>A translation of the meanings of the Quran.</p>
+          <p id="attribution"></p>
+          <p class="metadata-credit">Chapter metadata © Tanzil, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a>.</p>
+        </footer>
       </main>
     </div>
     <noscript><div class="noscript">Please enable JavaScript to load the local translations and use the reader.</div></noscript>

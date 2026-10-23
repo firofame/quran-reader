@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, parseTranslation, parseHash, selectAyah, adjacentPosition, matchesChapter, decodeState } from "./reader.js";
+import { TRANSLATIONS, createChapters, parseTranslation, parseHash, selectAyah, adjacentPosition, swipeDirection, matchesChapter, decodeState } from "./reader.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -8,6 +8,7 @@ const icons = {
   moon: '<path d="M20 14A8.5 8.5 0 0 1 10 4a8.5 8.5 0 1 0 10 10Z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  settings: '<path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="2" fill="var(--paper)"/><circle cx="16" cy="17" r="2" fill="var(--paper)"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   left: '<path d="m14 6-6 6 6 6M8 12h12"/>',
   right: '<path d="m10 6 6 6-6 6M16 12H4"/>',
@@ -25,6 +26,7 @@ let requestId = 0;
 let noticeTimer;
 let storageFailed = false;
 let loading = false;
+let ayahTouch = null;
 
 function notify(message, persistent = false) {
   if (storageFailed && !persistent) {
@@ -107,10 +109,10 @@ function updateTabs() {
 function renderHeading() {
   const chapter = chapters[state.position.chapter - 1];
   if (view === "saved") {
-    $("chapter-heading").innerHTML = `<div><span class="eyebrow">KEEP THE WORDS CLOSE</span><h2>Saved verses</h2><p>A collection to come back to.</p></div><span class="heading-symbol">${icon("bookmark")}</span>`;
+    $("chapter-heading").innerHTML = `<div><h1>Saved verses</h1><p>A collection to come back to.</p></div>`;
     document.title = "Saved verses — The Quran";
   } else {
-    $("chapter-heading").innerHTML = `<div><span class="eyebrow">CHAPTER ${String(chapter.id).padStart(2, "0")} <span class="meta-dot">·</span> ${chapter.origin.toUpperCase()} <span class="meta-dot">·</span> ${chapter.verses} VERSES</span><h2>${chapter.name}</h2><p>${chapter.meaning}</p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
+    $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
     document.title = `${chapter.name} — The Quran`;
   }
   const jumpOptions = Array.from({ length: chapter.verses }, (_, index) => new Option(index + 1, index + 1));
@@ -135,6 +137,7 @@ function isBookmarked(chapter, verse) {
 }
 
 function renderVerses() {
+  ayahTouch = null;
   const data = cache.get(state.translation);
   if (!data) return;
   const query = $("verse-search").value.trim();
@@ -210,6 +213,8 @@ function renderVerses() {
   $("search-count").textContent = view === "read" && selection.ayah
     ? `${selection.index + 1} of ${selection.matches.length} matches`
     : `${selection.matches.length} ${selection.matches.length === 1 ? "verse" : "verses"}`;
+  $("active-search").hidden = !query;
+  $("active-search-label").textContent = query ? `Search: “${query}” · ${$("search-count").textContent}` : "";
   $("jump-control").hidden = view !== "read" || Boolean(query);
   renderPagination(selection);
 }
@@ -219,7 +224,7 @@ function renderPagination(selection) {
   const focusedDirection = document.activeElement?.getAttribute("data-direction");
   const searching = Boolean($("verse-search").value.trim());
   nav.hidden = view !== "read" || !selection.ayah;
-  $("keyboard-hint").hidden = nav.hidden;
+  $("navigation-hint").hidden = nav.hidden;
   nav.replaceChildren();
   if (nav.hidden) return;
   for (const direction of [-1, 1]) {
@@ -231,11 +236,10 @@ function renderPagination(selection) {
     button.disabled = !target;
     button.dataset.direction = direction;
     button.setAttribute("aria-label", direction === -1 ? "Previous ayah" : "Next ayah");
-    const label = searching ? "MATCH" : target && target.chapter !== state.position.chapter ? "CHAPTER" : "AYAH";
     const title = target
       ? target.chapter !== state.position.chapter ? chapters[target.chapter - 1].name : direction === -1 ? "Back" : "Continue"
       : searching ? "No more matches" : direction === -1 ? "The beginning" : "The final ayah";
-    button.innerHTML = `${icon(direction === -1 ? "left" : "right")}<span><span>${direction === -1 ? "PREVIOUS" : "NEXT"} ${label}</span><strong>${title}</strong></span>`;
+    button.innerHTML = `${icon(direction === -1 ? "left" : "right")}<strong>${title}</strong>`;
     nav.append(button);
     if (direction === -1) {
       const position = document.createElement("span");
@@ -252,6 +256,7 @@ function renderPagination(selection) {
 }
 
 async function loadReading({ scroll = false } = {}) {
+  ayahTouch = null;
   const request = ++requestId;
   loading = true;
   updateTabs();
@@ -259,7 +264,8 @@ async function loadReading({ scroll = false } = {}) {
   renderHeading();
   $("ayah-navigation").hidden = true;
   $("ayah-status").hidden = true;
-  $("keyboard-hint").hidden = true;
+  $("active-search").hidden = true;
+  $("navigation-hint").hidden = true;
   $("chapter-progress").hidden = true;
   $("reading-content").setAttribute("aria-busy", "true");
   $("reading-content").innerHTML = '<div class="loading-state"><span class="loading-dot"></span>Opening the words…</div>';
@@ -326,6 +332,7 @@ function navigate(chapter, verse = 1) {
   savePosition({ chapter, verse });
   view = "read";
   $("verse-search").value = "";
+  $("reading-controls").open = false;
   closeMenu();
   loadReading({ scroll: true });
 }
@@ -338,10 +345,48 @@ $("ayah-navigation").addEventListener("click", event => {
   const button = event.target.closest("[data-direction]");
   if (button) moveAyah(Number(button.dataset.direction));
 });
+$("reading-content").addEventListener("touchstart", event => {
+  ayahTouch = null;
+  if (event.touches.length !== 1 || loading || view !== "read" || $("ayah-navigation").hidden ||
+    $("sidebar").classList.contains("is-open") || window.getSelection()?.isCollapsed === false ||
+    event.target.closest("a, button, input, select, textarea, [contenteditable]")) return;
+  const touch = event.touches[0];
+  ayahTouch = { id: touch.identifier, x: touch.clientX, y: touch.clientY };
+}, { passive: true });
+$("reading-content").addEventListener("touchmove", event => {
+  if (!ayahTouch) return;
+  const touch = event.touches[0];
+  if (event.touches.length !== 1 || touch.identifier !== ayahTouch.id) {
+    ayahTouch = null;
+    return;
+  }
+  const deltaX = Math.abs(touch.clientX - ayahTouch.x);
+  const deltaY = Math.abs(touch.clientY - ayahTouch.y);
+  // Once a gesture becomes a vertical scroll, it must not turn the page.
+  if (deltaY > 10 && deltaY >= deltaX) ayahTouch = null;
+}, { passive: true });
+$("reading-content").addEventListener("touchend", event => {
+  const start = ayahTouch;
+  ayahTouch = null;
+  if (!start || event.touches.length || loading || view !== "read" ||
+    $("sidebar").classList.contains("is-open") || window.getSelection()?.isCollapsed === false) return;
+  const touch = Array.from(event.changedTouches).find(item => item.identifier === start.id);
+  if (!touch) return;
+  const direction = swipeDirection(touch.clientX - start.x, touch.clientY - start.y);
+  if (direction) moveAyah(direction);
+}, { passive: true });
+$("reading-content").addEventListener("touchcancel", () => { ayahTouch = null; }, { passive: true });
 $("chapter-search").addEventListener("input", renderChapters);
 $("verse-search").addEventListener("input", () => { if (!loading) renderVerses(); });
+$("clear-search").addEventListener("click", () => {
+  $("verse-search").value = "";
+  if (!loading) renderVerses();
+  $("reading-controls").querySelector("summary").focus({ preventScroll: true });
+});
 $("verse-jump").addEventListener("change", () => {
+  $("reading-controls").open = false;
   showAyah({ chapter: state.position.chapter, verse: Number($("verse-jump").value) });
+  $("reading-controls").querySelector("summary").focus({ preventScroll: true });
 });
 $("translation").addEventListener("change", () => {
   state.translation = $("translation").value;
@@ -376,6 +421,7 @@ for (const [id, value] of [["read-tab", "read"], ["saved-tab", "saved"]]) {
     if (view === value) return;
     view = value;
     $("verse-search").value = "";
+    $("reading-controls").open = false;
     loadReading({ scroll: true });
   });
 }
@@ -414,6 +460,9 @@ document.addEventListener("keydown", event => {
     if (event.target instanceof HTMLInputElement && event.target.value) {
       event.target.value = "";
       event.target.dispatchEvent(new Event("input"));
+    } else if ($("reading-controls").open) {
+      $("reading-controls").open = false;
+      $("reading-controls").querySelector("summary").focus({ preventScroll: true });
     }
   }
   if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey &&

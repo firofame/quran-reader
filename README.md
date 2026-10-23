@@ -30,8 +30,11 @@ because browsers restrict fetching local translation files.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - On touchscreens, swipe left over the verse to continue or right to go back.
-  Each successful swipe turns the ayah like a book page, in the swipe direction.
-  The animation is skipped when your device requests reduced motion.
+  The page follows your finger with a live preview and shading; release a short
+  drag to let it settle back without navigating. With a mouse, drag the page
+  margins or the space above or below the text, leaving text selection available.
+  Buttons and arrow keys use the same directional book-page animation.
+  All page animation is skipped when your device requests reduced motion.
   Swipes follow search matches when searching, just like the navigation buttons.
   Vertical scrolling, pinch-to-zoom, text selection, and bookmark taps remain
   available; swiping does not navigate in **Saved**.

@@ -32,7 +32,7 @@ function markerNumberAt(markers, position) {
 
 export function getVerseMetadata(position, data) {
   const hizbQuarter = markerNumberAt(data.HizbQaurter, position);
-  const sajda = data.Sajda.find(([chapter, verse]) =>
+  const sajda = data.Sajda.some(([chapter, verse]) =>
     chapter === position.chapter && verse === position.verse);
   return {
     page: markerNumberAt(data.Page, position),
@@ -40,7 +40,7 @@ export function getVerseMetadata(position, data) {
     manzil: markerNumberAt(data.Manzil, position),
     hizb: hizbQuarter === null ? null : Math.floor((hizbQuarter - 1) / 4) + 1,
     juz: markerNumberAt(data.Juz, position),
-    sajda: sajda ? { type: sajda[2] } : null,
+    sajda,
   };
 }
 

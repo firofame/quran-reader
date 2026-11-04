@@ -19,7 +19,7 @@ test("metadata contains exactly 114 chapters and 6,236 verses", () => {
 test("verse metadata follows page, ruku, manzil, hizb, juz, and sajda boundaries", () => {
   const data = context.QuranData;
   assert.deepEqual(getVerseMetadata({ chapter: 1, verse: 1 }, data), {
-    page: 1, ruku: 1, manzil: 1, hizb: 1, juz: 1, sajda: null,
+    page: 1, ruku: 1, manzil: 1, hizb: 1, juz: 1, sajda: false,
   });
   const pageStart = getVerseMetadata({ chapter: 2, verse: 1 }, data);
   assert.equal(pageStart.page, 2);
@@ -29,9 +29,9 @@ test("verse metadata follows page, ruku, manzil, hizb, juz, and sajda boundaries
   const juzStart = getVerseMetadata({ chapter: 2, verse: 142 }, data);
   assert.equal(juzStart.hizb, 3);
   assert.equal(juzStart.juz, 2);
-  assert.equal(getVerseMetadata({ chapter: 7, verse: 206 }, data).sajda.type, "recommended");
-  assert.equal(getVerseMetadata({ chapter: 32, verse: 15 }, data).sajda.type, "obligatory");
-  assert.equal(getVerseMetadata({ chapter: 32, verse: 14 }, data).sajda, null);
+  assert.equal(getVerseMetadata({ chapter: 7, verse: 206 }, data).sajda, true);
+  assert.equal(getVerseMetadata({ chapter: 32, verse: 15 }, data).sajda, true);
+  assert.equal(getVerseMetadata({ chapter: 32, verse: 14 }, data).sajda, false);
 });
 
 test("translation options match the supported English and Malayalam translations", async () => {

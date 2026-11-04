@@ -246,7 +246,7 @@ function renderReadingMetadata(verse) {
     symbol.setAttribute("aria-hidden", "true");
     symbol.textContent = "۩";
     const label = document.createElement("span");
-    label.textContent = `Sajda · ${metadata.sajda.type}`;
+    label.textContent = "Sajda";
     item.append(symbol, label);
     container.append(item);
   }

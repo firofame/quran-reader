@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, parseTranslation, parseHash, selectAyah, adjacentPosition, swipeDirection, matchesChapter, decodeState } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, parseTranslation, parseHash, selectAyah, adjacentPosition, swipeDirection, matchesChapter, decodeState } from "./reader.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -133,6 +133,8 @@ function updateTabs() {
 }
 
 function renderHeading() {
+  $("reading-metadata").hidden = true;
+  $("reading-metadata").replaceChildren();
   const chapter = chapters[state.position.chapter - 1];
   if (view === "saved") {
     $("chapter-heading").innerHTML = `<div><h1>Saved verses</h1><p>A collection to come back to.</p></div>`;
@@ -173,6 +175,7 @@ function renderVerses() {
   const selection = selectAyah(verses, state.position.verse, query);
   const filtered = view === "read" ? (selection.ayah ? [selection.ayah] : []) : selection.matches;
   const chapter = chapters[state.position.chapter - 1];
+  renderReadingMetadata(view === "read" ? selection.ayah : null);
   if (view === "read" && selection.ayah) {
     if (state.position.verse !== selection.ayah.verse) {
       savePosition({ chapter: chapter.id, verse: selection.ayah.verse });
@@ -205,6 +208,49 @@ function renderVerses() {
   $("active-search-label").textContent = query ? `Search: “${query}” · ${$("search-count").textContent}` : "";
   $("jump-control").hidden = view !== "read" || Boolean(query);
   renderPagination(selection);
+}
+
+function renderReadingMetadata(verse) {
+  const container = $("reading-metadata");
+  container.replaceChildren();
+  if (view !== "read" || !verse) {
+    container.hidden = true;
+    return;
+  }
+
+  const metadata = getVerseMetadata(verse, globalThis.QuranData);
+  for (const [label, value] of [
+    ["Page", metadata.page],
+    ["Ruku", metadata.ruku],
+    ["Manzil", metadata.manzil],
+    ["Hizb", metadata.hizb],
+    ["Juz", metadata.juz],
+  ]) {
+    if (value === null) continue;
+    const item = document.createElement("span");
+    item.className = "reading-metadata-item";
+    const name = document.createElement("span");
+    name.className = "reading-metadata-label";
+    name.textContent = label;
+    const number = document.createElement("span");
+    number.className = "reading-metadata-value";
+    number.textContent = value;
+    item.append(name, number);
+    container.append(item);
+  }
+  if (metadata.sajda) {
+    const item = document.createElement("span");
+    item.className = "sajda-indicator";
+    const symbol = document.createElement("span");
+    symbol.className = "sajda-symbol";
+    symbol.setAttribute("aria-hidden", "true");
+    symbol.textContent = "۩";
+    const label = document.createElement("span");
+    label.textContent = "Sajda";
+    item.append(symbol, label);
+    container.append(item);
+  }
+  container.hidden = false;
 }
 
 function createVerse(verse) {

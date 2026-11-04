@@ -27,6 +27,8 @@ because browsers restrict fetching local translation files.
   without clipping or shrinking the text. Source credits sit below the reader.
 - Browse or search all 114 chapters by name, meaning, Arabic name, or number.
 - Read the supplied Saheeh International or Malayalam translation.
+- See the current ayah's page, ruku, manzil, hizb, and juz; sajda ayahs carry a
+  subtle ۩ marker.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - On touchscreens, swipe left over the verse to continue or right to go back.

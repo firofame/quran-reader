@@ -19,6 +19,31 @@ export function createChapters(rows) {
   }));
 }
 
+function markerNumberAt(markers, position) {
+  let number = null;
+  for (let index = 1; index < markers.length; index++) {
+    const [chapter, verse] = markers[index];
+    if (chapter < position.chapter || (chapter === position.chapter && verse <= position.verse)) {
+      number = index;
+    }
+  }
+  return number;
+}
+
+export function getVerseMetadata(position, data) {
+  const hizbQuarter = markerNumberAt(data.HizbQaurter, position);
+  const sajda = data.Sajda.find(([chapter, verse]) =>
+    chapter === position.chapter && verse === position.verse);
+  return {
+    page: markerNumberAt(data.Page, position),
+    ruku: markerNumberAt(data.Ruku, position),
+    manzil: markerNumberAt(data.Manzil, position),
+    hizb: hizbQuarter === null ? null : Math.floor((hizbQuarter - 1) / 4) + 1,
+    juz: markerNumberAt(data.Juz, position),
+    sajda: sajda ? { type: sajda[2] } : null,
+  };
+}
+
 export function validPosition(position, chapters) {
   if (!position || !Number.isInteger(position.chapter) || !Number.isInteger(position.verse)) return false;
   const chapter = chapters[position.chapter - 1];

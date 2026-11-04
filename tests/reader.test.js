@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
-import { TRANSLATIONS, createChapters, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition, swipeDirection } from "../reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition, swipeDirection } from "../reader.js";
 import { createReaderServer } from "../server.js";
 
 const context = vm.createContext({});
@@ -14,6 +14,24 @@ test("metadata contains exactly 114 chapters and 6,236 verses", () => {
   assert.equal(chapters.reduce((total, chapter) => total + chapter.verses, 0), 6236);
   assert.equal(chapters[0].name, "Al-Faatiha");
   assert.equal(chapters[113].verses, 6);
+});
+
+test("verse metadata follows page, ruku, manzil, hizb, juz, and sajda boundaries", () => {
+  const data = context.QuranData;
+  assert.deepEqual(getVerseMetadata({ chapter: 1, verse: 1 }, data), {
+    page: 1, ruku: 1, manzil: 1, hizb: 1, juz: 1, sajda: null,
+  });
+  const pageStart = getVerseMetadata({ chapter: 2, verse: 1 }, data);
+  assert.equal(pageStart.page, 2);
+  assert.equal(pageStart.ruku, 2);
+  assert.equal(pageStart.hizb, 1);
+  assert.equal(pageStart.juz, 1);
+  const juzStart = getVerseMetadata({ chapter: 2, verse: 142 }, data);
+  assert.equal(juzStart.hizb, 3);
+  assert.equal(juzStart.juz, 2);
+  assert.equal(getVerseMetadata({ chapter: 7, verse: 206 }, data).sajda.type, "recommended");
+  assert.equal(getVerseMetadata({ chapter: 32, verse: 15 }, data).sajda.type, "obligatory");
+  assert.equal(getVerseMetadata({ chapter: 32, verse: 14 }, data).sajda, null);
 });
 
 test("translation options match the supported English and Malayalam translations", async () => {

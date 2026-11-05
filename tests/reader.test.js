@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { TRANSLATIONS, createChapters, getVerseMetadata, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition, swipeDirection } from "../reader.js";
+import { reduceReaderState } from "../reader-state.js";
+import { createPreferencesStore, PREFERENCES_KEY } from "../preferences-store.js";
+import { createTranslationRepository } from "../translation-repository.js";
 import { createReaderServer } from "../server.js";
 
 const context = vm.createContext({});
@@ -172,12 +175,99 @@ test("new and removed translation preferences use Saheeh International without l
   }
 });
 
+test("reader state changes are validated, immutable, and bounded", () => {
+  const initial = decodeState(null, chapters);
+  const positioned = reduceReaderState(initial, {
+    type: "position/set",
+    position: { chapter: 2, verse: 255 },
+  }, chapters);
+  assert.deepEqual(initial.position, { chapter: 1, verse: 1 });
+  assert.deepEqual(positioned.position, { chapter: 2, verse: 255 });
+
+  const translated = reduceReaderState(positioned, {
+    type: "translation/set",
+    translation: "ml.abdulhameed",
+  }, chapters);
+  const bookmarked = reduceReaderState(translated, {
+    type: "bookmark/toggle",
+    position: { chapter: 2, verse: 255 },
+  }, chapters);
+  assert.equal(bookmarked.translation, "ml.abdulhameed");
+  assert.deepEqual(bookmarked.bookmarks, [{ chapter: 2, verse: 255 }]);
+  assert.deepEqual(
+    reduceReaderState(bookmarked, { type: "bookmark/toggle", position: { chapter: 2, verse: 255 } }, chapters).bookmarks,
+    [],
+  );
+  assert.equal(reduceReaderState(bookmarked, { type: "font-size/adjust", delta: 20 }, chapters).fontSize, 29);
+  assert.equal(reduceReaderState(initial, { type: "font-size/adjust", delta: -20 }, chapters).fontSize, 17);
+  assert.equal(reduceReaderState(initial, { type: "theme/toggle" }, chapters).theme, "dark");
+  assert.throws(() => reduceReaderState(initial, { type: "position/set", position: { chapter: 1, verse: 8 } }, chapters), /invalid ayah/);
+  assert.throws(() => reduceReaderState(initial, { type: "translation/set", translation: "missing" }, chapters), /unsupported/);
+  assert.throws(() => reduceReaderState(initial, { type: "font-size/adjust", delta: 1.5 }, chapters), /integer/);
+  assert.throws(() => reduceReaderState(initial, { type: "unknown" }, chapters), /Unknown reader state action/);
+});
+
+test("preference storage keeps the existing key and propagates storage failures", () => {
+  const values = new Map();
+  const storage = {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  const preferences = createPreferencesStore(storage, chapters);
+  assert.equal(preferences.load().translation, "en.sahih");
+  const saved = {
+    ...decodeState(null, chapters),
+    position: { chapter: 2, verse: 255 },
+    bookmarks: [{ chapter: 1, verse: 2 }],
+  };
+  preferences.save(saved);
+  assert.equal(values.has("quran-reader:v1"), true);
+  assert.equal(PREFERENCES_KEY, "quran-reader:v1");
+  assert.deepEqual(preferences.load(), saved);
+  assert.throws(() => createPreferencesStore({ getItem() { throw new Error("Storage unavailable."); } }, chapters).load(), /Storage unavailable/);
+});
+
+test("translation repository caches successful loads and shares concurrent requests", async () => {
+  const source = await readFile(new URL("../en.sahih.txt", import.meta.url), "utf8");
+  let requests = 0;
+  const repository = createTranslationRepository(async file => {
+    requests++;
+    assert.equal(file, "en.sahih.txt");
+    await Promise.resolve();
+    return { ok: true, status: 200, text: async () => source };
+  });
+  const [first, second] = await Promise.all([
+    repository.load("en.sahih", chapters),
+    repository.load("en.sahih", chapters),
+  ]);
+  assert.strictEqual(first, second);
+  assert.strictEqual(repository.getLoaded("en.sahih"), first);
+  assert.equal(requests, 1);
+  assert.equal((await repository.load("en.sahih", chapters)), first);
+  assert.equal(requests, 1);
+  await assert.rejects(repository.load("missing", chapters), /Unknown translation/);
+});
+
+test("translation repository reports failed requests and retries them", async () => {
+  const source = await readFile(new URL("../en.sahih.txt", import.meta.url), "utf8");
+  let requests = 0;
+  const repository = createTranslationRepository(async () => {
+    requests++;
+    if (requests === 1) return { ok: false, status: 503 };
+    return { ok: true, status: 200, text: async () => source };
+  });
+  await assert.rejects(repository.load("en.sahih", chapters), /503/);
+  assert.equal(repository.getLoaded("en.sahih"), undefined);
+  assert.equal((await repository.load("en.sahih", chapters)).flat().length, 6236);
+  assert.equal(requests, 2);
+});
+
 test("static server serves local assets and rejects unlisted paths and methods", async t => {
   const server = createReaderServer();
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
   const base = `http://127.0.0.1:${server.address().port}`;
-  for (const path of ["/", "/app.js", "/reader.js", "/styles.css", "/quran-data.js", "/favicon.svg", ...Object.values(TRANSLATIONS).map(item => `/${item.file}`)]) {
+  for (const path of ["/", "/app.js", "/reader.js", "/reader-state.js", "/preferences-store.js", "/translation-repository.js", "/styles.css", "/quran-data.js", "/favicon.svg", ...Object.values(TRANSLATIONS).map(item => `/${item.file}`)]) {
     const response = await fetch(`${base}${path}`);
     assert.equal(response.status, 200, path);
     assert.ok((await response.text()).length > 0, path);

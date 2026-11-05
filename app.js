@@ -1,4 +1,7 @@
-import { TRANSLATIONS, createChapters, getVerseMetadata, parseTranslation, parseHash, selectAyah, adjacentPosition, swipeDirection, matchesChapter, decodeState } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, parseHash, selectAyah, adjacentPosition, swipeDirection, matchesChapter, decodeState } from "./reader.js";
+import { reduceReaderState } from "./reader-state.js";
+import { createPreferencesStore } from "./preferences-store.js";
+import { createTranslationRepository } from "./translation-repository.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -18,8 +21,11 @@ const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 document.querySelectorAll("[data-icon]").forEach(element => { element.innerHTML = icon(element.dataset.icon); });
 
 const chapters = createChapters(globalThis.QuranData.Sura);
-const cache = new Map();
-const storageKey = "quran-reader:v1";
+const preferences = createPreferencesStore({
+  getItem: key => globalThis.localStorage.getItem(key),
+  setItem: (key, value) => globalThis.localStorage.setItem(key, value),
+}, chapters);
+const translations = createTranslationRepository();
 let state;
 let view = "read";
 let requestId = 0;
@@ -66,7 +72,7 @@ function notify(message, persistent = false) {
 }
 
 try {
-  state = decodeState(localStorage.getItem(storageKey), chapters);
+  state = preferences.load();
 } catch (error) {
   console.error("Unable to read saved Quran reader preferences:", error);
   state = decodeState(null, chapters);
@@ -75,7 +81,7 @@ try {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify(state));
+    preferences.save(state);
   } catch (error) {
     if (!storageFailed) {
       console.error("Unable to save Quran reader preferences:", error);
@@ -85,8 +91,13 @@ function persist() {
   }
 }
 
+function dispatch(action) {
+  state = reduceReaderState(state, action, chapters);
+  persist();
+}
+
 const initialPosition = parseHash(location.hash, chapters);
-if (initialPosition) state.position = initialPosition;
+if (initialPosition) state = reduceReaderState(state, { type: "position/set", position: initialPosition }, chapters);
 else if (location.hash && location.hash !== "#main") notify("That verse link isn't valid. Your last reading position has been opened.");
 
 function applyPreferences() {
@@ -166,7 +177,7 @@ function isBookmarked(chapter, verse) {
 
 function renderVerses() {
   cancelAyahDrag();
-  const data = cache.get(state.translation);
+  const data = translations.getLoaded(state.translation);
   if (!data) return;
   const query = $("verse-search").value.trim();
   const verses = view === "read"
@@ -177,9 +188,6 @@ function renderVerses() {
   const chapter = chapters[state.position.chapter - 1];
   renderReadingMetadata(view === "read" ? selection.ayah : null);
   if (view === "read" && selection.ayah) {
-    if (state.position.verse !== selection.ayah.verse) {
-      savePosition({ chapter: chapter.id, verse: selection.ayah.verse });
-    }
     $("verse-jump").value = state.position.verse;
     document.title = `${chapter.name} ${chapter.id}:${state.position.verse} — The Quran`;
   }
@@ -346,14 +354,10 @@ async function loadReading({ scroll = false } = {}) {
   if (scroll) window.scrollTo({ top: 0, behavior: "instant" });
   try {
     const translationId = state.translation;
-    if (!cache.has(translationId)) {
-      const response = await fetch(TRANSLATIONS[translationId].file);
-      if (!response.ok) throw new Error(`Translation request failed (${response.status}).`);
-      const data = parseTranslation(await response.text(), chapters);
-      cache.set(translationId, data);
-    }
+    const data = await translations.load(translationId, chapters);
     if (request !== requestId) return;
     loading = false;
+    synchronizeSearchPosition(data);
     renderVerses();
   } catch (error) {
     if (request !== requestId) return;
@@ -366,9 +370,19 @@ async function loadReading({ scroll = false } = {}) {
 }
 
 function savePosition(position) {
-  state.position = { chapter: position.chapter, verse: position.verse };
+  state = reduceReaderState(state, { type: "position/set", position }, chapters);
   history.replaceState(null, "", `#${position.chapter}:${position.verse}`);
   persist();
+}
+
+function synchronizeSearchPosition(data) {
+  if (view !== "read") return;
+  const query = $("verse-search").value.trim();
+  if (!query) return;
+  const selection = selectAyah(data[state.position.chapter - 1], state.position.verse, query);
+  if (selection.ayah && selection.ayah.verse !== state.position.verse) {
+    savePosition({ chapter: state.position.chapter, verse: selection.ayah.verse });
+  }
 }
 
 function showAyah(position) {
@@ -383,7 +397,7 @@ function showAyah(position) {
 
 function ayahTarget(direction) {
   if (loading || view !== "read") return null;
-  const data = cache.get(state.translation);
+  const data = translations.getLoaded(state.translation);
   if (!data) return null;
   const query = $("verse-search").value.trim();
   const selection = selectAyah(data[state.position.chapter - 1], state.position.verse, query);
@@ -405,7 +419,7 @@ function beginPageTurn(direction, target) {
   sheet.append(previous, shade);
   const preview = document.createElement("div");
   preview.className = "page-preview";
-  const next = createVerse(cache.get(state.translation)[target.chapter - 1][target.verse - 1]);
+  const next = createVerse(translations.getLoaded(state.translation)[target.chapter - 1][target.verse - 1]);
   next.removeAttribute("id");
   preview.append(next);
   for (const layer of [sheet, preview]) {
@@ -567,7 +581,12 @@ $("reading-content").addEventListener("lostpointercapture", event => {
 window.addEventListener("blur", interruptPageTurn);
 window.addEventListener("resize", interruptPageTurn);
 $("chapter-search").addEventListener("input", renderChapters);
-$("verse-search").addEventListener("input", () => { if (!loading) renderVerses(); });
+$("verse-search").addEventListener("input", () => {
+  if (loading) return;
+  const data = translations.getLoaded(state.translation);
+  if (data) synchronizeSearchPosition(data);
+  renderVerses();
+});
 $("clear-search").addEventListener("click", () => {
   $("verse-search").value = "";
   if (!loading) renderVerses();
@@ -579,8 +598,7 @@ $("verse-jump").addEventListener("change", () => {
   $("reading-controls").querySelector("summary").focus({ preventScroll: true });
 });
 $("translation").addEventListener("change", () => {
-  state.translation = $("translation").value;
-  persist();
+  dispatch({ type: "translation/set", translation: $("translation").value });
   loadReading();
 });
 $("reading-content").addEventListener("click", event => {
@@ -593,9 +611,7 @@ $("reading-content").addEventListener("click", event => {
   if (!button) return;
   const [chapter, verse] = button.dataset.bookmark.split(":").map(Number);
   const saved = isBookmarked(chapter, verse);
-  if (saved) state.bookmarks = state.bookmarks.filter(item => item.chapter !== chapter || item.verse !== verse);
-  else state.bookmarks.push({ chapter, verse });
-  persist();
+  dispatch({ type: "bookmark/toggle", position: { chapter, verse } });
   updateTabs();
   if (view === "saved") renderVerses();
   else {
@@ -617,15 +633,13 @@ for (const [id, value] of [["read-tab", "read"], ["saved-tab", "saved"]]) {
 }
 for (const [id, increment] of [["font-down", -2], ["font-up", 2]]) {
   $(id).addEventListener("click", () => {
-    state.fontSize = Math.max(17, Math.min(29, state.fontSize + increment));
+    dispatch({ type: "font-size/adjust", delta: increment });
     applyPreferences();
-    persist();
   });
 }
 $("theme-toggle").addEventListener("click", () => {
-  state.theme = state.theme === "light" ? "dark" : "light";
+  dispatch({ type: "theme/toggle" });
   applyPreferences();
-  persist();
 });
 $("open-menu").addEventListener("click", () => {
   $("sidebar").classList.add("is-open");

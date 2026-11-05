@@ -55,12 +55,23 @@ Translations are loaded from the supplied local files and retained in memory
 while the page is open. There are no external API calls. This is a translation
 reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
 
+## Architecture
+
+The app remains a dependency-free static site. `reader.js` contains pure Quran
+data, parsing, search, and navigation logic. `reader-state.js` owns validated
+state transitions; `preferences-store.js` isolates browser persistence; and
+`translation-repository.js` loads, validates, and caches translation data.
+`app.js` connects those modules to the browser UI and interaction behavior.
+
 ## Validate
 
 ```sh
 npm run check
 npm test
 ```
+
+Pull requests targeting `main` run these checks automatically through the
+[validation workflow](.github/workflows/validate.yml).
 
 Tests verify all 6,236 verses in each translation, metadata alignment, malformed
 data handling, focused ayah selection, navigation across chapter boundaries,

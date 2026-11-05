@@ -70,6 +70,9 @@ npm run check
 npm test
 ```
 
+Pull requests targeting `main` run these checks automatically through the
+[validation workflow](.github/workflows/validate.yml).
+
 Tests verify all 6,236 verses in each translation, metadata alignment, malformed
 data handling, focused ayah selection, navigation across chapter boundaries,
 swipe thresholds and directions, search, deep links, saved preferences, and

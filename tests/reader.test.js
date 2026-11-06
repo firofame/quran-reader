@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
-import { TRANSLATIONS, createChapters, getVerseMetadata, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition, swipeDirection } from "../reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition, swipeDirection } from "../reader.js";
 import { reduceReaderState } from "../reader-state.js";
 import { createPreferencesStore, PREFERENCES_KEY } from "../preferences-store.js";
 import { createTranslationRepository } from "../translation-repository.js";
@@ -35,6 +35,44 @@ test("verse metadata follows page, ruku, manzil, hizb, juz, and sajda boundaries
   assert.equal(getVerseMetadata({ chapter: 7, verse: 206 }, data).sajda, true);
   assert.equal(getVerseMetadata({ chapter: 32, verse: 15 }, data).sajda, true);
   assert.equal(getVerseMetadata({ chapter: 32, verse: 14 }, data).sajda, false);
+});
+
+test("ruku progress fills within each ruku and resets across ruku and chapter boundaries", () => {
+  const data = context.QuranData;
+  for (const [chapter, verse, value, max] of [
+    [1, 1, 1, 7], [1, 7, 7, 7],
+    [2, 1, 1, 7], [2, 7, 7, 7], [2, 8, 1, 13],
+    [2, 14, 7, 13], [2, 20, 13, 13], [2, 21, 1, 9],
+    [2, 284, 1, 3], [2, 286, 3, 3], [3, 1, 1, 9],
+    [73, 20, 1, 1], [114, 1, 1, 6], [114, 6, 6, 6],
+  ]) {
+    assert.deepEqual(getRukuProgress({ chapter, verse }, data, chapters), { value, max }, `${chapter}:${verse}`);
+  }
+  assert.throws(() => getRukuProgress({ chapter: 1, verse: 8 }, data, chapters), /invalid ayah/);
+  assert.throws(() => getRukuProgress({ chapter: 1, verse: 1 }, { Ruku: [[]] }, chapters), /metadata is missing/);
+});
+
+test("ruku progress covers all 6,236 ayahs with the correct ruku length", () => {
+  const data = context.QuranData;
+  let position = { chapter: 1, verse: 1 };
+  let count = 0;
+  for (let ruku = 1; ruku < data.Ruku.length; ruku++) {
+    const [chapter, verse] = data.Ruku[ruku];
+    assert.deepEqual(position, { chapter, verse });
+    const next = data.Ruku[ruku + 1];
+    const lastChapter = chapters.at(-1);
+    const end = next
+      ? chapters[next[0] - 1].start + next[1] - 1
+      : lastChapter.start + lastChapter.verses;
+    const length = end - (chapters[chapter - 1].start + verse - 1);
+    for (let value = 1; value <= length; value++) {
+      assert.deepEqual(getRukuProgress(position, data, chapters), { value, max: length }, `${position.chapter}:${position.verse}`);
+      position = adjacentPosition(position, 1, chapters);
+      count++;
+    }
+  }
+  assert.equal(count, 6236);
+  assert.equal(position, null);
 });
 
 test("translation options match the supported English and Malayalam translations", async () => {

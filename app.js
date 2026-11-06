@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, getVerseMetadata, parseHash, selectAyah, adjacentPosition, swipeDirection, matchesChapter, decodeState } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, selectAyah, adjacentPosition, swipeDirection, matchesChapter, decodeState } from "./reader.js";
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
@@ -195,9 +195,13 @@ function renderVerses() {
   $("reading-content").setAttribute("aria-live", view === "read" ? "polite" : "off");
   $("ayah-status").hidden = view !== "read" || !selection.ayah;
   $("ayah-status").textContent = `AYAH ${state.position.verse} OF ${chapter.verses}`;
-  $("chapter-progress").hidden = view !== "read" || !selection.ayah;
-  $("chapter-progress").max = chapter.verses;
-  $("chapter-progress").value = state.position.verse;
+  $("ruku-progress").hidden = view !== "read" || !selection.ayah;
+  if (view === "read" && selection.ayah) {
+    const progress = getRukuProgress(selection.ayah, globalThis.QuranData, chapters);
+    $("ruku-progress").max = progress.max;
+    $("ruku-progress").value = progress.value;
+    $("ruku-progress").setAttribute("aria-valuetext", `Ayah ${progress.value} of ${progress.max} in this ruku`);
+  }
   const fragment = document.createDocumentFragment();
   if (!filtered.length) {
     const empty = document.createElement("div");
@@ -348,7 +352,7 @@ async function loadReading({ scroll = false } = {}) {
   $("ayah-status").hidden = true;
   $("active-search").hidden = true;
   $("navigation-hint").hidden = true;
-  $("chapter-progress").hidden = true;
+  $("ruku-progress").hidden = true;
   $("reading-content").setAttribute("aria-busy", "true");
   $("reading-content").innerHTML = '<div class="loading-state"><span class="loading-dot"></span>Opening the words…</div>';
   if (scroll) window.scrollTo({ top: 0, behavior: "instant" });

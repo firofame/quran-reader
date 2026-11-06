@@ -44,6 +44,25 @@ export function getVerseMetadata(position, data) {
   };
 }
 
+export function getRukuProgress(position, data, chapters) {
+  if (!validPosition(position, chapters)) {
+    throw new Error("Cannot calculate ruku progress for an invalid ayah.");
+  }
+  const ruku = markerNumberAt(data.Ruku, position);
+  if (ruku === null) throw new Error("Ruku metadata is missing for this ayah.");
+  const [startChapter, startVerse] = data.Ruku[ruku];
+  const start = chapters[startChapter - 1].start + startVerse - 1;
+  const next = data.Ruku[ruku + 1];
+  const lastChapter = chapters.at(-1);
+  const end = next
+    ? chapters[next[0] - 1].start + next[1] - 1
+    : lastChapter.start + lastChapter.verses;
+  return {
+    value: chapters[position.chapter - 1].start + position.verse - start,
+    max: end - start,
+  };
+}
+
 export function validPosition(position, chapters) {
   if (!position || !Number.isInteger(position.chapter) || !Number.isInteger(position.verse)) return false;
   const chapter = chapters[position.chapter - 1];

@@ -1,6 +1,6 @@
-# Quran Reader — Cross-Device Cloudflare Sync Worker
+# Quran Reader — Cross-Device Sync Worker
 
-A Cloudflare Worker paired with a SQLite-backed Durable Object providing strongly consistent, real-time synchronization of Quran reading progress across devices (such as desktop Opera on macOS and Opera on Android).
+A Cloudflare Worker paired with a SQLite-backed Durable Object provides strongly consistent, real-time synchronization of Quran reading progress across devices. The reader app is configured to use `https://quran.firofame.workers.dev`; readers do not need to deploy the Worker or enter its URL.
 
 ---
 
@@ -41,7 +41,87 @@ Workers KV is **eventually consistent**. Writes made from one location (e.g. mob
 
 ---
 
-## Deployment Steps
+## Maintainer Deployment (One Time)
+
+These steps are for the project maintainer. The reader app already points to the
+project's deployed Worker.
+
+The reader site's default address is `DEFAULT_SYNC_ENDPOINT` in
+[`../sync-client.js`](../sync-client.js). If the Worker is moved to a different
+Cloudflare account or hostname, update that constant before publishing the reader.
+
+### GitHub Actions
+
+The repository's `.github/workflows/deploy-worker.yml` deploys this Worker with
+Wrangler:
+
+- Changes to `worker/` merged into `main` deploy to production after syntax checks
+  and the full test suite. Manual production dispatch is restricted to `main`
+  once this workflow exists on the default branch.
+- Production reuses the existing `quran` Worker. If only `quran-reader-sync`
+  exists, it is renamed in place. The workflow never creates a replacement
+  Worker and verifies the immutable Worker ID and active Durable Object namespace
+  bindings before and after deployment.
+- A same-repository PR targeting `main` can deploy to production without merging
+  through the explicit maintainer opt-in below. Ordinary PR pushes deploy only
+  an isolated preview, even if the production label is still present.
+- Same-repository pull requests get an isolated Worker preview. The preview is
+  removed when the pull request closes, including its temporary Durable Object
+  storage. Fork pull requests do not get a Cloudflare preview.
+
+Add this value in the repository's **Settings → Secrets and variables → Actions**:
+
+- **Secret** `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with Workers edit
+  access in the account set in `wrangler.jsonc`. During a legacy rename, use
+  temporary account-scoped **Workers Scripts: Edit** access, or verified
+  individual-Worker edit access to the existing Worker's identity. A token
+  limited only to a future `quran` resource does not authorize editing an
+  existing `quran-reader-sync` resource.
+
+After migration and production verification succeed, reduce the token to the
+existing `quran` Worker's permissions where supported. When `quran` already
+exists, the workflow does not probe the legacy resource, so it does not require
+access to a different, retired Worker. The selected Worker is updated by its
+immutable ID, not deleted and recreated.
+
+The production workflow tests the actual Actions secret with an in-place name
+update (a same-name update when already migrated) and Wrangler deployment.
+Secret existence, a local login, and successful preview deployment do **not**
+prove these production permissions. HTTP authorization failures, name conflicts,
+unexpected API responses, or changed namespace identities stop the job explicitly.
+Do not paste deployment tokens into setup codes, source files, or workflow logs.
+
+### Explicit pre-merge production deployment
+
+1. Push the approved changes to the same-repository PR branch and wait for green
+   reader validation and the isolated preview on that exact head commit.
+2. A maintainer with repository **write**, **maintain**, or **admin** access creates
+   and applies the label `deploy-sync-production`. Applying the label is the
+   production authorization; users with only read or triage access cannot deploy.
+3. The production job checks out the exact PR head, checks both the label sender
+   and rerun actor's permissions, and runs all tests before production changes.
+   It rechecks that the PR is open, still targets `main`, retains the label, and
+   has the same head before the in-place update. Production jobs are serialized.
+4. The job verifies edit permissions and preserves the existing Worker, deploys,
+   and checks `/health` for `status: "ok"` and `service: "quran"`. It compares
+   Worker/namespace identity, reads a synthetic private sync canary written before
+   deployment, checks the new API's read/write payload, and confirms a different
+   fresh key has no state. The pre-deployment canary includes an empty legacy
+   bookmarks field for older Workers; normal reader requests do not include it.
+   Canary keys are
+   masked in logs and the runner's private state file is removed on completion.
+   These checks never use an existing reader's pairing key; the synthetic canary
+   leaves only its isolated sample state in the service.
+5. Confirm the deployed revision and verification results in the Actions job
+   summary, then remove the opt-in label. If the PR head changes, wait for green
+   checks and remove/reapply the label to authorize that new revision.
+
+This deploys the **Worker only**. It neither merges the PR nor publishes the reader
+site; GitHub Pages continues to publish through the normal `main` workflow.
+
+The Worker's optional `SYNC_SECRET` is for API authentication and is unrelated
+to deployment; leave it unset for normal per-device pairing. Wrangler's local
+`wrangler login` session also cannot authenticate a GitHub Actions runner.
 
 ### 1. Prerequisites
 - [Node.js](https://nodejs.org/) v20 or later.
@@ -68,12 +148,21 @@ the same sync space and generated per-device keys would not work.
 Deploy the Worker and create the SQLite Durable Object migration:
 
 ```bash
+cd ..
+npm run check
+npm test
+cd worker
+npm run check
 npx wrangler deploy
 ```
 
+If the legacy Worker still exists, migrate it in place with verified edit
+permissions before running a manual deploy; do not create a fresh `quran`
+Worker and assume its Durable Object data will be shared.
+
 Wrangler will output your public Worker URL, for example:
 ```
-https://quran-reader-sync.<your-subdomain>.workers.dev
+https://quran.firofame.workers.dev
 ```
 
 ### 5. Local Development (Optional)
@@ -88,21 +177,20 @@ Local URL will typically be `http://localhost:8787`.
 
 ## Connecting Devices in the Quran Reader App
 
-1. Open your Quran Reader in the browser (e.g., Mac Mini Opera).
-2. Tap **Controls** in the header.
-3. On the first device, in the **Cross-device sync** panel:
-   - **Worker URL**: Enter your deployed Worker URL (e.g. `https://quran-reader-sync.<subdomain>.workers.dev`).
-   - **Pairing key**: Click **Generate key**, then **Copy key**. The key is generated with the browser's cryptographic random-number generator; keep it private.
-   - Click **Save & connect**.
-4. Nothing is sent to Cloudflare before **Save & connect**. After connecting, the reader sends reading position and the selected translation identifier to this Worker; translation text stays local. Sync then runs automatically.
-5. On each additional device (e.g., Android Opera):
-   - Open Quran Reader -> **Controls** -> **Cross-device sync**.
-   - Enter the exact same **Worker URL** and paste the copied **Pairing key**.
-   - Click **Save & connect**.
-   - The device pulls the current state and joins automatic sync.
+1. On the first device, open **Controls** → **Cross-device sync** and choose
+   **Start syncing**.
+2. Choose **Copy setup code** and keep it private.
+3. On each additional device, paste the code under **Another device** and choose
+   **Join sync**.
 
-Anyone with the pairing key can read or change the corresponding sync space.
-Different random keys map to separate Durable Objects.
+The app creates a random private key and includes it with the service address in
+the setup code. Codes are Base64url-encoded, not encrypted, and are accepted only
+for `https://quran.firofame.workers.dev`. Anyone with the code can read or change
+that sync space. Different random keys map to separate Durable Objects.
+
+Saved sync configurations for other services are cleared before startup sync;
+local reading progress and preferences are preserved. Those devices must choose
+**Start syncing** or rejoin with a valid project-service setup code.
 
 ---
 
@@ -150,4 +238,4 @@ Updates reading progress.
   block updates.
 
 ### `GET /health`
-Health check endpoint returning `{ "status": "ok", "service": "quran-reader-sync" }`.
+Health check endpoint returning `{ "status": "ok", "service": "quran" }`.

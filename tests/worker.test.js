@@ -139,7 +139,7 @@ test("Worker fetch: responds to health check", async () => {
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.status, "ok");
-  assert.equal(body.service, "quran-reader-sync");
+  assert.equal(body.service, "quran");
 });
 
 test("Worker fetch: returns 404 for unknown endpoints", async () => {

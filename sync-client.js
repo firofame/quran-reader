@@ -1,4 +1,5 @@
 export const SYNC_STORAGE_KEY = "quran-reader:sync:v1";
+export const DEFAULT_SYNC_ENDPOINT = "https://quran.firofame.workers.dev";
 
 const DEFAULT_CONFIG = {
   explicitlyConfigured: false,
@@ -37,7 +38,7 @@ function positionsMatch(first, second) {
   );
 }
 
-export function loadSyncConfig(storage) {
+export function loadSyncConfig(storage, { onInvalidConfig = () => {} } = {}) {
   try {
     const raw = storage.getItem(SYNC_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_CONFIG };
@@ -47,8 +48,13 @@ export function loadSyncConfig(storage) {
       clearSyncConfig(storage);
       return { ...DEFAULT_CONFIG };
     }
-    const endpoint = typeof parsed.endpoint === "string" ? parsed.endpoint.trim() : "";
-    const syncKey = typeof parsed.syncKey === "string" ? parsed.syncKey.trim() : "";
+    const setup = normalizeSyncSetup(parsed.endpoint, parsed.syncKey);
+    if (!setup) {
+      clearSyncConfig(storage);
+      onInvalidConfig();
+      return { ...DEFAULT_CONFIG };
+    }
+    const { endpoint, syncKey } = setup;
     const config = {
       explicitlyConfigured: true,
       endpoint,
@@ -124,6 +130,61 @@ export function generateSyncKey() {
   return `quran-${hex.match(/.{8}/g).join("-")}`;
 }
 
+const SYNC_SETUP_CODE_PREFIX = "QRS1-";
+const MAX_SYNC_SETUP_CODE_LENGTH = 4096;
+
+function normalizeSyncSetup(endpoint, syncKey) {
+  const normalizedEndpoint = normalizeEndpoint(endpoint);
+  const normalizedKey = typeof syncKey === "string" ? syncKey.trim() : "";
+  if (
+    normalizedEndpoint !== DEFAULT_SYNC_ENDPOINT ||
+    !normalizedKey ||
+    normalizedKey.length > 512 ||
+    /[^\u0020-\u007e\u0080-\u00ff]/u.test(normalizedKey)
+  ) {
+    return null;
+  }
+  return { endpoint: normalizedEndpoint, syncKey: normalizedKey };
+}
+
+export function createSyncSetupCode(endpoint, syncKey) {
+  const setup = normalizeSyncSetup(endpoint, syncKey);
+  if (!setup) {
+    throw new Error("Sync setup must use the project's sync service and a valid private key.");
+  }
+
+  const payload = JSON.stringify({ version: 1, endpoint: setup.endpoint, key: setup.syncKey });
+  const bytes = new TextEncoder().encode(payload);
+  const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join("");
+  const encoded = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  const code = `${SYNC_SETUP_CODE_PREFIX}${encoded}`;
+  if (code.length > MAX_SYNC_SETUP_CODE_LENGTH) {
+    throw new Error("Sync setup code is too long.");
+  }
+  return code;
+}
+
+export function parseSyncSetupCode(rawCode) {
+  if (typeof rawCode !== "string" || rawCode.length > MAX_SYNC_SETUP_CODE_LENGTH) return null;
+  const code = rawCode.trim();
+  if (!code.startsWith(SYNC_SETUP_CODE_PREFIX)) return null;
+
+  try {
+    const encoded = code.slice(SYNC_SETUP_CODE_PREFIX.length);
+    if (!/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
+    const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.version !== 1) return null;
+    return normalizeSyncSetup(payload.endpoint, payload.key);
+  } catch (error) {
+    if (error instanceof SyntaxError || error instanceof TypeError || error instanceof DOMException) return null;
+    throw error;
+  }
+}
+
 export function createSyncClient({
   storage = globalThis.localStorage,
   fetch = globalThis.fetch?.bind(globalThis),
@@ -131,7 +192,12 @@ export function createSyncClient({
   onStatusChange = () => {},
   debounceMs = 1500,
 } = {}) {
-  let config = loadSyncConfig(storage);
+  let statusMessage = "";
+  let config = loadSyncConfig(storage, {
+    onInvalidConfig() {
+      statusMessage = "Your previous sync setup is no longer supported. Start syncing or join again. Your reading progress is saved locally.";
+    },
+  });
   if (config.lastPosition === undefined) {
     config.lastPosition = null;
   }
@@ -141,7 +207,6 @@ export function createSyncClient({
   }
 
   let status = isConfigured() ? "idle" : "unconfigured";
-  let statusMessage = "";
   let debounceTimer = null;
   let activePromise = null;
   let latestLocalState = null;
@@ -160,8 +225,16 @@ export function createSyncClient({
   }
 
   function updateConfig(newFields) {
-    const endpoint = newFields.endpoint !== undefined ? normalizeEndpoint(newFields.endpoint) : config.endpoint;
-    const syncKey = newFields.syncKey !== undefined ? newFields.syncKey.trim() : config.syncKey;
+    const setup = normalizeSyncSetup(
+      newFields.endpoint !== undefined ? newFields.endpoint : config.endpoint,
+      newFields.syncKey !== undefined ? newFields.syncKey : config.syncKey
+    );
+    if (!setup) {
+      const message = "Sync setup must use the project's sync service and a valid private key.";
+      notifyStatus("error", message);
+      throw new Error(message);
+    }
+    const { endpoint, syncKey } = setup;
     const pairingChanged = endpoint !== config.endpoint || syncKey !== config.syncKey;
     config = {
       ...config,
@@ -229,13 +302,13 @@ export function createSyncClient({
 
   function formatSyncError(statusCode, errText) {
     if (statusCode === 401) {
-      return "Incorrect pairing key or unauthorized.";
+      return "This setup code was not accepted.";
     }
     if (statusCode === 404) {
-      return "Worker endpoint not found. Check the URL.";
+      return "The sync service could not be found. Try again later.";
     }
     if (statusCode >= 500) {
-      return `Worker server error (${statusCode}).`;
+      return `Sync service error (${statusCode}).`;
     }
     try {
       const parsed = JSON.parse(errText);

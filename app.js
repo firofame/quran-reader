@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { createSyncClient, generateSyncKey, normalizeEndpoint } from "./sync-client.js";
+import { createSyncClient, createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "./sync-client.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -17,7 +17,6 @@ const icons = {
   right: '<path d="m10 6 6 6-6 6M16 12H4"/>',
   cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
   refresh: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/>',
-  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m11.5 11.5 8.5-8.5M16 7l2 2M18 5l2 2"/>',
 };
 const $ = id => document.getElementById(id);
 const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || ""}</svg>`;
@@ -506,26 +505,26 @@ matchMedia("(max-width: 760px)").addEventListener("change", closeMenu);
 function renderSyncUI(statusInfo = syncClient.getStatus()) {
   const badge = $("sync-badge");
   const quickBtn = $("sync-quick-btn");
-  const nowBtn = $("sync-now-btn");
   const disconnectBtn = $("sync-disconnect-btn");
   const message = $("sync-message");
-  const endpointInput = $("sync-endpoint");
-  const keyInput = $("sync-key");
-  const copyBtn = $("copy-sync-key");
+  const toggleBtn = $("sync-toggle-panel");
+  const details = $("sync-details");
+  const setupCodeOutput = $("sync-code-output");
+  const newForm = $("sync-new-form");
+  const joinForm = $("sync-join-form");
+  const codePanel = $("sync-code-panel");
   const config = syncClient.getConfig();
-
-  if (document.activeElement !== endpointInput) {
-    endpointInput.value = config.endpoint || "";
-  }
-  if (document.activeElement !== keyInput) {
-    keyInput.value = config.syncKey || "";
-  }
-  copyBtn.disabled = !keyInput.value.trim();
 
   const configured = syncClient.isConfigured();
   quickBtn.hidden = !configured;
-  nowBtn.hidden = !configured;
   disconnectBtn.hidden = !configured;
+  newForm.hidden = configured;
+  joinForm.hidden = configured;
+  codePanel.hidden = !configured;
+  if (document.activeElement !== setupCodeOutput) {
+    setupCodeOutput.value = configured ? createSyncSetupCode(config.endpoint, config.syncKey) : "";
+  }
+  if (details.hidden) toggleBtn.textContent = configured ? "Setup code" : "Set up";
 
   badge.className = "sync-badge";
   switch (statusInfo.status) {
@@ -562,7 +561,7 @@ function renderSyncUI(statusInfo = syncClient.getStatus()) {
       message.textContent = "Connected. Ready to sync with cloud.";
     }
   } else {
-    message.textContent = "Sync is off. Enter a Worker URL and private pairing key, then choose Save & connect. No reading data is sent before then.";
+    message.textContent = "Sync is off. Choose Start syncing here or join with a setup code from another device.";
   }
 }
 
@@ -570,118 +569,101 @@ function initSyncUI() {
   const toggleBtn = $("sync-toggle-panel");
   const details = $("sync-details");
   const quickBtn = $("sync-quick-btn");
-  const nowBtn = $("sync-now-btn");
-  const generateBtn = $("generate-sync-key");
-  const copyBtn = $("copy-sync-key");
-  const toggleKeyBtn = $("toggle-sync-key");
-  const keyInput = $("sync-key");
-  const endpointInput = $("sync-endpoint");
-  const form = $("sync-form");
+  const newForm = $("sync-new-form");
+  const newButton = $("sync-new-btn");
+  const joinForm = $("sync-join-form");
+  const joinButton = $("sync-join-btn");
+  const setupCodeInput = $("sync-code-input");
+  const setupCodeOutput = $("sync-code-output");
+  const copyCodeButton = $("copy-sync-code");
   const disconnectBtn = $("sync-disconnect-btn");
 
   toggleBtn.addEventListener("click", () => {
     const isHidden = details.hidden;
     details.hidden = !isHidden;
     toggleBtn.setAttribute("aria-expanded", String(isHidden));
-    toggleBtn.textContent = isHidden ? "Close" : "Configure";
-    if (isHidden) {
-      if (!endpointInput.value) endpointInput.focus();
-      else if (!keyInput.value) keyInput.focus();
-    }
+    toggleBtn.textContent = isHidden ? "Close" : (syncClient.isConfigured() ? "Setup code" : "Set up");
+    if (isHidden && !syncClient.isConfigured()) newButton.focus();
   });
 
   const triggerSync = async () => {
     quickBtn.disabled = true;
-    nowBtn.disabled = true;
     try {
       await syncClient.sync(state);
     } finally {
       quickBtn.disabled = false;
-      nowBtn.disabled = false;
     }
   };
 
   quickBtn.addEventListener("click", triggerSync);
-  nowBtn.addEventListener("click", triggerSync);
 
-  generateBtn.addEventListener("click", () => {
+  newForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    let syncKey;
     try {
-      keyInput.value = generateSyncKey();
-      keyInput.type = "text";
-      copyBtn.disabled = false;
-      keyInput.focus();
-      $("sync-message").className = "sync-message";
-      $("sync-message").textContent = "Key generated. Copy it and enter the same key on your other devices.";
+      syncKey = generateSyncKey();
     } catch (error) {
       $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = error.message || "Could not generate a secure pairing key.";
+      $("sync-message").textContent = error.message || "Could not create a secure setup code.";
+      return;
+    }
+
+    newButton.disabled = true;
+    try {
+      syncClient.updateConfig({ endpoint: DEFAULT_SYNC_ENDPOINT, syncKey, autoSync: true });
+      await triggerSync();
+    } catch (error) {
+      $("sync-message").className = "sync-message is-error";
+      $("sync-message").textContent = error.message;
+    } finally {
+      newButton.disabled = false;
     }
   });
 
-  copyBtn.addEventListener("click", async () => {
-    const syncKey = keyInput.value.trim();
-    if (!syncKey) return;
+  joinForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const setup = parseSyncSetupCode(setupCodeInput.value);
+    if (!setup) {
+      $("sync-message").className = "sync-message is-error";
+      $("sync-message").textContent = "That setup code is not valid. Copy it again from your connected device.";
+      setupCodeInput.focus();
+      return;
+    }
+
+    joinButton.disabled = true;
+    setupCodeInput.value = "";
+    try {
+      syncClient.updateConfig({ ...setup, autoSync: true });
+      await triggerSync();
+    } catch (error) {
+      $("sync-message").className = "sync-message is-error";
+      $("sync-message").textContent = error.message;
+    } finally {
+      joinButton.disabled = false;
+    }
+  });
+
+  copyCodeButton.addEventListener("click", async () => {
+    const setupCode = setupCodeOutput.value;
+    if (!setupCode) return;
     if (!navigator.clipboard?.writeText) {
       $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = "Clipboard access is unavailable. Select and copy the key manually.";
+      $("sync-message").textContent = "Clipboard access is unavailable. Select and copy the setup code manually.";
       return;
     }
     try {
-      await navigator.clipboard.writeText(syncKey);
+      await navigator.clipboard.writeText(setupCode);
       $("sync-message").className = "sync-message";
-      $("sync-message").textContent = "Pairing key copied. Keep it private; anyone with it can access your synced data.";
+      $("sync-message").textContent = "Setup code copied. Paste it on each device you want to sync.";
     } catch {
       $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = "Could not copy the key. Select and copy it manually.";
+      $("sync-message").textContent = "Could not copy the code. Select and copy it manually.";
     }
-  });
-
-  keyInput.addEventListener("input", () => {
-    copyBtn.disabled = !keyInput.value.trim();
-  });
-
-  toggleKeyBtn.addEventListener("click", () => {
-    const isPassword = keyInput.type === "password";
-    keyInput.type = isPassword ? "text" : "password";
-    toggleKeyBtn.setAttribute("aria-label", isPassword ? "Hide pairing key" : "Show pairing key");
-  });
-
-  form.addEventListener("submit", async event => {
-    event.preventDefault();
-    const endpoint = endpointInput.value.trim();
-    const syncKey = keyInput.value.trim();
-
-    if (!endpoint) {
-      $("sync-message").textContent = "Please enter your Cloudflare Worker URL.";
-      $("sync-message").className = "sync-message is-error";
-      endpointInput.focus();
-      return;
-    }
-
-    const normalizedEndpoint = normalizeEndpoint(endpoint);
-    if (!normalizedEndpoint) {
-      $("sync-message").textContent = "Please enter a valid HTTPS Worker URL (HTTP allowed only for localhost).";
-      $("sync-message").className = "sync-message is-error";
-      endpointInput.focus();
-      return;
-    }
-
-    if (!syncKey) {
-      $("sync-message").textContent = "Please generate or enter a private pairing key.";
-      $("sync-message").className = "sync-message is-error";
-      keyInput.focus();
-      return;
-    }
-
-    syncClient.updateConfig({ endpoint: normalizedEndpoint, syncKey, autoSync: true });
-    renderSyncUI();
-    await triggerSync();
   });
 
   disconnectBtn.addEventListener("click", () => {
     syncClient.clearConfig();
-    endpointInput.value = "";
-    keyInput.value = "";
+    setupCodeInput.value = "";
     renderSyncUI();
     notify("Cloud sync disconnected. Your progress is saved locally.");
   });

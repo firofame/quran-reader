@@ -268,7 +268,7 @@ export default {
       return new Response(
         JSON.stringify({
           status: "ok",
-          service: "quran-reader-sync",
+          service: "quran",
           storage: "SQLite Durable Object",
         }),
         {

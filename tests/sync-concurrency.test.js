@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { createSyncClient } from "../sync-client.js";
+import { createSyncClient, createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, parseSyncSetupCode } from "../sync-client.js";
 import { SyncDurableObject } from "../worker/src/index.js";
 
 function createMockSqlStorage() {
@@ -54,10 +54,10 @@ test("paired devices synchronize reading progress using timestamp-based LWW", as
     debounceMs: 5,
     onRemoteUpdate: data => { phoneRemoteState = data; },
   });
-  const endpoint = "https://sync.example.workers.dev";
+  const endpoint = DEFAULT_SYNC_ENDPOINT;
   const sharedKey = "private-paired-key";
   mac.updateConfig({ endpoint, syncKey: sharedKey });
-  phone.updateConfig({ endpoint, syncKey: sharedKey });
+  phone.updateConfig(parseSyncSetupCode(createSyncSetupCode(endpoint, sharedKey)));
 
   const initialMacState = {
     position: { chapter: 1, verse: 1 },
@@ -114,7 +114,7 @@ test("regression: in-flight sync does not overwrite newer local reading progress
     debounceMs: 50,
   });
 
-  const endpoint = "https://sync.example.workers.dev";
+  const endpoint = DEFAULT_SYNC_ENDPOINT;
   const sharedKey = "shared-pairing-key";
   client.updateConfig({ endpoint, syncKey: sharedKey });
 

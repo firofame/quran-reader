@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "quran-reader-sync",
+  "name": "quran",
+  "account_id": "d2c3c656cbf2f4e32a133ab2fa3dcd5a",
   "main": "src/index.js",
   "compatibility_date": "2024-11-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -17,5 +18,15 @@
       "tag": "v1",
       "new_sqlite_classes": ["SyncDurableObject"]
     }
-  ]
+  ],
+  "previews": {
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "SYNC_DO",
+          "class_name": "SyncDurableObject"
+        }
+      ]
+    }
+  }
 }

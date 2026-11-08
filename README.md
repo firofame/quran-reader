@@ -55,9 +55,10 @@ This is a translation reader, not an Arabic Quran text reader. Translation text 
 Sync is off by default. Nothing is sent to the sync service until you explicitly
 choose **Start syncing** or **Join sync** in the Cross-device sync panel.
 
-After upgrading from an older version, any sync configuration that did not record
-explicit consent is cleared; local reading data remains. Set up sync again and
-rejoin your devices with the new setup code.
+After upgrading from an older version, sync configuration without explicit
+consent, or configuration pointing to a different service, is cleared before
+any sync request. Local reading data remains. Set up sync again and rejoin your
+devices with the new setup code.
 
 1. On your first device, open **Controls** → **Cross-device sync** and choose
    **Start syncing**. The app creates a private key and connects automatically.
@@ -65,7 +66,9 @@ rejoin your devices with the new setup code.
 3. On each additional device, open **Cross-device sync**, paste the code under
    **Another device**, and choose **Join sync**.
 
-The setup code is private: anyone with it can read or change that sync space's
+Setup codes connect only to the project's service at
+`https://quran.firofame.workers.dev`; custom-server codes are not accepted.
+The code is Base64url-encoded, not encrypted. Keep it private: anyone with it can read or change that sync space's
 reading position and translation choice. Reading changes are saved locally first
 and remain available offline. Position and translation updates use bounded
 timestamp-based conflict resolution.

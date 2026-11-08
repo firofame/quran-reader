@@ -612,6 +612,9 @@ function initSyncUI() {
     try {
       syncClient.updateConfig({ endpoint: DEFAULT_SYNC_ENDPOINT, syncKey, autoSync: true });
       await triggerSync();
+    } catch (error) {
+      $("sync-message").className = "sync-message is-error";
+      $("sync-message").textContent = error.message;
     } finally {
       newButton.disabled = false;
     }
@@ -632,6 +635,9 @@ function initSyncUI() {
     try {
       syncClient.updateConfig({ ...setup, autoSync: true });
       await triggerSync();
+    } catch (error) {
+      $("sync-message").className = "sync-message is-error";
+      $("sync-message").textContent = error.message;
     } finally {
       joinButton.disabled = false;
     }

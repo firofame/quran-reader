@@ -8,7 +8,7 @@ on:
       - ".github/workflows/deploy-worker.yml"
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened, labeled, closed]
     paths:
       - "worker/**"
       - ".github/workflows/deploy-worker.yml"
@@ -19,35 +19,48 @@ permissions:
 
 jobs:
   deploy-production:
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.action == 'labeled' &&
+       github.event.label.name == 'deploy-sync-production' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: sync-worker-production
+      cancel-in-progress: false
+    env:
+      DEPLOY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
     steps:
-      - name: Check out the repository
+      - name: Check out the exact production revision
         uses: actions/checkout@v5
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
 
-      - name: Rename the existing Worker in place
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Verify maintainer authorization
         env:
-          ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node worker/scripts/deployment.js authorize
+
+      - name: Validate the exact revision before production changes
         run: |
-          set -euo pipefail
-          for current_name in quran-reader-sync quran; do
-            http_status=$(curl --silent --show-error \
-              --output "$RUNNER_TEMP/worker-rename-response.json" \
-              --write-out "%{http_code}" \
-              --request PATCH \
-              "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/workers/${current_name}" \
-              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              --header "Content-Type: application/json" \
-              --data '{"name":"quran"}')
-            if [[ "$http_status" == 200 ]]; then
-              echo "Worker is named quran."
-              exit 0
-            fi
-          done
-          cat "$RUNNER_TEMP/worker-rename-response.json"
-          exit 1
+          npm run check
+          npm --prefix worker run check
+          npm test
+
+      - name: Verify permissions and preserve the existing Worker
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node worker/scripts/deployment.js prepare
 
       - name: Deploy production Worker
         uses: cloudflare/wrangler-action@v4
@@ -57,8 +70,20 @@ jobs:
           workingDirectory: worker
           command: deploy
 
+      - name: Verify production identity, health, and sync
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node worker/scripts/deployment.js verify
+
+      - name: Remove private canary credentials from the runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sync-production-state.json"
+
   preview:
-    if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event_name == 'pull_request' &&
+      contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -67,27 +92,20 @@ jobs:
     steps:
       - name: Check out the pull request
         uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
 
       - name: Find the current Worker name
         id: worker
         env:
           ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          for worker_name in quran quran-reader-sync; do
-            http_status=$(curl --silent --show-error \
-              --output /dev/null \
-              --write-out "%{http_code}" \
-              "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/workers/${worker_name}" \
-              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}")
-            if [[ "$http_status" == 200 ]]; then
-              echo "name=${worker_name}" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-          echo "Could not find the sync Worker under either its old or new name." >&2
-          exit 1
+        run: node worker/scripts/deployment.js find
 
       - name: Deploy isolated Worker preview
         id: preview
@@ -111,29 +129,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check out the repository
+      - name: Check out the pull request deployment helper
         uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
 
       - name: Find the current Worker name
         id: worker
         env:
           ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          for worker_name in quran quran-reader-sync; do
-            http_status=$(curl --silent --show-error \
-              --output /dev/null \
-              --write-out "%{http_code}" \
-              "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/workers/${worker_name}" \
-              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}")
-            if [[ "$http_status" == 200 ]]; then
-              echo "name=${worker_name}" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-          echo "Could not find the sync Worker under either its old or new name." >&2
-          exit 1
+        run: node worker/scripts/deployment.js find
 
       - name: Delete the pull request preview
         uses: cloudflare/wrangler-action@v4

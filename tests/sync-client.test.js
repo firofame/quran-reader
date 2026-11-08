@@ -1,15 +1,154 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { PREFERENCES_KEY } from "../preferences-store.js";
 import {
   SYNC_STORAGE_KEY,
+  DEFAULT_SYNC_ENDPOINT,
   loadSyncConfig,
   saveSyncConfig,
   clearSyncConfig,
   normalizeEndpoint,
   generateSyncKey,
+  createSyncSetupCode,
+  parseSyncSetupCode,
   createSyncClient,
 } from "../sync-client.js";
+
+function encodeSetupPayload(payload) {
+  return `QRS1-${Buffer.from(JSON.stringify(payload)).toString("base64url")}`;
+}
+
+test("setup code: generated keys round-trip with exactly the trusted endpoint and key", () => {
+  const syncKey = generateSyncKey();
+  const code = createSyncSetupCode(DEFAULT_SYNC_ENDPOINT, syncKey);
+  assert.match(code, /^QRS1-[A-Za-z0-9_-]+$/);
+  assert.deepEqual(parseSyncSetupCode(code), { endpoint: DEFAULT_SYNC_ENDPOINT, syncKey });
+  assert.ok(code.length <= 4096);
+});
+
+test("setup code: normalizes surrounding whitespace, trusted URLs, and valid UTF-8 keys", () => {
+  const syncKey = "caf\u00e9-private-key";
+  const code = createSyncSetupCode(`  ${DEFAULT_SYNC_ENDPOINT}/api/sync  `, `\u2003${syncKey}\u2003`);
+  assert.deepEqual(parseSyncSetupCode(`\u2003${code}\n`), { endpoint: DEFAULT_SYNC_ENDPOINT, syncKey });
+  assert.deepEqual(parseSyncSetupCode(encodeSetupPayload({
+    version: 1,
+    endpoint: "https://QURAN.FIROFAME.WORKERS.DEV:443/",
+    key: ` ${syncKey} `,
+  })), { endpoint: DEFAULT_SYNC_ENDPOINT, syncKey });
+  assert.equal(parseSyncSetupCode(code.replace("QRS1-", "QRS1- ")), null);
+});
+
+test("setup code: rejects invalid prefixes, Base64url, JSON, payload shapes, and versions", () => {
+  for (const code of [undefined, null, 42, {}, "", "   ", "QRS2-abc", "qrs1-abc", "QRS1-", "QRS1-a", "QRS1-%%%", "QRS1-YQ==", "QRS1-e30+"]) {
+    assert.equal(parseSyncSetupCode(code), null);
+  }
+  assert.equal(parseSyncSetupCode(`QRS1-${Buffer.from("{bad json").toString("base64url")}`), null);
+  for (const payload of [null, [], 1, "string", {}, { version: "1" }, { version: 2 }, { version: 1, key: {} }]) {
+    assert.equal(parseSyncSetupCode(encodeSetupPayload(payload)), null);
+  }
+});
+
+test("setup code: rejects invalid UTF-8 even in an otherwise ignored payload field", () => {
+  const bytes = Buffer.concat([
+    Buffer.from(`{"version":1,"endpoint":"${DEFAULT_SYNC_ENDPOINT}","key":"private-key","extra":"`),
+    Buffer.from([0xff]),
+    Buffer.from('"}'),
+  ]);
+  assert.equal(parseSyncSetupCode(`QRS1-${bytes.toString("base64url")}`), null);
+});
+
+test("setup code: creation and parsing reject untrusted and invalid endpoints", () => {
+  for (const endpoint of [
+    undefined,
+    null,
+    {},
+    "",
+    "not a valid url :::",
+    "https://untrusted.example",
+    "http://quran.firofame.workers.dev",
+    "http://localhost:8787",
+    "https://quran.firofame.workers.dev:8443",
+    "https://quran.firofame.workers.dev.evil.example",
+    "https://quran.firofame.workers.dev@evil.example",
+    "https://evil-quran.firofame.workers.dev",
+  ]) {
+    assert.throws(() => createSyncSetupCode(endpoint, "private-key"), /project's sync service/);
+    assert.equal(parseSyncSetupCode(encodeSetupPayload({ version: 1, endpoint, key: "private-key" })), null);
+  }
+});
+
+test("setup code: enforces nonempty header-safe keys and the exact 512-character boundary", () => {
+  for (const key of [undefined, null, 42, {}, "", " \n ", "a".repeat(513), "private\nkey", "private\rkey", "private\u0000key", "private\u007fkey", "private\u0100key", "private\ud83d\udd11key"]) {
+    assert.throws(() => createSyncSetupCode(DEFAULT_SYNC_ENDPOINT, key), /valid private key/);
+    assert.equal(parseSyncSetupCode(encodeSetupPayload({ version: 1, endpoint: DEFAULT_SYNC_ENDPOINT, key })), null);
+  }
+  for (const syncKey of ["a".repeat(512), "\u00e9".repeat(512)]) {
+    const code = createSyncSetupCode(DEFAULT_SYNC_ENDPOINT, syncKey);
+    assert.deepEqual(parseSyncSetupCode(code), { endpoint: DEFAULT_SYNC_ENDPOINT, syncKey });
+    assert.ok(code.length <= 4096);
+  }
+});
+
+test("setup code: accepts 4096 input characters and rejects 4097 before trimming", () => {
+  const payload = JSON.stringify({ version: 1, endpoint: DEFAULT_SYNC_ENDPOINT, key: "private-key" });
+  const bytes = payload + " ".repeat(3068 - Buffer.byteLength(payload));
+  const code = `QRS1-${Buffer.from(bytes).toString("base64url")}`;
+  assert.equal(code.length, 4096);
+  assert.deepEqual(parseSyncSetupCode(code), { endpoint: DEFAULT_SYNC_ENDPOINT, syncKey: "private-key" });
+  assert.equal(parseSyncSetupCode(`${code} `), null);
+  assert.equal(parseSyncSetupCode(`QRS1-${Buffer.from(`${bytes} `).toString("base64url")}`), null);
+});
+
+test("sync config: clears unsupported settings before requests and preserves local reading data", async () => {
+  const reading = JSON.stringify({ position: { chapter: 2, verse: 255 }, translation: "en.sahih" });
+  for (const endpoint of ["https://custom.example", "http://localhost:8787", ""]) {
+    const store = new Map([
+      [PREFERENCES_KEY, reading],
+      [SYNC_STORAGE_KEY, JSON.stringify({ explicitlyConfigured: true, endpoint, syncKey: "old-key", autoSync: true })],
+    ]);
+    const storage = {
+      getItem: key => store.get(key) ?? null,
+      setItem: (key, value) => store.set(key, value),
+      removeItem: key => store.delete(key),
+    };
+    let fetchCalls = 0;
+    const client = createSyncClient({ storage, fetch: async () => { fetchCalls++; throw new Error("Must not fetch"); } });
+    assert.equal(store.has(SYNC_STORAGE_KEY), false);
+    assert.equal(store.get(PREFERENCES_KEY), reading);
+    assert.equal(client.isConfigured(), false);
+    assert.match(client.getStatus().message, /Start syncing or join again/);
+    assert.equal((await client.pull()).reason, "unconfigured");
+    assert.equal((await client.push({ position: { chapter: 1, verse: 1 } })).reason, "unconfigured");
+    assert.equal((await client.sync({ position: { chapter: 1, verse: 1 } })).reason, "unconfigured");
+    client.queuePush({ position: { chapter: 1, verse: 1 } });
+    assert.equal(fetchCalls, 0);
+    client.destroy();
+  }
+});
+
+test("sync client: rejects invalid configuration explicitly without storing or sending it", async () => {
+  const store = new Map();
+  const storage = {
+    getItem: key => store.get(key) ?? null,
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key),
+  };
+  let fetchCalls = 0;
+  const client = createSyncClient({ storage, fetch: async () => { fetchCalls++; throw new Error("Must not fetch"); } });
+  for (const config of [
+    { endpoint: "https://custom.example", syncKey: "private-key" },
+    { endpoint: DEFAULT_SYNC_ENDPOINT, syncKey: "private\nkey" },
+  ]) {
+    assert.throws(() => client.updateConfig(config), /valid private key/);
+    assert.equal(client.getStatus().status, "error");
+    assert.equal(client.isConfigured(), false);
+    assert.equal(store.has(SYNC_STORAGE_KEY), false);
+    assert.equal((await client.pull()).reason, "unconfigured");
+  }
+  assert.equal(fetchCalls, 0);
+  client.destroy();
+});
 
 test("sync config: loads defaults when storage is empty or corrupted", () => {
   const store = new Map();
@@ -45,7 +184,7 @@ test("sync config: saves, loads, and clears valid configuration", () => {
 
   const config = {
     explicitlyConfigured: true,
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "secret-key-123",
     lastSyncedAt: 1000,
     lastUpdatedAt: 1000,
@@ -63,7 +202,7 @@ test("sync config: saves, loads, and clears valid configuration", () => {
 
 test("sync config: clears legacy settings that did not record explicit consent", async () => {
   const store = new Map([[SYNC_STORAGE_KEY, JSON.stringify({
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "legacy-shared-key",
     autoSync: true,
   })]]);
@@ -189,7 +328,7 @@ test("sync client: pushes local state to worker with correct authorization and p
   });
 
   client.updateConfig({
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "test-secret-key",
   });
   assert.equal(client.isConfigured(), true);
@@ -201,7 +340,7 @@ test("sync client: pushes local state to worker with correct authorization and p
 
   const res = await client.push(localState);
   assert.equal(res.success, true);
-  assert.equal(capturedUrl, "https://sync.example.workers.dev/api/sync");
+  assert.equal(capturedUrl, `${DEFAULT_SYNC_ENDPOINT}/api/sync`);
   assert.equal(capturedHeaders.Authorization, "Bearer test-secret-key");
   assert.equal(capturedHeaders["X-Sync-Key"], "test-secret-key");
   assert.equal(capturedBody.chapter, 2);
@@ -242,7 +381,7 @@ test("sync client: pulls newer remote state and triggers onRemoteUpdate", async 
   });
 
   client.updateConfig({
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "test-secret-key",
     lastUpdatedAt: 1000, // Local is older than remote (1000 < 500000)
   });
@@ -272,7 +411,7 @@ test("sync client: handles network failure gracefully without throwing", async (
   });
 
   client.updateConfig({
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "test-secret-key",
   });
 
@@ -303,23 +442,23 @@ test("sync client: maps HTTP error codes to friendly messages", async () => {
   });
 
   client.updateConfig({
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "wrong-key",
   });
 
   await client.pull();
   assert.equal(lastStatus.status, "error");
-  assert.match(lastStatus.message, /Incorrect pairing key/);
+  assert.equal(lastStatus.message, "This setup code was not accepted.");
 
   mockStatus = 404;
   await client.pull();
   assert.equal(lastStatus.status, "error");
-  assert.match(lastStatus.message, /Worker endpoint not found/);
+  assert.equal(lastStatus.message, "The sync service could not be found. Try again later.");
 
   mockStatus = 500;
   await client.pull();
   assert.equal(lastStatus.status, "error");
-  assert.match(lastStatus.message, /Worker server error/);
+  assert.equal(lastStatus.message, "Sync service error (500).");
 });
 
 test("sync client: debounced queuePush coalesces rapid local updates", async () => {
@@ -349,7 +488,7 @@ test("sync client: debounced queuePush coalesces rapid local updates", async () 
   });
 
   client.updateConfig({
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "test-secret",
   });
 
@@ -410,7 +549,7 @@ test("sync client: fresh device pairing pulls remote cloud progress", async () =
   });
 
   client.updateConfig({
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "paired-device-key",
   });
 
@@ -456,7 +595,7 @@ test("sync client: queuePush maintains monotonic timestamps when stored timestam
   const client = createSyncClient({ storage });
   const futureTimestamp = Date.now() + 100000;
   client.updateConfig({
-    endpoint: "https://sync.example.workers.dev",
+    endpoint: DEFAULT_SYNC_ENDPOINT,
     syncKey: "paired-device-key",
     lastUpdatedAt: futureTimestamp,
     lastPosition: { chapter: 1, verse: 1 },

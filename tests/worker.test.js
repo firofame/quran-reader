@@ -13,7 +13,8 @@ function createMockSqlStorage() {
   const db = new DatabaseSync(":memory:");
   return {
     exec(query, ...params) {
-      if (query.trim().toUpperCase().startsWith("SELECT")) {
+      const normalizedQuery = query.trim().toUpperCase();
+      if (normalizedQuery.startsWith("SELECT") || normalizedQuery.startsWith("PRAGMA")) {
         const rows = db.prepare(query).all(...params);
         return {
           toArray: () => rows,
@@ -265,6 +266,42 @@ test("SyncDurableObject (SQLite): handles position and translation LWW", async (
   const getRes2 = await doInstance.fetch(getReq2);
   const data2 = await getRes2.json();
   assert.deepEqual(data2, storedNew);
+});
+
+test("SyncDurableObject migrates existing SQLite state and preserves reading progress", async () => {
+  const sql = createMockSqlStorage();
+  const updatedAt = Date.now() - 1000;
+  sql.exec(`
+    CREATE TABLE sync_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      chapter INTEGER NOT NULL,
+      verse INTEGER NOT NULL,
+      bookmarks TEXT NOT NULL,
+      translation TEXT,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+  sql.exec(
+    "INSERT INTO sync_state (id, chapter, verse, bookmarks, translation, updated_at) VALUES (1, ?, ?, ?, ?, ?)",
+    18,
+    10,
+    "[]",
+    "ml.abdulhameed",
+    updatedAt
+  );
+
+  const doInstance = new SyncDurableObject({ storage: { sql } }, {});
+  const columns = sql.exec("PRAGMA table_info(sync_state);").toArray();
+  assert.equal(columns.some(column => column.name === "bookmarks"), false);
+
+  const state = await (await doInstance.fetch(new Request("https://internal/sync"))).json();
+  assert.deepEqual(state, {
+    empty: false,
+    chapter: 18,
+    verse: 10,
+    translation: "ml.abdulhameed",
+    updatedAt,
+  });
 });
 
 test("SyncDurableObject: isolated instances keep separate SQLite state", async () => {

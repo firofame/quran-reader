@@ -52,9 +52,11 @@ export class SyncDurableObject extends BaseDurableObject {
         updated_at INTEGER NOT NULL
       );
     `);
-    try {
+    const cursor = this.sql.exec("PRAGMA table_info(sync_state);");
+    const columns = typeof cursor.toArray === "function" ? cursor.toArray() : [...cursor];
+    if (columns.some(column => column.name === "bookmarks")) {
       this.sql.exec("ALTER TABLE sync_state DROP COLUMN bookmarks;");
-    } catch {}
+    }
   }
 
   async fetch(request) {

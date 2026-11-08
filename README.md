@@ -92,3 +92,27 @@ npm test
 
 Pull requests targeting `main` run these checks automatically through the
 [validation workflow](.github/workflows/validate.yml).
+
+## Publish
+
+[GitHub Pages](https://firofame.github.io/quran-reader/) is deployed automatically
+by [the Pages workflow](.github/workflows/pages.yml) when changes are pushed to
+`main`. It can also be run manually from the repository's Actions tab.
+
+The workflow runs the checks and tests, then publishes only the HTML, CSS,
+browser JavaScript, favicon, metadata, and translation files. The local server,
+tests, and project configuration are not included in the published site.
+The repository's **Settings → Pages → Source** must be set to **GitHub Actions**.
+Relative asset URLs support the `/quran-reader/` project path and direct ayah
+links such as <https://firofame.github.io/quran-reader/#2:255>.
+
+## Sources
+
+The supplied translation files include their original source and translator
+attribution. English: Saheeh International. Malayalam:
+Cheriyamundam Abdul Hameed and Kunhi Mohammed Parappoor. Source:
+[Tanzil translations](https://tanzil.net/trans/). These files remain unchanged;
+their respective translators' rights and terms continue to apply.
+
+Chapter metadata: copyright © 2008–2009 Tanzil.info, licensed under
+[Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/).

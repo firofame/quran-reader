@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, selectAyah, adjacentPosition, swipeDirection, matchesChapter, decodeState } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, selectAyah, adjacentPosition, matchesChapter, decodeState } from "./reader.js";
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
@@ -32,7 +32,6 @@ let requestId = 0;
 let noticeTimer;
 let storageFailed = false;
 let loading = false;
-let ayahTouch = null;
 
 function notify(message, persistent = false) {
   if (storageFailed && !persistent) {
@@ -150,7 +149,6 @@ function isBookmarked(chapter, verse) {
 }
 
 function renderVerses() {
-  ayahTouch = null;
   const data = translations.getLoaded(state.translation);
   if (!data) return;
   const query = $("verse-search").value.trim();
@@ -316,7 +314,6 @@ function renderPagination(selection) {
 }
 
 async function loadReading({ scroll = false } = {}) {
-  ayahTouch = null;
   const request = ++requestId;
   loading = true;
   updateTabs();
@@ -416,37 +413,6 @@ $("ayah-navigation").addEventListener("click", event => {
   const button = event.target.closest("[data-direction]");
   if (button) moveAyah(Number(button.dataset.direction));
 });
-$("reading-content").addEventListener("touchstart", event => {
-  ayahTouch = null;
-  if (event.touches.length !== 1 || loading || view !== "read" || $("ayah-navigation").hidden ||
-    $("sidebar").classList.contains("is-open") || window.getSelection()?.isCollapsed === false ||
-    event.target.closest("a, button, input, select, textarea, [contenteditable]")) return;
-  const touch = event.touches[0];
-  ayahTouch = { id: touch.identifier, x: touch.clientX, y: touch.clientY };
-}, { passive: true });
-$("reading-content").addEventListener("touchmove", event => {
-  if (!ayahTouch) return;
-  const touch = event.touches[0];
-  if (event.touches.length !== 1 || touch.identifier !== ayahTouch.id) {
-    ayahTouch = null;
-    return;
-  }
-  const deltaX = Math.abs(touch.clientX - ayahTouch.x);
-  const deltaY = Math.abs(touch.clientY - ayahTouch.y);
-  // Once a gesture becomes a vertical scroll, it must not turn the page.
-  if (deltaY > 10 && deltaY >= deltaX) ayahTouch = null;
-}, { passive: true });
-$("reading-content").addEventListener("touchend", event => {
-  const start = ayahTouch;
-  ayahTouch = null;
-  if (!start || event.touches.length || loading || view !== "read" ||
-    $("sidebar").classList.contains("is-open") || window.getSelection()?.isCollapsed !== false) return;
-  const touch = Array.from(event.changedTouches).find(item => item.identifier === start.id);
-  if (!touch) return;
-  const direction = swipeDirection(touch.clientX - start.x, touch.clientY - start.y);
-  if (direction) moveAyah(direction);
-}, { passive: true });
-$("reading-content").addEventListener("touchcancel", () => { ayahTouch = null; }, { passive: true });
 $("chapter-search").addEventListener("input", renderChapters);
 $("verse-search").addEventListener("input", () => {
   if (loading) return;

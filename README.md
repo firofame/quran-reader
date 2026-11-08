@@ -40,20 +40,53 @@ because browsers restrict fetching local translation files.
   return to its chapter.
 - Adjust text size and switch between light and dark themes.
 - The exact selected ayah, bookmarks, and preferences are saved in this browser's local
-  storage. No reading data is sent to a server. Clearing browser data removes it.
+  storage by default. Cross-device synchronization is off until you configure and connect
+  it; see [Cross-Device Sync](#cross-device-sync).
 - Press `/` to find a chapter, and Escape to clear a focused search or close
   the controls or mobile chapter drawer.
 
 Translations are loaded from the supplied local files and retained in memory
-while the page is open. There are no external API calls. This is a translation
-reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
+while the page is open. A fresh installation makes no cloud requests. After you
+explicitly connect sync, the app sends your reading position, bookmarks, and
+selected translation identifier to the configured Worker; translation text
+remains local.
+This is a translation reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
+
+## Cross-Device Sync
+
+Sync is off by default. Nothing is sent to Cloudflare until you explicitly choose
+**Save & connect** in the Cross-device sync panel.
+
+After upgrading from an older version, any sync configuration that did not record
+explicit consent is cleared; local reading data remains. Generate a new private
+key and pair your devices again.
+
+1. On your first device, open **Controls** and then **Cross-device sync**.
+2. Enter your deployed Cloudflare Worker URL and choose **Generate key**. The app
+   uses the browser's cryptographic random-number generator and offers **Copy key**
+   to transfer the private key.
+3. Choose **Save & connect**. The app saves the key in this browser and begins
+   syncing your reading position, bookmarks, and selected translation identifier
+   with that Worker. Your translation text is not uploaded.
+4. On each additional device, enter the same Worker URL, paste the exact same key,
+   and choose **Save & connect**. The devices then sync automatically.
+
+Each key identifies a separate sync space. Keep it private: anyone with the key
+can read or change that space's synced data. Reading and bookmark changes are
+saved locally first and remain available offline. Position and translation
+updates use bounded timestamp-based conflict resolution; bookmark additions and
+removals are reconciled per verse so stale devices do not silently erase
+concurrent additions or restore removed bookmarks.
+
+See [`worker/README.md`](worker/README.md) for complete Cloudflare Worker configuration, SQLite Durable Object schema, and deployment instructions using Wrangler.
 
 ## Architecture
 
 The app remains a dependency-free static site. `reader.js` contains pure Quran
 data, parsing, search, and navigation logic. `reader-state.js` owns validated
-state transitions; `preferences-store.js` isolates browser persistence; and
-`translation-repository.js` loads, validates, and caches translation data.
+state transitions; `preferences-store.js` isolates browser persistence;
+`sync-client.js` manages background cross-device synchronization and conflict resolution;
+and `translation-repository.js` loads, validates, and caches translation data.
 `app.js` connects those modules to the browser UI and interaction behavior.
 
 ## Validate

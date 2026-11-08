@@ -11,6 +11,7 @@ const files = new Map([
   ["/reader-state.js", ["reader-state.js", "text/javascript; charset=utf-8"]],
   ["/preferences-store.js", ["preferences-store.js", "text/javascript; charset=utf-8"]],
   ["/translation-repository.js", ["translation-repository.js", "text/javascript; charset=utf-8"]],
+  ["/sync-client.js", ["sync-client.js", "text/javascript; charset=utf-8"]],
   ["/quran-data.js", ["quran-data.js", "text/javascript; charset=utf-8"]],
   ["/favicon.svg", ["favicon.svg", "image/svg+xml"]],
   ...["en.sahih", "ml.abdulhameed"].map(id => [`/${id}.txt`, [`${id}.txt`, "text/plain; charset=utf-8"]]),

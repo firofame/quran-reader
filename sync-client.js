@@ -34,6 +34,34 @@ function normalizeBookmarks(bookmarks) {
   return result;
 }
 
+function normalizePosition(pos) {
+  if (
+    !pos ||
+    typeof pos !== "object" ||
+    !Number.isSafeInteger(pos.chapter) ||
+    pos.chapter < 1 ||
+    pos.chapter > 114 ||
+    !Number.isSafeInteger(pos.verse) ||
+    pos.verse < 1
+  ) {
+    return null;
+  }
+  return {
+    chapter: pos.chapter,
+    verse: pos.verse,
+    translation: typeof pos.translation === "string" ? pos.translation : undefined,
+  };
+}
+
+function positionsMatch(first, second) {
+  if (!first || !second) return false;
+  return (
+    first.chapter === second.chapter &&
+    first.verse === second.verse &&
+    (first.translation || "") === (second.translation || "")
+  );
+}
+
 function getBookmarkChanges(bookmarks, baseline, updatedAt) {
   const currentBookmarks = normalizeBookmarks(bookmarks);
   const previousBookmarks = normalizeBookmarks(baseline);
@@ -78,6 +106,9 @@ export function loadSyncConfig(storage) {
     if (parsed.disabled !== undefined) {
       config.disabled = Boolean(parsed.disabled);
     }
+    if (parsed.lastPosition !== undefined) {
+      config.lastPosition = normalizePosition(parsed.lastPosition);
+    }
     return config;
   } catch {
     return { ...DEFAULT_CONFIG };
@@ -100,6 +131,15 @@ export function clearSyncConfig(storage) {
   }
 }
 
+function isLocalhost(hostname) {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname.endsWith(".localhost")
+  );
+}
+
 export function normalizeEndpoint(rawUrl) {
   if (!rawUrl || typeof rawUrl !== "string") return "";
   let url = rawUrl.trim();
@@ -109,7 +149,13 @@ export function normalizeEndpoint(rawUrl) {
   }
   try {
     const parsed = new URL(url);
-    return `${parsed.protocol}//${parsed.host}`;
+    if (parsed.protocol === "https:") {
+      return `${parsed.protocol}//${parsed.host}`;
+    }
+    if (parsed.protocol === "http:" && isLocalhost(parsed.hostname)) {
+      return `${parsed.protocol}//${parsed.host}`;
+    }
+    return "";
   } catch {
     return "";
   }
@@ -132,6 +178,9 @@ export function createSyncClient({
   debounceMs = 1500,
 } = {}) {
   let config = loadSyncConfig(storage);
+  if (config.lastPosition === undefined) {
+    config.lastPosition = null;
+  }
 
   function isConfigured() {
     return Boolean(config.explicitlyConfigured && !config.disabled && config.endpoint && config.syncKey);
@@ -172,23 +221,37 @@ export function createSyncClient({
       config.lastSyncedAt = Number.isSafeInteger(newFields.lastSyncedAt) ? newFields.lastSyncedAt : 0;
       config.lastUpdatedAt = Number.isSafeInteger(newFields.lastUpdatedAt) ? newFields.lastUpdatedAt : 0;
       config.bookmarkBaseline = normalizeBookmarks(newFields.bookmarkBaseline);
+      config.lastPosition = normalizePosition(newFields.lastPosition);
+    } else if (newFields.lastPosition !== undefined) {
+      config.lastPosition = normalizePosition(newFields.lastPosition);
     }
     saveSyncConfig(storage, config);
     notifyStatus(isConfigured() ? "idle" : "unconfigured", "");
   }
 
   function clearConfig() {
-    config = { ...DEFAULT_CONFIG, disabled: true };
+    config = { ...DEFAULT_CONFIG, disabled: true, lastPosition: null };
     saveSyncConfig(storage, config);
     clearTimeout(debounceTimer);
     notifyStatus("unconfigured", "");
   }
 
   function ensureBookmarkBaseline(localState) {
+    let changed = false;
     if (config.bookmarkBaseline === null) {
       config.bookmarkBaseline = config.lastSyncedAt > 0
         ? normalizeBookmarks(localState.bookmarks)
         : [];
+      changed = true;
+    }
+    if (config.lastPosition === null && localState?.position) {
+      config.lastPosition = normalizePosition({
+        ...localState.position,
+        translation: localState.translation,
+      });
+      changed = true;
+    }
+    if (changed) {
       saveSyncConfig(storage, config);
     }
   }
@@ -201,14 +264,39 @@ export function createSyncClient({
     return getBookmarkChanges(first, second, 0).length > 0;
   }
 
+  function hasPositionChanges(localState) {
+    if (!localState || !localState.position) return false;
+    const currentPos = normalizePosition({
+      ...localState.position,
+      translation: localState.translation,
+    });
+    if (!config.lastPosition) return true;
+    return !positionsMatch(currentPos, config.lastPosition);
+  }
+
   function recordRemoteState(remoteData) {
     const updatedAt = Number.isSafeInteger(remoteData.updatedAt) && remoteData.updatedAt >= 0
       ? remoteData.updatedAt
       : 0;
     config.lastSyncedAt = updatedAt;
     config.lastUpdatedAt = updatedAt;
+    if (Number.isSafeInteger(remoteData.chapter) && Number.isSafeInteger(remoteData.verse)) {
+      config.lastPosition = {
+        chapter: remoteData.chapter,
+        verse: remoteData.verse,
+        translation: typeof remoteData.translation === "string" ? remoteData.translation : undefined,
+      };
+    }
     if (Array.isArray(remoteData.bookmarks)) {
       config.bookmarkBaseline = normalizeBookmarks(remoteData.bookmarks);
+    }
+    if (latestLocalState && Number.isSafeInteger(remoteData.chapter) && Number.isSafeInteger(remoteData.verse)) {
+      latestLocalState = {
+        ...latestLocalState,
+        position: { chapter: remoteData.chapter, verse: remoteData.verse },
+        translation: typeof remoteData.translation === "string" ? remoteData.translation : latestLocalState.translation,
+        bookmarks: Array.isArray(remoteData.bookmarks) ? normalizeBookmarks(remoteData.bookmarks) : latestLocalState.bookmarks,
+      };
     }
     saveSyncConfig(storage, config);
   }
@@ -311,8 +399,27 @@ export function createSyncClient({
     notifyStatus("syncing", "Saving progress to cloud…");
     try {
       const url = `${normalizeEndpoint(config.endpoint)}/api/sync`;
-      const updatedAt = suppliedUpdatedAt ?? nextUpdatedAt();
+      const positionChanged = hasPositionChanges(localState);
       const normalizedBookmarks = normalizeBookmarks(localState.bookmarks);
+
+      let updatedAt = suppliedUpdatedAt;
+      if (updatedAt === undefined) {
+        if (positionChanged || !config.lastUpdatedAt) {
+          updatedAt = nextUpdatedAt();
+          config.lastUpdatedAt = updatedAt;
+        } else {
+          updatedAt = config.lastUpdatedAt;
+        }
+      }
+
+      if (positionChanged) {
+        config.lastPosition = normalizePosition({
+          ...localState.position,
+          translation: localState.translation,
+        });
+      }
+
+      const effectiveBookmarkUpdatedAt = bookmarkUpdatedAt ?? nextUpdatedAt();
 
       const payload = {
         chapter: localState.position.chapter,
@@ -321,7 +428,7 @@ export function createSyncClient({
         bookmarkChanges: getBookmarkChanges(
           normalizedBookmarks,
           config.bookmarkBaseline || [],
-          bookmarkUpdatedAt ?? updatedAt
+          effectiveBookmarkUpdatedAt
         ),
         translation: localState.translation || "en.sahih",
         updatedAt,
@@ -430,22 +537,40 @@ export function createSyncClient({
           return { success: true, direction: "pulled", data: remoteData };
         }
 
-        if (hasBookmarkChanges(localState.bookmarks)) {
-          return await push(localState);
-        }
-
         const localUpdatedAt = config.lastUpdatedAt || 0;
+        const localHasBookmarkChanges = hasBookmarkChanges(localState.bookmarks);
+
         if (remoteData.updatedAt > localUpdatedAt) {
-          // Remote is newer than local
+          // Remote reading position is newer than local
+          if (localHasBookmarkChanges) {
+            const adoptedState = {
+              ...localState,
+              position: { chapter: remoteData.chapter, verse: remoteData.verse },
+              translation: remoteData.translation || localState.translation,
+            };
+            return await push(adoptedState, {
+              updatedAt: remoteData.updatedAt,
+              bookmarkUpdatedAt: nextUpdatedAt(),
+            });
+          }
           recordRemoteState(remoteData);
           onRemoteUpdate(remoteData);
           notifyStatus("synced", `Updated to Ayah ${remoteData.chapter}:${remoteData.verse}`);
           return { success: true, direction: "pulled", data: remoteData };
         } else if (localUpdatedAt > remoteData.updatedAt) {
-          // Local is newer than remote
-          return await push(localState);
+          // Local reading position is newer than remote
+          return await push(localState, {
+            updatedAt: localUpdatedAt,
+            bookmarkUpdatedAt: nextUpdatedAt(),
+          });
         } else {
-          // Equal timestamps
+          // Equal timestamps (position unchanged on both sides)
+          if (localHasBookmarkChanges) {
+            return await push(localState, {
+              updatedAt: localUpdatedAt > 0 ? localUpdatedAt : remoteData.updatedAt,
+              bookmarkUpdatedAt: nextUpdatedAt(),
+            });
+          }
           recordRemoteState(remoteData);
           saveSyncConfig(storage, config);
           if (bookmarkListsDiffer(remoteData.bookmarks, localState.bookmarks)) {
@@ -472,8 +597,16 @@ export function createSyncClient({
     latestLocalState = localState;
     if (!isConfigured() || !config.autoSync || destroyed) return;
 
-    config.lastUpdatedAt = Date.now();
-    saveSyncConfig(storage, config);
+    ensureBookmarkBaseline(localState);
+    const positionChanged = hasPositionChanges(localState);
+    if (positionChanged) {
+      config.lastPosition = normalizePosition({
+        ...localState.position,
+        translation: localState.translation,
+      });
+      config.lastUpdatedAt = Date.now();
+      saveSyncConfig(storage, config);
+    }
 
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {

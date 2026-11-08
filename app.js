@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { createSyncClient, generateSyncKey } from "./sync-client.js";
+import { createSyncClient, generateSyncKey, normalizeEndpoint } from "./sync-client.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -761,6 +761,14 @@ function initSyncUI() {
       return;
     }
 
+    const normalizedEndpoint = normalizeEndpoint(endpoint);
+    if (!normalizedEndpoint) {
+      $("sync-message").textContent = "Please enter a valid HTTPS Worker URL (HTTP allowed only for localhost).";
+      $("sync-message").className = "sync-message is-error";
+      endpointInput.focus();
+      return;
+    }
+
     if (!syncKey) {
       $("sync-message").textContent = "Please generate or enter a private pairing key.";
       $("sync-message").className = "sync-message is-error";
@@ -768,7 +776,7 @@ function initSyncUI() {
       return;
     }
 
-    syncClient.updateConfig({ endpoint, syncKey, autoSync: true });
+    syncClient.updateConfig({ endpoint: normalizedEndpoint, syncKey, autoSync: true });
     renderSyncUI();
     await triggerSync();
   });

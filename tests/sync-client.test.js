@@ -90,13 +90,18 @@ test("sync config: clears legacy settings that did not record explicit consent",
   assert.equal(fetchCalled, false);
 });
 
-test("normalizeEndpoint: sanitizes worker URLs correctly", () => {
+test("normalizeEndpoint: sanitizes worker URLs correctly and enforces HTTPS for remote hosts", () => {
   assert.equal(normalizeEndpoint(""), "");
   assert.equal(normalizeEndpoint("   "), "");
   assert.equal(normalizeEndpoint("sync.example.workers.dev"), "https://sync.example.workers.dev");
   assert.equal(normalizeEndpoint("https://sync.example.workers.dev/"), "https://sync.example.workers.dev");
   assert.equal(normalizeEndpoint("https://sync.example.workers.dev/api/sync"), "https://sync.example.workers.dev");
   assert.equal(normalizeEndpoint("http://localhost:8787/api/sync"), "http://localhost:8787");
+  assert.equal(normalizeEndpoint("http://127.0.0.1:8787/api/sync"), "http://127.0.0.1:8787");
+  assert.equal(normalizeEndpoint("http://[::1]:8787/api/sync"), "http://[::1]:8787");
+  assert.equal(normalizeEndpoint("http://app.localhost:8787"), "http://app.localhost:8787");
+  assert.equal(normalizeEndpoint("http://sync.example.workers.dev"), "");
+  assert.equal(normalizeEndpoint("http://insecure.example.com/api/sync"), "");
   assert.equal(normalizeEndpoint("not a valid url :::"), "");
 });
 

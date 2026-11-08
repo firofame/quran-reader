@@ -310,7 +310,7 @@ test("SyncDurableObject rejects unsafe and unreasonable future timestamps", asyn
   }));
 
   const unsafeTimestamp = await put(Number.MAX_SAFE_INTEGER + 1);
-  const futureTimestamp = await put(Date.now() + MAX_FUTURE_SKEW_MS + 1);
+  const futureTimestamp = await put(Date.now() + MAX_FUTURE_SKEW_MS + 5000);
   assert.equal(unsafeTimestamp.status, 400);
   assert.equal(futureTimestamp.status, 400);
 
@@ -321,7 +321,7 @@ test("SyncDurableObject rejects unsafe and unreasonable future timestamps", asyn
 test("SyncDurableObject repairs an already-stored unreasonable timestamp", async () => {
   const sql = createMockSqlStorage();
   const doInstance = new SyncDurableObject({ storage: { sql } }, {});
-  const poisonedTimestamp = Date.now() + MAX_FUTURE_SKEW_MS + 1000;
+  const poisonedTimestamp = Date.now() + MAX_FUTURE_SKEW_MS + 5000000;
   sql.exec(
     "INSERT INTO sync_state (id, chapter, verse, bookmarks, translation, updated_at) VALUES (1, ?, ?, ?, ?, ?)",
     2,

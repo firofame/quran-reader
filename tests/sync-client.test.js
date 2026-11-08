@@ -451,3 +451,42 @@ test("static server serves sync-client.js", async t => {
   assert.match(response.headers.get("content-type"), /javascript/);
   assert.ok((await response.text()).includes("createSyncClient"));
 });
+
+test("sync client: queuePush maintains monotonic timestamps when stored timestamp is ahead of local clock", () => {
+  const store = new Map();
+  const storage = {
+    getItem: key => store.get(key) ?? null,
+    setItem: (key, val) => store.set(key, val),
+    removeItem: key => store.delete(key),
+  };
+
+  const client = createSyncClient({ storage });
+  const futureTimestamp = Date.now() + 100000;
+  client.updateConfig({
+    endpoint: "https://sync.example.workers.dev",
+    syncKey: "paired-device-key",
+    lastUpdatedAt: futureTimestamp,
+    lastPosition: { chapter: 1, verse: 1 },
+  });
+
+  assert.equal(client.getConfig().lastUpdatedAt, futureTimestamp);
+
+  // User navigates to chapter 2, verse 1
+  client.queuePush({
+    position: { chapter: 2, verse: 1 },
+    bookmarks: [],
+    translation: "en.sahih",
+  });
+
+  const updatedConfig = client.getConfig();
+  assert.equal(
+    updatedConfig.lastUpdatedAt,
+    futureTimestamp + 1,
+    "lastUpdatedAt must monotonically advance beyond future timestamp instead of rewinding to local clock"
+  );
+  assert.ok(
+    updatedConfig.lastUpdatedAt > futureTimestamp,
+    "lastUpdatedAt must remain strictly greater than the stored remote timestamp"
+  );
+  client.destroy();
+});

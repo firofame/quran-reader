@@ -278,6 +278,7 @@ export class SyncDurableObject extends BaseDurableObject {
       return Response.json({ error: "Invalid state payload." }, { status: 400 });
     }
 
+    const isBookmarkOnly = Boolean(data.isBookmarkOnly || data.positionUpdated === false);
     const sanitizedBookmarks = sanitizeBookmarks(bookmarks);
     const hasBookmarkChanges = Object.hasOwn(data, "bookmarkChanges");
     let bookmarkChanges = null;
@@ -325,15 +326,15 @@ export class SyncDurableObject extends BaseDurableObject {
         ? bookmarkChanges
         : legacyBookmarkChanges(sanitizedBookmarks, existingBookmarks, updatedAt);
       const mergedBookmarks = mergeBookmarkChanges(existingBookmarks, changes);
-      const positionWins = !existing || !validExistingTimestamp || updatedAt >= existingUpdatedAt;
+      const positionWins = !isBookmarkOnly && (!existing || !validExistingTimestamp || updatedAt >= existingUpdatedAt);
       const mergedUpdatedAt = positionWins ? updatedAt : existingUpdatedAt;
 
       const nextState = {
-        chapter: positionWins ? chapter : existing.chapter,
-        verse: positionWins ? verse : existing.verse,
+        chapter: positionWins || !existing ? chapter : existing.chapter,
+        verse: positionWins || !existing ? verse : existing.verse,
         bookmarks: serializeBookmarkState(mergedBookmarks),
-        translation: positionWins ? safeTranslation : existing.translation,
-        updatedAt: mergedUpdatedAt,
+        translation: positionWins || !existing ? safeTranslation : existing.translation,
+        updatedAt: !existing ? updatedAt : mergedUpdatedAt,
       };
       this.sql.exec(
         `INSERT INTO sync_state (id, chapter, verse, bookmarks, translation, updated_at)
@@ -360,6 +361,7 @@ export class SyncDurableObject extends BaseDurableObject {
       bookmarks: sanitizedBookmarks,
       bookmarkChanges,
       hasBookmarkChanges,
+      isBookmarkOnly,
       translation: safeTranslation,
       updatedAt,
     });
@@ -382,15 +384,16 @@ export class SyncDurableObject extends BaseDurableObject {
       ? newState.bookmarkChanges
       : legacyBookmarkChanges(newState.bookmarks, existingBookmarks, newState.updatedAt);
     const mergedBookmarks = mergeBookmarkChanges(existingBookmarks, changes);
-    const positionWins = !existing || !validExistingTimestamp || newState.updatedAt >= existingUpdatedAt;
+    const isBookmarkOnly = Boolean(newState.isBookmarkOnly || newState.positionUpdated === false);
+    const positionWins = !isBookmarkOnly && (!existing || !validExistingTimestamp || newState.updatedAt >= existingUpdatedAt);
     const mergedUpdatedAt = positionWins ? newState.updatedAt : existingUpdatedAt;
 
     const record = {
-      chapter: positionWins ? newState.chapter : existing.chapter,
-      verse: positionWins ? newState.verse : existing.verse,
+      chapter: positionWins || !existing ? newState.chapter : existing.chapter,
+      verse: positionWins || !existing ? newState.verse : existing.verse,
       bookmarkState: { version: 1, items: mergedBookmarks },
-      translation: positionWins ? newState.translation : existing.translation,
-      updatedAt: mergedUpdatedAt,
+      translation: positionWins || !existing ? newState.translation : existing.translation,
+      updatedAt: !existing ? newState.updatedAt : mergedUpdatedAt,
     };
     await this.state.storage?.put?.("sync_state", record);
     return Response.json({

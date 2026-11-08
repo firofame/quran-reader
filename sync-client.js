@@ -191,6 +191,7 @@ export function createSyncClient({
   let debounceTimer = null;
   let activePromise = null;
   let latestLocalState = null;
+  let localRevision = 0;
   let destroyed = false;
 
   function notifyStatus(newStatus, message = "") {
@@ -389,17 +390,24 @@ export function createSyncClient({
     }
   }
 
-  async function push(localState, { updatedAt: suppliedUpdatedAt, bookmarkUpdatedAt } = {}) {
+  async function push(localState, { updatedAt: suppliedUpdatedAt, bookmarkUpdatedAt, isBookmarkOnly: explicitBookmarkOnly } = {}) {
     if (!isConfigured() || destroyed) {
       return { success: false, reason: "unconfigured" };
     }
 
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
     latestLocalState = localState;
+    localRevision++;
+    const pushRevision = localRevision;
     ensureBookmarkBaseline(localState);
     notifyStatus("syncing", "Saving progress to cloud…");
     try {
       const url = `${normalizeEndpoint(config.endpoint)}/api/sync`;
       const positionChanged = hasPositionChanges(localState);
+      const isBookmarkOnly = explicitBookmarkOnly !== undefined
+        ? explicitBookmarkOnly
+        : (!positionChanged && hasBookmarkChanges(localState.bookmarks));
       const normalizedBookmarks = normalizeBookmarks(localState.bookmarks);
 
       let updatedAt = suppliedUpdatedAt;
@@ -432,6 +440,8 @@ export function createSyncClient({
         ),
         translation: localState.translation || "en.sahih",
         updatedAt,
+        isBookmarkOnly,
+        positionUpdated: !isBookmarkOnly,
       };
 
       const response = await fetch(url, {
@@ -461,7 +471,45 @@ export function createSyncClient({
         throw new Error("Worker returned an invalid sync state.");
       }
 
-      const remoteWon = responseData.updatedAt > updatedAt;
+      // Check if local state was modified while this push was in flight!
+      const localChangedInFlight = localRevision > pushRevision;
+
+      if (localChangedInFlight) {
+        // Newer local changes were made while this push was in flight.
+        // Update baseline and synced time, but do NOT overwrite the newer local position.
+        config.lastSyncedAt = Math.max(config.lastSyncedAt, responseData.updatedAt);
+        if (Array.isArray(responseData.bookmarks)) {
+          config.bookmarkBaseline = normalizeBookmarks(responseData.bookmarks);
+        }
+        saveSyncConfig(storage, config);
+        if (bookmarkListsDiffer(responseData.bookmarks, latestLocalState?.bookmarks || [])) {
+          onRemoteUpdate({ bookmarks: responseData.bookmarks });
+        }
+        return { success: true, supersededLocally: true, data: responseData };
+      }
+
+      const positionMatchesLocal = Boolean(
+        localState?.position &&
+        Number.isSafeInteger(localState.position.chapter) &&
+        Number.isSafeInteger(localState.position.verse) &&
+        localState.position.chapter === responseData.chapter &&
+        localState.position.verse === responseData.verse
+      );
+
+      if (isBookmarkOnly && !positionMatchesLocal && responseData.updatedAt <= updatedAt) {
+        config.lastSyncedAt = Math.max(config.lastSyncedAt, responseData.updatedAt);
+        if (Array.isArray(responseData.bookmarks)) {
+          config.bookmarkBaseline = normalizeBookmarks(responseData.bookmarks);
+        }
+        saveSyncConfig(storage, config);
+        if (bookmarkListsDiffer(responseData.bookmarks, latestLocalState?.bookmarks || [])) {
+          onRemoteUpdate({ bookmarks: responseData.bookmarks });
+        }
+        notifyStatus("synced", "Bookmarks synchronized.");
+        return { success: true, data: responseData };
+      }
+
+      const remoteWon = !isBookmarkOnly && responseData.updatedAt > updatedAt;
       recordRemoteState(responseData);
       onRemoteUpdate(responseData);
       if (remoteWon) {
@@ -485,10 +533,12 @@ export function createSyncClient({
     }
 
     latestLocalState = localState;
+    localRevision++;
     ensureBookmarkBaseline(localState);
     if (activePromise) return activePromise;
 
     activePromise = (async () => {
+      const syncRevision = localRevision;
       notifyStatus("syncing", "Synchronizing…");
       try {
         const url = `${normalizeEndpoint(config.endpoint)}/api/sync`;
@@ -509,26 +559,50 @@ export function createSyncClient({
 
         const remoteData = await response.json();
 
+        // Reconcile against the latest local state after the async GET operation
+        const effectiveLocalState = latestLocalState || localState;
+        ensureBookmarkBaseline(effectiveLocalState);
+
+        const localChangedInFlight = localRevision > syncRevision;
+        const positionChangedInFlight = !positionsMatch(
+          normalizePosition({ ...effectiveLocalState.position, translation: effectiveLocalState.translation }),
+          normalizePosition({ ...localState.position, translation: localState.translation })
+        );
+
+        if (localChangedInFlight && positionChangedInFlight) {
+          // Local position changed while GET was in flight.
+          // Never overwrite with older remote data; ensure local timestamp beats remote and push.
+          const freshUpdatedAt = Math.max(config.lastUpdatedAt || 0, (remoteData.updatedAt || 0) + 1);
+          config.lastUpdatedAt = freshUpdatedAt;
+          saveSyncConfig(storage, config);
+          return await push(effectiveLocalState, {
+            updatedAt: freshUpdatedAt,
+            bookmarkUpdatedAt: nextUpdatedAt(),
+            isBookmarkOnly: false,
+          });
+        }
+
         // If remote has no saved progress yet, push local state
         if (remoteData.empty || !remoteData.updatedAt) {
           config.lastSyncedAt = 0;
           config.lastUpdatedAt = 0;
           config.bookmarkBaseline = [];
           saveSyncConfig(storage, config);
-          return await push(localState);
+          return await push(effectiveLocalState);
         }
 
         // If this device has never synced before, adopt existing cloud state
         if (config.lastSyncedAt === 0) {
-          if (hasBookmarkChanges(localState.bookmarks)) {
+          if (hasBookmarkChanges(effectiveLocalState.bookmarks)) {
             const adoptedState = {
-              ...localState,
+              ...effectiveLocalState,
               position: { chapter: remoteData.chapter, verse: remoteData.verse },
-              translation: remoteData.translation || localState.translation,
+              translation: remoteData.translation || effectiveLocalState.translation,
             };
             return await push(adoptedState, {
               updatedAt: remoteData.updatedAt,
               bookmarkUpdatedAt: nextUpdatedAt(),
+              isBookmarkOnly: true,
             });
           }
           recordRemoteState(remoteData);
@@ -538,19 +612,20 @@ export function createSyncClient({
         }
 
         const localUpdatedAt = config.lastUpdatedAt || 0;
-        const localHasBookmarkChanges = hasBookmarkChanges(localState.bookmarks);
+        const localHasBookmarkChanges = hasBookmarkChanges(effectiveLocalState.bookmarks);
 
         if (remoteData.updatedAt > localUpdatedAt) {
           // Remote reading position is newer than local
           if (localHasBookmarkChanges) {
             const adoptedState = {
-              ...localState,
+              ...effectiveLocalState,
               position: { chapter: remoteData.chapter, verse: remoteData.verse },
-              translation: remoteData.translation || localState.translation,
+              translation: remoteData.translation || effectiveLocalState.translation,
             };
             return await push(adoptedState, {
               updatedAt: remoteData.updatedAt,
               bookmarkUpdatedAt: nextUpdatedAt(),
+              isBookmarkOnly: true,
             });
           }
           recordRemoteState(remoteData);
@@ -559,21 +634,23 @@ export function createSyncClient({
           return { success: true, direction: "pulled", data: remoteData };
         } else if (localUpdatedAt > remoteData.updatedAt) {
           // Local reading position is newer than remote
-          return await push(localState, {
+          return await push(effectiveLocalState, {
             updatedAt: localUpdatedAt,
             bookmarkUpdatedAt: nextUpdatedAt(),
+            isBookmarkOnly: false,
           });
         } else {
           // Equal timestamps (position unchanged on both sides)
           if (localHasBookmarkChanges) {
-            return await push(localState, {
+            return await push(effectiveLocalState, {
               updatedAt: localUpdatedAt > 0 ? localUpdatedAt : remoteData.updatedAt,
               bookmarkUpdatedAt: nextUpdatedAt(),
+              isBookmarkOnly: true,
             });
           }
           recordRemoteState(remoteData);
           saveSyncConfig(storage, config);
-          if (bookmarkListsDiffer(remoteData.bookmarks, localState.bookmarks)) {
+          if (bookmarkListsDiffer(remoteData.bookmarks, effectiveLocalState.bookmarks)) {
             onRemoteUpdate({ bookmarks: remoteData.bookmarks });
             notifyStatus("synced", "Merged bookmarks from cloud.");
             return { success: true, direction: "pulled", data: remoteData };
@@ -597,6 +674,7 @@ export function createSyncClient({
     latestLocalState = localState;
     if (!isConfigured() || !config.autoSync || destroyed) return;
 
+    localRevision++;
     ensureBookmarkBaseline(localState);
     const positionChanged = hasPositionChanges(localState);
     if (positionChanged) {
@@ -604,13 +682,13 @@ export function createSyncClient({
         ...localState.position,
         translation: localState.translation,
       });
-      config.lastUpdatedAt = Date.now();
+      config.lastUpdatedAt = nextUpdatedAt();
       saveSyncConfig(storage, config);
     }
 
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-      push(localState);
+      push(latestLocalState || localState);
     }, debounceMs);
   }
 

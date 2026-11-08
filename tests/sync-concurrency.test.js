@@ -191,3 +191,158 @@ test("regression: bookmark-only sync does not overwrite newer reading progress (
   mac.destroy();
   phone.destroy();
 });
+
+test("regression: in-flight sync does not overwrite newer local reading progress", async () => {
+  const remote = new SyncDurableObject({ storage: { sql: createMockSqlStorage() } }, {});
+  let delayGatePromise = null;
+  const fetchRemote = async (url, options = {}) => {
+    if ((options.method === "GET" || !options.method) && delayGatePromise) {
+      await delayGatePromise;
+    }
+    return remote.fetch(new Request(url, options));
+  };
+
+  let clientRemoteState = null;
+  const client = createSyncClient({
+    storage: createStorage(),
+    fetch: fetchRemote,
+    debounceMs: 50,
+    onRemoteUpdate: data => { clientRemoteState = data; },
+  });
+
+  const endpoint = "https://sync.example.workers.dev";
+  const sharedKey = "shared-pairing-key";
+  client.updateConfig({ endpoint, syncKey: sharedKey });
+
+  // Cloud already has initial reading progress at chapter 1, verse 1
+  await remote.fetch(new Request("https://sync.example.workers.dev/api/sync", {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${sharedKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      chapter: 1,
+      verse: 1,
+      bookmarks: [],
+      translation: "en.sahih",
+      updatedAt: 1000,
+    }),
+  }));
+
+  // Device initial state at chapter 1, verse 1
+  const startState = {
+    position: { chapter: 1, verse: 1 },
+    bookmarks: [],
+    translation: "en.sahih",
+  };
+
+  let releaseGet;
+  delayGatePromise = new Promise(resolve => { releaseGet = resolve; });
+
+  // 1. Sync starts with chapter 1, verse 1 (GET request is delayed and in-flight)
+  const syncPromise = client.sync(startState);
+
+  // 2. User navigates to chapter 2, verse 1 while GET is pending
+  const newState = {
+    position: { chapter: 2, verse: 1 },
+    bookmarks: [],
+    translation: "en.sahih",
+  };
+  client.queuePush(newState);
+
+  // 3. GET request completes
+  releaseGet();
+  const syncResult = await syncPromise;
+
+  // 4. Assert that final reading position remains chapter 2, verse 1
+  assert.equal(syncResult.success, true);
+  assert.equal(syncResult.data.chapter, 2, "Returned reading position chapter must remain chapter 2");
+  assert.equal(syncResult.data.verse, 1, "Returned reading position verse must remain verse 1");
+
+  const remoteRes = await remote.fetch(new Request("https://sync.example.workers.dev/api/sync", {
+    headers: { Authorization: `Bearer ${sharedKey}` },
+  }));
+  const remoteData = await remoteRes.json();
+  assert.equal(remoteData.chapter, 2, "Worker reading position chapter must remain chapter 2");
+  assert.equal(remoteData.verse, 1, "Worker reading position verse must remain verse 1");
+
+  client.destroy();
+});
+
+test("regression: bookmark-only sync with equal timestamps does not overwrite different reading position", async () => {
+  const remote = new SyncDurableObject({ storage: { sql: createMockSqlStorage() } }, {});
+  const fetchRemote = async (url, options = {}) => {
+    return remote.fetch(new Request(url, options));
+  };
+
+  const endpoint = "https://sync.example.workers.dev";
+  const sharedKey = "shared-pairing-key";
+
+  let devARemoteState = null;
+  const devA = createSyncClient({
+    storage: createStorage(),
+    fetch: fetchRemote,
+    onRemoteUpdate: data => { devARemoteState = data; },
+  });
+
+  let devBRemoteState = null;
+  const devB = createSyncClient({
+    storage: createStorage(),
+    fetch: fetchRemote,
+    onRemoteUpdate: data => { devBRemoteState = data; },
+  });
+
+  const positionTimestamp = 5000;
+  devA.updateConfig({
+    endpoint,
+    syncKey: sharedKey,
+    lastUpdatedAt: positionTimestamp,
+    lastSyncedAt: positionTimestamp,
+    lastPosition: { chapter: 1, verse: 1 },
+  });
+
+  devB.updateConfig({
+    endpoint,
+    syncKey: sharedKey,
+    lastUpdatedAt: positionTimestamp,
+    lastSyncedAt: positionTimestamp,
+    lastPosition: { chapter: 2, verse: 1 },
+  });
+
+  // Device B pushes reading position chapter 2, verse 1 at timestamp 5000
+  const devBPush = await devB.push({
+    position: { chapter: 2, verse: 1 },
+    bookmarks: [],
+    translation: "en.sahih",
+  }, { updatedAt: positionTimestamp, isBookmarkOnly: false });
+  assert.equal(devBPush.success, true);
+  assert.equal(devBPush.data.chapter, 2);
+  assert.equal(devBPush.data.verse, 1);
+
+  // Device A is at chapter 1, verse 1 at identical position timestamp 5000
+  // Device A adds a bookmark and synchronizes (bookmark-only sync)
+  const bookmark = { chapter: 3, verse: 16 };
+  const devAPush = await devA.push({
+    position: { chapter: 1, verse: 1 },
+    bookmarks: [bookmark],
+    translation: "en.sahih",
+  }, { updatedAt: positionTimestamp, isBookmarkOnly: true });
+
+  assert.equal(devAPush.success, true);
+
+  // Assert that Worker reading position remains chapter 2, verse 1 (not overwritten by Device A chapter 1, verse 1)
+  const remoteRes = await remote.fetch(new Request("https://sync.example.workers.dev/api/sync", {
+    headers: { Authorization: `Bearer ${sharedKey}` },
+  }));
+  const remoteData = await remoteRes.json();
+  assert.equal(remoteData.chapter, 2, "Remote chapter must remain chapter 2");
+  assert.equal(remoteData.verse, 1, "Remote verse must remain verse 1");
+  assert.deepEqual(remoteData.bookmarks, [bookmark], "Remote bookmarks must contain Device A added bookmark");
+
+  // Device A should preserve its own reading position and not adopt Device B position on bookmark-only push
+  assert.equal(devARemoteState, null, "Device A should not receive position change update");
+
+  devA.destroy();
+  devB.destroy();
+});

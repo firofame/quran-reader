@@ -86,34 +86,41 @@
                     </div>
                     <div class="sync-header-actions">
                       <button id="sync-quick-btn" type="button" class="secondary-button sync-quick-btn" title="Sync reading progress now" hidden><span data-icon="refresh"></span>Sync now</button>
-                      <button id="sync-toggle-panel" type="button" class="sync-toggle-btn" aria-expanded="false" aria-controls="sync-details">Configure</button>
+                      <button id="sync-toggle-panel" type="button" class="sync-toggle-btn" aria-expanded="false" aria-controls="sync-details">Set up</button>
                     </div>
                   </div>
                   <div id="sync-details" class="sync-details" hidden>
-                    <p class="sync-description">Nothing is sent to Cloudflare until you choose Save &amp; connect. Afterward, your reading position and selected translation are synced to this Worker. Generate a private key on one device, copy it, then use the same key and Worker URL on your other devices. Anyone with the key can access your synced data.</p>
-                    <form id="sync-form" class="sync-form" autocomplete="off">
-                      <div class="sync-fields">
-                        <label class="sync-field">
-                          <span class="sync-field-label">Worker URL</span>
-                          <input id="sync-endpoint" type="url" placeholder="https://quran-sync.<worker>.workers.dev" autocomplete="off" spellcheck="false">
-                        </label>
-                        <label class="sync-field">
-                          <span class="sync-field-label">Pairing key</span>
-                          <div class="input-wrap sync-key-wrap">
-                            <input id="sync-key" type="password" placeholder="Private pairing key" autocomplete="off" spellcheck="false">
-                            <button id="toggle-sync-key" type="button" class="sync-icon-btn" aria-label="Show pairing key" title="Show/hide pairing key" data-icon="key"></button>
-                          </div>
-                        </label>
-                      </div>
+                    <p class="sync-description">Keep your reading position and translation in sync. Nothing is sent until you choose an option below. Start on one device, then join the others with one private setup code.</p>
+                    <form id="sync-new-form" class="sync-setup-section" autocomplete="off">
+                      <h3>First device</h3>
+                      <p class="sync-section-description">Start syncing here. A private setup code will be created for your other devices.</p>
                       <div class="sync-actions">
-                        <button id="generate-sync-key" type="button" class="secondary-button">Generate key</button>
-                        <button id="copy-sync-key" type="button" class="secondary-button" disabled>Copy key</button>
-                        <button id="sync-save-btn" type="submit" class="primary-button sync-save-btn">Save &amp; connect</button>
-                        <button id="sync-now-btn" type="button" class="secondary-button sync-now-btn" hidden><span data-icon="refresh"></span>Sync now</button>
+                        <button id="sync-new-btn" type="submit" class="primary-button sync-primary-btn">Start syncing</button>
+                      </div>
+                    </form>
+                    <div id="sync-code-panel" class="sync-setup-section" hidden>
+                      <h3>Your setup code</h3>
+                      <label class="sync-field">
+                        <span class="sync-field-label">Copy this code to your other devices</span>
+                        <textarea id="sync-code-output" rows="3" readonly spellcheck="false" aria-label="Private sync setup code"></textarea>
+                      </label>
+                      <div class="sync-actions">
+                        <button id="copy-sync-code" type="button" class="secondary-button">Copy setup code</button>
                         <button id="sync-disconnect-btn" type="button" class="disconnect-button" hidden>Disconnect</button>
                       </div>
-                      <div id="sync-message" class="sync-message" role="status" aria-live="polite"></div>
+                      <p class="sync-code-warning">Keep the code private. Anyone with it can access your synced reading position and translation.</p>
+                    </div>
+                    <form id="sync-join-form" class="sync-setup-section" autocomplete="off">
+                      <h3>Another device</h3>
+                      <label class="sync-field">
+                        <span class="sync-field-label">Setup code</span>
+                        <textarea id="sync-code-input" rows="3" placeholder="Paste the code from your first device" autocomplete="off" spellcheck="false"></textarea>
+                      </label>
+                      <div class="sync-actions">
+                        <button id="sync-join-btn" type="submit" class="primary-button sync-primary-btn">Join sync</button>
+                      </div>
                     </form>
+                    <div id="sync-message" class="sync-message" role="status" aria-live="polite"></div>
                   </div>
                 </div>
               </div>

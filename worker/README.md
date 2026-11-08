@@ -1,6 +1,6 @@
-# Quran Reader — Cross-Device Cloudflare Sync Worker
+# Quran Reader — Cross-Device Sync Worker
 
-A Cloudflare Worker paired with a SQLite-backed Durable Object providing strongly consistent, real-time synchronization of Quran reading progress across devices (such as desktop Opera on macOS and Opera on Android).
+A Cloudflare Worker paired with a SQLite-backed Durable Object provides strongly consistent, real-time synchronization of Quran reading progress across devices. The reader app is configured to use `https://quran.firofame.workers.dev`; readers do not need to deploy the Worker or enter its URL.
 
 ---
 
@@ -41,7 +41,36 @@ Workers KV is **eventually consistent**. Writes made from one location (e.g. mob
 
 ---
 
-## Deployment Steps
+## Maintainer Deployment (One Time)
+
+These steps are for the project maintainer. The reader app already points to the
+project's deployed Worker.
+
+The reader site's default address is `DEFAULT_SYNC_ENDPOINT` in
+[`../sync-client.js`](../sync-client.js). If the Worker is moved to a different
+Cloudflare account or hostname, update that constant before publishing the reader.
+
+### GitHub Actions
+
+The repository's `.github/workflows/deploy-worker.yml` deploys this Worker with
+Wrangler:
+
+- Changes to `worker/` merged into `main` deploy to production.
+- The first production deploy renames the existing Worker from `quran-reader-sync`
+  to `quran` in place, preserving the Worker identity and its Durable Object data.
+- Same-repository pull requests get an isolated Worker preview. The preview is
+  removed when the pull request closes, including its temporary Durable Object
+  storage. Fork pull requests do not get a Cloudflare preview.
+
+Add this value in the repository's **Settings → Secrets and variables → Actions**:
+
+- **Secret** `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Edit Cloudflare
+  Workers** access, scoped to the `quran` Worker in the account set in
+  `wrangler.jsonc`.
+
+The Worker's optional `SYNC_SECRET` is for API authentication and is unrelated
+to deployment; leave it unset for normal per-device pairing. Wrangler's local
+`wrangler login` session also cannot authenticate a GitHub Actions runner.
 
 ### 1. Prerequisites
 - [Node.js](https://nodejs.org/) v20 or later.
@@ -73,7 +102,7 @@ npx wrangler deploy
 
 Wrangler will output your public Worker URL, for example:
 ```
-https://quran-reader-sync.<your-subdomain>.workers.dev
+https://quran.firofame.workers.dev
 ```
 
 ### 5. Local Development (Optional)
@@ -88,21 +117,15 @@ Local URL will typically be `http://localhost:8787`.
 
 ## Connecting Devices in the Quran Reader App
 
-1. Open your Quran Reader in the browser (e.g., Mac Mini Opera).
-2. Tap **Controls** in the header.
-3. On the first device, in the **Cross-device sync** panel:
-   - **Worker URL**: Enter your deployed Worker URL (e.g. `https://quran-reader-sync.<subdomain>.workers.dev`).
-   - **Pairing key**: Click **Generate key**, then **Copy key**. The key is generated with the browser's cryptographic random-number generator; keep it private.
-   - Click **Save & connect**.
-4. Nothing is sent to Cloudflare before **Save & connect**. After connecting, the reader sends reading position and the selected translation identifier to this Worker; translation text stays local. Sync then runs automatically.
-5. On each additional device (e.g., Android Opera):
-   - Open Quran Reader -> **Controls** -> **Cross-device sync**.
-   - Enter the exact same **Worker URL** and paste the copied **Pairing key**.
-   - Click **Save & connect**.
-   - The device pulls the current state and joins automatic sync.
+1. On the first device, open **Controls** → **Cross-device sync** and choose
+   **Start syncing**.
+2. Choose **Copy setup code** and keep it private.
+3. On each additional device, paste the code under **Another device** and choose
+   **Join sync**.
 
-Anyone with the pairing key can read or change the corresponding sync space.
-Different random keys map to separate Durable Objects.
+The app creates a random private key and includes it with the service address in
+the setup code. Anyone with the code can read or change that sync space. Different
+random keys map to separate Durable Objects.
 
 ---
 
@@ -150,4 +173,4 @@ Updates reading progress.
   block updates.
 
 ### `GET /health`
-Health check endpoint returning `{ "status": "ok", "service": "quran-reader-sync" }`.
+Health check endpoint returning `{ "status": "ok", "service": "quran" }`.

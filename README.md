@@ -38,43 +38,41 @@ browser blocks the reader's local data-file requests.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes.
 - The exact selected ayah and preferences are saved in this browser's local
-  storage by default. Cross-device synchronization is off until you configure and connect
-  it; see [Cross-Device Sync](#cross-device-sync).
+  storage by default. Cross-device synchronization is off until you choose to
+  start or join it; see [Cross-Device Sync](#cross-device-sync).
 - Press `/` to find a chapter, and Escape to clear a focused search or close
   the controls or mobile chapter drawer.
 
 Translations are loaded from the supplied local files and retained in memory
 while the page is open. A fresh installation makes no cloud requests. After you
-explicitly connect sync, the app sends your reading position and
-selected translation identifier to the configured Worker; translation text
-remains local.
+choose **Start syncing** or **Join sync**, the app sends your reading position
+and selected translation identifier to the Quran Reader sync service;
+translation text remains local.
 This is a translation reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
 
 ## Cross-Device Sync
 
-Sync is off by default. Nothing is sent to Cloudflare until you explicitly choose
-**Save & connect** in the Cross-device sync panel.
+Sync is off by default. Nothing is sent to the sync service until you explicitly
+choose **Start syncing** or **Join sync** in the Cross-device sync panel.
 
 After upgrading from an older version, any sync configuration that did not record
-explicit consent is cleared; local reading data remains. Generate a new private
-key and pair your devices again.
+explicit consent is cleared; local reading data remains. Set up sync again and
+rejoin your devices with the new setup code.
 
-1. On your first device, open **Controls** and then **Cross-device sync**.
-2. Enter your deployed Cloudflare Worker URL and choose **Generate key**. The app
-   uses the browser's cryptographic random-number generator and offers **Copy key**
-   to transfer the private key.
-3. Choose **Save & connect**. The app saves the key in this browser and begins
-   syncing your reading position and selected translation identifier
-   with that Worker. Your translation text is not uploaded.
-4. On each additional device, enter the same Worker URL, paste the exact same key,
-   and choose **Save & connect**. The devices then sync automatically.
+1. On your first device, open **Controls** → **Cross-device sync** and choose
+   **Start syncing**. The app creates a private key and connects automatically.
+2. Choose **Copy setup code**.
+3. On each additional device, open **Cross-device sync**, paste the code under
+   **Another device**, and choose **Join sync**.
 
-Each key identifies a separate sync space. Keep it private: anyone with the key
-can read or change that space's synced data. Reading changes are
-saved locally first and remain available offline. Position and translation
-updates use bounded timestamp-based conflict resolution.
+The setup code is private: anyone with it can read or change that sync space's
+reading position and translation choice. Reading changes are saved locally first
+and remain available offline. Position and translation updates use bounded
+timestamp-based conflict resolution.
 
-See [`worker/README.md`](worker/README.md) for complete Cloudflare Worker configuration, SQLite Durable Object schema, and deployment instructions using Wrangler.
+The sync service is hosted by the project, so readers do not need a Cloudflare
+account or a Worker URL. See [`worker/README.md`](worker/README.md) for maintainer
+deployment and service details.
 
 ## Architecture
 

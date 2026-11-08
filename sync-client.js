@@ -1,4 +1,5 @@
 export const SYNC_STORAGE_KEY = "quran-reader:sync:v1";
+export const DEFAULT_SYNC_ENDPOINT = "https://quran.firofame.workers.dev";
 
 const DEFAULT_CONFIG = {
   explicitlyConfigured: false,
@@ -124,6 +125,52 @@ export function generateSyncKey() {
   return `quran-${hex.match(/.{8}/g).join("-")}`;
 }
 
+const SYNC_SETUP_CODE_PREFIX = "QRS1-";
+const MAX_SYNC_SETUP_CODE_LENGTH = 4096;
+
+export function createSyncSetupCode(endpoint, syncKey) {
+  const normalizedEndpoint = normalizeEndpoint(endpoint);
+  const normalizedKey = typeof syncKey === "string" ? syncKey.trim() : "";
+  if (!normalizedEndpoint || !normalizedKey) {
+    throw new Error("Sync setup is incomplete.");
+  }
+
+  const payload = JSON.stringify({ version: 1, endpoint: normalizedEndpoint, key: normalizedKey });
+  const bytes = new TextEncoder().encode(payload);
+  const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join("");
+  const encoded = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return `${SYNC_SETUP_CODE_PREFIX}${encoded}`;
+}
+
+export function parseSyncSetupCode(rawCode) {
+  if (typeof rawCode !== "string") return null;
+  const code = rawCode.trim();
+  if (
+    code.length > MAX_SYNC_SETUP_CODE_LENGTH ||
+    !code.startsWith(SYNC_SETUP_CODE_PREFIX)
+  ) {
+    return null;
+  }
+
+  try {
+    const encoded = code.slice(SYNC_SETUP_CODE_PREFIX.length);
+    if (!/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
+    const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+    if (!payload || payload.version !== 1 || typeof payload.key !== "string") return null;
+
+    const endpoint = normalizeEndpoint(payload.endpoint);
+    const syncKey = payload.key.trim();
+    if (!endpoint || !syncKey || syncKey.length > 512) return null;
+    return { endpoint, syncKey };
+  } catch {
+    return null;
+  }
+}
+
 export function createSyncClient({
   storage = globalThis.localStorage,
   fetch = globalThis.fetch?.bind(globalThis),
@@ -229,13 +276,13 @@ export function createSyncClient({
 
   function formatSyncError(statusCode, errText) {
     if (statusCode === 401) {
-      return "Incorrect pairing key or unauthorized.";
+      return "This setup code was not accepted.";
     }
     if (statusCode === 404) {
-      return "Worker endpoint not found. Check the URL.";
+      return "The sync service could not be found. Try again later.";
     }
     if (statusCode >= 500) {
-      return `Worker server error (${statusCode}).`;
+      return `Sync service error (${statusCode}).`;
     }
     try {
       const parsed = JSON.parse(errText);

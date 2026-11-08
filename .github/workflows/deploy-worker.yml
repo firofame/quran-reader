@@ -1,0 +1,144 @@
+name: Deploy Quran Reader sync Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - ".github/workflows/deploy-worker.yml"
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "worker/**"
+      - ".github/workflows/deploy-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-production:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Rename the existing Worker in place
+        env:
+          ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          for current_name in quran-reader-sync quran; do
+            http_status=$(curl --silent --show-error \
+              --output "$RUNNER_TEMP/worker-rename-response.json" \
+              --write-out "%{http_code}" \
+              --request PATCH \
+              "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/workers/${current_name}" \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data '{"name":"quran"}')
+            if [[ "$http_status" == 200 ]]; then
+              echo "Worker is named quran."
+              exit 0
+            fi
+          done
+          cat "$RUNNER_TEMP/worker-rename-response.json"
+          exit 1
+
+      - name: Deploy production Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.158.0"
+          workingDirectory: worker
+          command: deploy
+
+  preview:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@v5
+
+      - name: Find the current Worker name
+        id: worker
+        env:
+          ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          for worker_name in quran quran-reader-sync; do
+            http_status=$(curl --silent --show-error \
+              --output /dev/null \
+              --write-out "%{http_code}" \
+              "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/workers/${worker_name}" \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}")
+            if [[ "$http_status" == 200 ]]; then
+              echo "name=${worker_name}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "Could not find the sync Worker under either its old or new name." >&2
+          exit 1
+
+      - name: Deploy isolated Worker preview
+        id: preview
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.158.0"
+          workingDirectory: worker
+          command: preview --name pr-${{ github.event.pull_request.number }} --worker-name ${{ steps.worker.outputs.name }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add preview URL to the job summary
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.preview-url }}
+        run: |
+          echo "### Cloudflare Worker preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "$PREVIEW_URL" >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup-preview:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Find the current Worker name
+        id: worker
+        env:
+          ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          for worker_name in quran quran-reader-sync; do
+            http_status=$(curl --silent --show-error \
+              --output /dev/null \
+              --write-out "%{http_code}" \
+              "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/workers/${worker_name}" \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}")
+            if [[ "$http_status" == 200 ]]; then
+              echo "name=${worker_name}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "Could not find the sync Worker under either its old or new name." >&2
+          exit 1
+
+      - name: Delete the pull request preview
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.158.0"
+          workingDirectory: worker
+          command: preview delete --name pr-${{ github.event.pull_request.number }} --worker-name ${{ steps.worker.outputs.name }} --skip-confirmation

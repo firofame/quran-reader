@@ -152,24 +152,25 @@ select option { background: var(--paper); color: var(--text); }
 .sync-toggle-btn { font-size: 10px; color: var(--green); text-decoration: underline; text-underline-offset: 3px; }
 .sync-details { padding-top: 10px; }
 .sync-description { margin: 0 0 12px; font-size: 11px; color: var(--muted); line-height: 1.5; }
-.sync-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.sync-setup-section { padding: 10px 0; border-top: 1px solid var(--line); }
+.sync-setup-section h3 { margin: 0 0 6px; color: var(--ink); font-size: 11px; font-weight: 600; }
+.sync-section-description { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.sync-setup-section textarea { display: block; width: 100%; min-height: 58px; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--text); font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+.sync-setup-section textarea:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+#sync-code-output { user-select: all; }
 .sync-field { display: flex; flex-direction: column; gap: 5px; font-size: 10px; color: var(--muted); }
 .sync-field-label { font-weight: 500; letter-spacing: .3px; }
 .sync-field input { height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--text); font-size: 11px; width: 100%; }
 .sync-field input:focus { outline: 2px solid var(--green); outline-offset: 1px; }
-.sync-key-wrap { position: relative; display: flex; align-items: center; height: 34px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); padding: 0 4px 0 10px; }
-.sync-key-wrap input { border: 0; padding: 0; height: 100%; flex: 1; min-width: 0; outline: none; }
-.sync-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; color: var(--muted); border-radius: 3px; }
-.sync-icon-btn:hover { color: var(--green); background: var(--green-soft); }
-.sync-icon-btn svg { width: 14px; height: 14px; }
 .sync-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .secondary-button { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; color: var(--text); background: var(--paper); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .secondary-button:hover:not(:disabled) { background: var(--green-soft); color: var(--green); border-color: var(--green); }
 .secondary-button svg { width: 13px; height: 13px; }
 .sync-quick-btn { padding: 4px 8px; font-size: 10px; }
-.sync-save-btn { margin-top: 0; padding: 6px 14px; font-size: 11px; }
+.sync-primary-btn { margin-top: 0; padding: 6px 14px; font-size: 11px; }
 .disconnect-button { font-size: 10px; color: var(--muted); margin-left: auto; text-decoration: underline; text-underline-offset: 3px; }
 .disconnect-button:hover { color: #c34b35; }
+.sync-code-warning { margin: 8px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .sync-message { font-size: 10px; line-height: 1.4; color: var(--muted); margin-top: 8px; min-height: 16px; }
 .sync-message.is-error { color: #c34b35; }
 :root[data-theme="dark"] .sync-message.is-error { color: #f28b74; }
@@ -247,7 +248,6 @@ select option { background: var(--paper); color: var(--text); }
   .chapter-arabic { display: none; }
   .reading-metadata { padding-left: 16px; padding-right: 16px; }
   .sync-panel { padding-left: 18px; padding-right: 18px; }
-  .sync-fields { grid-template-columns: 1fr; }
 }
 
 @media (any-pointer: coarse) {

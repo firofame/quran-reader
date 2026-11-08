@@ -22,6 +22,8 @@ npm start
 ```
 
 Then open `http://localhost:3000` in your browser.
+Opening `index.html` directly with a `file://` URL will not work because the
+browser blocks the reader's local data-file requests.
 
 ## Reader Features
 

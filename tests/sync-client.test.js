@@ -24,7 +24,6 @@ test("sync config: loads defaults when storage is empty or corrupted", () => {
   assert.equal(emptyConfig.syncKey, "");
   assert.equal(emptyConfig.lastSyncedAt, 0);
   assert.equal(emptyConfig.lastUpdatedAt, 0);
-  assert.equal(emptyConfig.bookmarkBaseline, null);
   assert.equal(emptyConfig.autoSync, false);
 
   store.set(SYNC_STORAGE_KEY, "{corrupt-json");
@@ -50,7 +49,6 @@ test("sync config: saves, loads, and clears valid configuration", () => {
     syncKey: "secret-key-123",
     lastSyncedAt: 1000,
     lastUpdatedAt: 1000,
-    bookmarkBaseline: null,
     autoSync: true,
   };
 
@@ -84,9 +82,9 @@ test("sync config: clears legacy settings that did not record explicit consent",
   assert.equal(client.isConfigured(), false);
   assert.equal(client.getConfig().syncKey, "");
   assert.equal(store.has(SYNC_STORAGE_KEY), false);
-  const syncResult = await client.sync({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  const syncResult = await client.sync({ position: { chapter: 1, verse: 1 } });
   assert.equal(syncResult.reason, "unconfigured");
-  client.queuePush({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  client.queuePush({ position: { chapter: 1, verse: 1 } });
   assert.equal(fetchCalled, false);
 });
 
@@ -144,15 +142,15 @@ test("sync client: unconfigured client safely returns without making network req
   assert.equal(pullRes.success, false);
   assert.equal(pullRes.reason, "unconfigured");
 
-  const pushRes = await client.push({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  const pushRes = await client.push({ position: { chapter: 1, verse: 1 } });
   assert.equal(pushRes.success, false);
   assert.equal(pushRes.reason, "unconfigured");
 
-  const syncRes = await client.sync({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  const syncRes = await client.sync({ position: { chapter: 1, verse: 1 } });
   assert.equal(syncRes.success, false);
   assert.equal(syncRes.reason, "unconfigured");
 
-  client.queuePush({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  client.queuePush({ position: { chapter: 1, verse: 1 } });
   assert.equal(fetchCalled, false);
 });
 
@@ -179,7 +177,6 @@ test("sync client: pushes local state to worker with correct authorization and p
         empty: false,
         chapter: capturedBody.chapter,
         verse: capturedBody.verse,
-        bookmarks: capturedBody.bookmarks,
         translation: capturedBody.translation,
         updatedAt: capturedBody.updatedAt,
       }),
@@ -199,7 +196,6 @@ test("sync client: pushes local state to worker with correct authorization and p
 
   const localState = {
     position: { chapter: 2, verse: 255 },
-    bookmarks: [{ chapter: 1, verse: 1 }, { chapter: 2, verse: 255 }],
     translation: "en.sahih",
   };
 
@@ -210,7 +206,6 @@ test("sync client: pushes local state to worker with correct authorization and p
   assert.equal(capturedHeaders["X-Sync-Key"], "test-secret-key");
   assert.equal(capturedBody.chapter, 2);
   assert.equal(capturedBody.verse, 255);
-  assert.deepEqual(capturedBody.bookmarks, localState.bookmarks);
   assert.equal(capturedBody.translation, "en.sahih");
   assert.ok(capturedBody.updatedAt > 0);
 
@@ -231,7 +226,6 @@ test("sync client: pulls newer remote state and triggers onRemoteUpdate", async 
     empty: false,
     chapter: 3,
     verse: 18,
-    bookmarks: [{ chapter: 3, verse: 18 }],
     translation: "ml.abdulhameed",
     updatedAt: 500000,
   };
@@ -282,7 +276,7 @@ test("sync client: handles network failure gracefully without throwing", async (
     syncKey: "test-secret-key",
   });
 
-  const res = await client.sync({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  const res = await client.sync({ position: { chapter: 1, verse: 1 } });
   assert.equal(res.success, false);
   assert.equal(lastStatus.status, "offline");
   assert.match(lastStatus.message, /Failed to fetch/);
@@ -349,7 +343,7 @@ test("sync client: debounced queuePush coalesces rapid local updates", async () 
       return {
         ok: true,
         status: 200,
-        json: async () => ({ empty: false, chapter: 1, verse: body.verse, bookmarks: [], updatedAt: body.updatedAt }),
+        json: async () => ({ empty: false, chapter: 1, verse: body.verse, updatedAt: body.updatedAt }),
       };
     },
   });
@@ -360,9 +354,9 @@ test("sync client: debounced queuePush coalesces rapid local updates", async () 
   });
 
   // Rapidly queue 3 pushes
-  client.queuePush({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
-  client.queuePush({ position: { chapter: 1, verse: 2 }, bookmarks: [] });
-  client.queuePush({ position: { chapter: 1, verse: 3 }, bookmarks: [] });
+  client.queuePush({ position: { chapter: 1, verse: 1 } });
+  client.queuePush({ position: { chapter: 1, verse: 2 } });
+  client.queuePush({ position: { chapter: 1, verse: 3 } });
 
   assert.equal(pushes, 0); // Not pushed yet
   await new Promise(resolve => setTimeout(resolve, 80));
@@ -382,7 +376,7 @@ test("sync client: unconfigured queuePush does not update lastUpdatedAt in stora
 
   const client = createSyncClient({ storage });
   assert.equal(client.isConfigured(), false);
-  client.queuePush({ position: { chapter: 2, verse: 1 }, bookmarks: [] });
+  client.queuePush({ position: { chapter: 2, verse: 1 } });
 
   const config = client.getConfig();
   assert.equal(config.lastUpdatedAt, 0);
@@ -400,7 +394,6 @@ test("sync client: fresh device pairing pulls remote cloud progress", async () =
     empty: false,
     chapter: 18,
     verse: 1,
-    bookmarks: [{ chapter: 18, verse: 1 }],
     translation: "en.sahih",
     updatedAt: 1000,
   };
@@ -424,7 +417,7 @@ test("sync client: fresh device pairing pulls remote cloud progress", async () =
   // Fresh device has lastSyncedAt === 0
   assert.equal(client.getConfig().lastSyncedAt, 0);
 
-  const res = await client.sync({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  const res = await client.sync({ position: { chapter: 1, verse: 1 } });
   assert.equal(res.success, true);
   assert.equal(res.direction, "pulled");
   assert.deepEqual(remoteUpdate, remotePayload);
@@ -474,7 +467,6 @@ test("sync client: queuePush maintains monotonic timestamps when stored timestam
   // User navigates to chapter 2, verse 1
   client.queuePush({
     position: { chapter: 2, verse: 1 },
-    bookmarks: [],
     translation: "en.sahih",
   });
 

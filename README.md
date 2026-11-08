@@ -1,32 +1,32 @@
-# The Quran
+# The Quran — A Space for Reflection
 
-A minimal, responsive Quran translation reader with a focused, one-ayah-at-a-time
-reading view. No framework, dependencies,
-accounts, API keys, or external font requests.
+A quiet, responsive web reader for English and Malayalam translations of the
+Quran.
 
-**Read online:** <https://firofame.github.io/quran-reader/>
+- Explore 114 chapters with search across chapter names, meanings, Arabic text,
+  and chapter numbers.
+- Switch between Saheeh International (English) and Cheriyamundam Abdul Hameed &
+  Kunhi Mohammed Parappoor (Malayalam).
+- Complete Tanzil chapter and ayah metadata is baked in: verses, revelation
+  order, revelation place, rukus, pages, manzils, hizb quarters, juzs, and
+  sajdas.
 
-## Run
+---
 
-Requires Node.js 22 or newer:
+## Getting Started
+
+Start the local static server:
 
 ```sh
 npm start
 ```
 
-Open <http://localhost:3000>. Use `PORT=3001 npm start` to choose another port.
-The server listens on the local machine only. Alternatively, serve this directory
-with a static web server; opening the HTML directly with `file://` will not work
-because browsers restrict fetching local translation files.
+Then open `http://localhost:3000` in your browser.
+Opening `index.html` directly with a `file://` URL will not work because the
+browser blocks the reader's local data-file requests.
 
-## Reading
+## Reader Features
 
-- The verse takes priority in a viewport-filling reader with a compact chapter
-  header. Open **Controls** for translation, text size, search, and ayah jump.
-  Short ayahs and their navigation fit on screen; longer ayahs scroll naturally
-  without clipping or shrinking the text. Source credits sit below the reader.
-- Browse or search all 114 chapters by name, meaning, Arabic name, or number.
-- Read the supplied Saheeh International or Malayalam translation.
 - See the current ayah's page, ruku, manzil, hizb, and juz; sajda ayahs carry a
   subtle ۩ marker.
 - The gold bar below the reader tracks your ayah position within the current
@@ -34,12 +34,10 @@ because browsers restrict fetching local translation files.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - Search the entire current chapter and move through matching ayahs one at a
-  time. Saved verses remain a browsable collection.
+  time.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
-- Bookmark verses and revisit them in **Saved**. Click a saved verse number to
-  return to its chapter.
 - Adjust text size and switch between light and dark themes.
-- The exact selected ayah, bookmarks, and preferences are saved in this browser's local
+- The exact selected ayah and preferences are saved in this browser's local
   storage by default. Cross-device synchronization is off until you configure and connect
   it; see [Cross-Device Sync](#cross-device-sync).
 - Press `/` to find a chapter, and Escape to clear a focused search or close
@@ -47,7 +45,7 @@ because browsers restrict fetching local translation files.
 
 Translations are loaded from the supplied local files and retained in memory
 while the page is open. A fresh installation makes no cloud requests. After you
-explicitly connect sync, the app sends your reading position, bookmarks, and
+explicitly connect sync, the app sends your reading position and
 selected translation identifier to the configured Worker; translation text
 remains local.
 This is a translation reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
@@ -66,17 +64,15 @@ key and pair your devices again.
    uses the browser's cryptographic random-number generator and offers **Copy key**
    to transfer the private key.
 3. Choose **Save & connect**. The app saves the key in this browser and begins
-   syncing your reading position, bookmarks, and selected translation identifier
+   syncing your reading position and selected translation identifier
    with that Worker. Your translation text is not uploaded.
 4. On each additional device, enter the same Worker URL, paste the exact same key,
    and choose **Save & connect**. The devices then sync automatically.
 
 Each key identifies a separate sync space. Keep it private: anyone with the key
-can read or change that space's synced data. Reading and bookmark changes are
+can read or change that space's synced data. Reading changes are
 saved locally first and remain available offline. Position and translation
-updates use bounded timestamp-based conflict resolution; bookmark additions and
-removals are reconciled per verse so stale devices do not silently erase
-concurrent additions or restore removed bookmarks.
+updates use bounded timestamp-based conflict resolution.
 
 See [`worker/README.md`](worker/README.md) for complete Cloudflare Worker configuration, SQLite Durable Object schema, and deployment instructions using Wrangler.
 
@@ -98,11 +94,6 @@ npm test
 
 Pull requests targeting `main` run these checks automatically through the
 [validation workflow](.github/workflows/validate.yml).
-
-Tests verify all 6,236 verses in each translation, metadata alignment, malformed
-data handling, focused ayah selection, navigation across chapter boundaries,
-bottom button navigation, search, deep links, saved preferences, and
-static server routes.
 
 ## Publish
 

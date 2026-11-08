@@ -2,19 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import workerDefault, {
+  MAX_FUTURE_SKEW_MS,
   SyncDurableObject,
   extractAuthKey,
   getCorsHeaders,
   hashSyncKey,
-  MAX_FUTURE_SKEW_MS,
 } from "../worker/src/index.js";
 
 function createMockSqlStorage() {
   const db = new DatabaseSync(":memory:");
   return {
     exec(query, ...params) {
-      const trimmed = query.trim().toUpperCase();
-      if (trimmed.startsWith("SELECT")) {
+      const normalizedQuery = query.trim().toUpperCase();
+      if (normalizedQuery.startsWith("SELECT") || normalizedQuery.startsWith("PRAGMA")) {
         const rows = db.prepare(query).all(...params);
         return {
           toArray: () => rows,
@@ -32,44 +32,46 @@ function createMockSqlStorage() {
 }
 
 test("CORS headers: returns expected permissive headers", () => {
-  const request = new Request("https://sync.example.com", {
-    headers: { Origin: "https://my-github-pages.io" },
-  });
-  const headers = getCorsHeaders(request);
-  assert.equal(headers["Access-Control-Allow-Origin"], "https://my-github-pages.io");
-  assert.match(headers["Access-Control-Allow-Methods"], /GET, PUT, POST, OPTIONS/);
+  const headers = getCorsHeaders(new Request("https://sync.example.com", {
+    headers: { Origin: "https://example.com" },
+  }));
+  assert.equal(headers["Access-Control-Allow-Origin"], "https://example.com");
+  assert.match(headers["Access-Control-Allow-Methods"], /GET/);
+  assert.match(headers["Access-Control-Allow-Methods"], /PUT/);
   assert.match(headers["Access-Control-Allow-Headers"], /Authorization/);
+  assert.match(headers["Access-Control-Allow-Headers"], /X-Sync-Key/);
 });
 
 test("extractAuthKey: parses Bearer token (case-insensitively per RFC 6750) and X-Sync-Key headers", () => {
-  const req1 = new Request("https://sync.example.com", {
+  const bearerReq = new Request("https://sync.example.com", {
     headers: { Authorization: "Bearer my-secret-token" },
   });
-  assert.equal(extractAuthKey(req1), "my-secret-token");
+  assert.equal(extractAuthKey(bearerReq), "my-secret-token");
 
-  const reqCase = new Request("https://sync.example.com", {
-    headers: { Authorization: "bearer lowercase-token" },
+  const caseInsensitiveBearer = new Request("https://sync.example.com", {
+    headers: { Authorization: "bearer lowercase-bearer-token" },
   });
-  assert.equal(extractAuthKey(reqCase), "lowercase-token");
+  assert.equal(extractAuthKey(caseInsensitiveBearer), "lowercase-bearer-token");
 
-  const req2 = new Request("https://sync.example.com", {
+  const mixedCaseBearer = new Request("https://sync.example.com", {
+    headers: { Authorization: "bEaReR mixed-case-token" },
+  });
+  assert.equal(extractAuthKey(mixedCaseBearer), "mixed-case-token");
+
+  const customHeaderReq = new Request("https://sync.example.com", {
     headers: { "X-Sync-Key": "custom-key-123" },
   });
-  assert.equal(extractAuthKey(req2), "custom-key-123");
+  assert.equal(extractAuthKey(customHeaderReq), "custom-key-123");
 
-  const req3 = new Request("https://sync.example.com", {
-    headers: { Authorization: "Basic dXNlcjpwYXNz" },
-  });
-  assert.equal(extractAuthKey(req3), null);
-
-  const req4 = new Request("https://sync.example.com");
-  assert.equal(extractAuthKey(req4), null);
+  const emptyReq = new Request("https://sync.example.com");
+  assert.equal(extractAuthKey(emptyReq), null);
 });
 
 test("hashSyncKey: creates deterministic 64-character SHA-256 hex string", async () => {
-  const hash1 = await hashSyncKey("apple-banana-123");
-  const hash2 = await hashSyncKey("apple-banana-123");
+  const hash1 = await hashSyncKey("my-secret-pairing-key");
+  const hash2 = await hashSyncKey("my-secret-pairing-key");
   const hash3 = await hashSyncKey("different-key");
+
   assert.equal(hash1.length, 64);
   assert.equal(hash1, hash2);
   assert.notEqual(hash1, hash3);
@@ -97,7 +99,6 @@ test("Worker fetch: isolates data for independent sync keys", async () => {
       body: JSON.stringify({
         chapter,
         verse: 1,
-        bookmarks: [],
         updatedAt: Date.now(),
       }),
     }),
@@ -123,42 +124,42 @@ test("Worker fetch: isolates data for independent sync keys", async () => {
 });
 
 test("Worker fetch: handles OPTIONS preflight with 204", async () => {
-  const request = new Request("https://sync.example.com/api/sync", {
+  const req = new Request("https://sync.example.com/api/sync", {
     method: "OPTIONS",
-    headers: { Origin: "https://pages.github.io" },
+    headers: { Origin: "https://example.com" },
   });
-  const response = await workerDefault.fetch(request, {}, {});
-  assert.equal(response.status, 204);
-  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://pages.github.io");
+  const res = await workerDefault.fetch(req, {}, {});
+  assert.equal(res.status, 204);
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://example.com");
 });
 
 test("Worker fetch: responds to health check", async () => {
-  const request = new Request("https://sync.example.com/health");
-  const response = await workerDefault.fetch(request, {}, {});
-  assert.equal(response.status, 200);
-  const data = await response.json();
-  assert.equal(data.status, "ok");
-  assert.equal(data.service, "quran-reader-sync");
+  const req = new Request("https://sync.example.com/health");
+  const res = await workerDefault.fetch(req, {}, {});
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.status, "ok");
+  assert.equal(body.service, "quran-reader-sync");
 });
 
 test("Worker fetch: returns 404 for unknown endpoints", async () => {
-  const request = new Request("https://sync.example.com/unknown");
-  const response = await workerDefault.fetch(request, {}, {});
-  assert.equal(response.status, 404);
+  const req = new Request("https://sync.example.com/unknown");
+  const res = await workerDefault.fetch(req, {}, {});
+  assert.equal(res.status, 404);
 });
 
 test("Worker fetch: rejects unauthorized requests with 401", async () => {
-  const request = new Request("https://sync.example.com/api/sync");
-  const response = await workerDefault.fetch(request, {}, {});
-  assert.equal(response.status, 401);
-  const body = await response.json();
+  const req = new Request("https://sync.example.com/api/sync", { method: "GET" });
+  const res = await workerDefault.fetch(req, {}, {});
+  assert.equal(res.status, 401);
+  const body = await res.json();
   assert.match(body.error, /Unauthorized/);
 });
 
 test("Worker fetch: validates master secret when env.SYNC_SECRET is set", async () => {
-  const env = { SYNC_SECRET: "master-password-xyz" };
-
+  const env = { SYNC_SECRET: "master-password" };
   const invalidReq = new Request("https://sync.example.com/api/sync", {
+    method: "GET",
     headers: { Authorization: "Bearer wrong-password" },
   });
   const res1 = await workerDefault.fetch(invalidReq, env, {});
@@ -166,24 +167,25 @@ test("Worker fetch: validates master secret when env.SYNC_SECRET is set", async 
 
   let stubFetched = false;
   const mockBinding = {
-    idFromName: name => `id-${name}`,
-    get: id => ({
+    idFromName: () => "mock-id",
+    get: () => ({
       fetch: async () => {
         stubFetched = true;
-        return new Response(JSON.stringify({ empty: true, updatedAt: 0 }), { status: 200 });
+        return new Response(JSON.stringify({ empty: true }));
       },
     }),
   };
 
   const validReq = new Request("https://sync.example.com/api/sync", {
-    headers: { Authorization: "Bearer master-password-xyz" },
+    method: "GET",
+    headers: { Authorization: "Bearer master-password" },
   });
   const res2 = await workerDefault.fetch(validReq, { ...env, SYNC_DO: mockBinding }, {});
   assert.equal(res2.status, 200);
   assert.equal(stubFetched, true);
 });
 
-test("SyncDurableObject (SQLite): handles position LWW and bookmark merging", async () => {
+test("SyncDurableObject (SQLite): handles position and translation LWW", async () => {
   const sql = createMockSqlStorage();
   const doInstance = new SyncDurableObject({ storage: { sql } }, {});
 
@@ -211,7 +213,6 @@ test("SyncDurableObject (SQLite): handles position LWW and bookmark merging", as
     body: JSON.stringify({
       chapter: 2,
       verse: 255,
-      bookmarks: [{ chapter: 1, verse: 1 }, { chapter: 2, verse: 255 }, { chapter: 1, verse: 1 }], // Duplicate bookmark
       translation: "en.sahih",
       updatedAt: 1000,
     }),
@@ -222,7 +223,6 @@ test("SyncDurableObject (SQLite): handles position LWW and bookmark merging", as
   assert.equal(stored1.empty, false);
   assert.equal(stored1.chapter, 2);
   assert.equal(stored1.verse, 255);
-  assert.equal(stored1.bookmarks.length, 2); // Correctly deduplicated
   assert.equal(stored1.updatedAt, 1000);
 
   // 4. PUT with an older timestamp does NOT overwrite newer state (atomic conflict resolution)
@@ -232,7 +232,6 @@ test("SyncDurableObject (SQLite): handles position LWW and bookmark merging", as
     body: JSON.stringify({
       chapter: 1,
       verse: 1,
-      bookmarks: [],
       updatedAt: 500, // Older than 1000
     }),
   });
@@ -250,7 +249,6 @@ test("SyncDurableObject (SQLite): handles position LWW and bookmark merging", as
     body: JSON.stringify({
       chapter: 3,
       verse: 18,
-      bookmarks: [{ chapter: 3, verse: 18 }],
       translation: "ml.abdulhameed",
       updatedAt: 2000,
     }),
@@ -270,6 +268,42 @@ test("SyncDurableObject (SQLite): handles position LWW and bookmark merging", as
   assert.deepEqual(data2, storedNew);
 });
 
+test("SyncDurableObject migrates existing SQLite state and preserves reading progress", async () => {
+  const sql = createMockSqlStorage();
+  const updatedAt = Date.now() - 1000;
+  sql.exec(`
+    CREATE TABLE sync_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      chapter INTEGER NOT NULL,
+      verse INTEGER NOT NULL,
+      bookmarks TEXT NOT NULL,
+      translation TEXT,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+  sql.exec(
+    "INSERT INTO sync_state (id, chapter, verse, bookmarks, translation, updated_at) VALUES (1, ?, ?, ?, ?, ?)",
+    18,
+    10,
+    "[]",
+    "ml.abdulhameed",
+    updatedAt
+  );
+
+  const doInstance = new SyncDurableObject({ storage: { sql } }, {});
+  const columns = sql.exec("PRAGMA table_info(sync_state);").toArray();
+  assert.equal(columns.some(column => column.name === "bookmarks"), false);
+
+  const state = await (await doInstance.fetch(new Request("https://internal/sync"))).json();
+  assert.deepEqual(state, {
+    empty: false,
+    chapter: 18,
+    verse: 10,
+    translation: "ml.abdulhameed",
+    updatedAt,
+  });
+});
+
 test("SyncDurableObject: isolated instances keep separate SQLite state", async () => {
   const sqlA = createMockSqlStorage();
   const doA = new SyncDurableObject({ storage: { sql: sqlA } }, {});
@@ -280,13 +314,13 @@ test("SyncDurableObject: isolated instances keep separate SQLite state", async (
   // Update instance A to 2:255
   await doA.fetch(new Request("https://internal/sync", {
     method: "PUT",
-    body: JSON.stringify({ chapter: 2, verse: 255, bookmarks: [], updatedAt: 100 }),
+    body: JSON.stringify({ chapter: 2, verse: 255, updatedAt: 100 }),
   }));
 
   // Update instance B to 36:1
   await doB.fetch(new Request("https://internal/sync", {
     method: "PUT",
-    body: JSON.stringify({ chapter: 36, verse: 1, bookmarks: [], updatedAt: 200 }),
+    body: JSON.stringify({ chapter: 36, verse: 1, updatedAt: 200 }),
   }));
 
   const resA = await (await doA.fetch(new Request("https://internal/sync"))).json();
@@ -304,7 +338,6 @@ test("SyncDurableObject rejects unsafe and unreasonable future timestamps", asyn
     body: JSON.stringify({
       chapter: 2,
       verse: 1,
-      bookmarks: [],
       updatedAt,
     }),
   }));
@@ -323,10 +356,9 @@ test("SyncDurableObject repairs an already-stored unreasonable timestamp", async
   const doInstance = new SyncDurableObject({ storage: { sql } }, {});
   const poisonedTimestamp = Date.now() + MAX_FUTURE_SKEW_MS + 5000000;
   sql.exec(
-    "INSERT INTO sync_state (id, chapter, verse, bookmarks, translation, updated_at) VALUES (1, ?, ?, ?, ?, ?)",
+    "INSERT INTO sync_state (id, chapter, verse, translation, updated_at) VALUES (1, ?, ?, ?, ?)",
     2,
     1,
-    JSON.stringify([{ chapter: 1, verse: 1 }]),
     "en.sahih",
     poisonedTimestamp
   );
@@ -341,70 +373,8 @@ test("SyncDurableObject repairs an already-stored unreasonable timestamp", async
     body: JSON.stringify({
       chapter: 3,
       verse: 1,
-      bookmarks: [{ chapter: 1, verse: 1 }],
-      bookmarkChanges: [],
       updatedAt: Date.now() + 1000,
     }),
   }))).json();
   assert.equal(updated.chapter, 3);
-});
-
-test("SyncDurableObject merges independent bookmark edits and retains removal tombstones", async () => {
-  const doInstance = new SyncDurableObject({ storage: { sql: createMockSqlStorage() } }, {});
-  const bookmarkA = { chapter: 1, verse: 1 };
-  const bookmarkB = { chapter: 2, verse: 1 };
-  const bookmarkC = { chapter: 3, verse: 1 };
-  const bookmarkD = { chapter: 4, verse: 1 };
-  const put = async (updatedAt, bookmarks, bookmarkChanges = [], chapter = 1) => {
-    const response = await doInstance.fetch(new Request("https://internal/sync", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chapter,
-        verse: 1,
-        bookmarks,
-        bookmarkChanges,
-        updatedAt,
-      }),
-    }));
-    assert.equal(response.status, 200);
-    return response.json();
-  };
-
-  await put(1000, [bookmarkA, bookmarkB], [bookmarkA, bookmarkB].map(item => ({
-    ...item,
-    bookmarked: true,
-    updatedAt: 1000,
-  })));
-  const bookmarkOnlyUpdate = await put(900, [bookmarkA, bookmarkB, bookmarkC], [{
-    ...bookmarkC,
-    bookmarked: true,
-    updatedAt: 2000,
-  }], 2);
-  assert.equal(bookmarkOnlyUpdate.chapter, 1);
-  assert.equal(bookmarkOnlyUpdate.updatedAt, 1000);
-
-  const afterConcurrentAddition = await put(
-    3000,
-    [bookmarkA, bookmarkB, bookmarkD],
-    [{ ...bookmarkD, bookmarked: true, updatedAt: 3000 }]
-  );
-  assert.deepEqual(afterConcurrentAddition.bookmarks, [bookmarkA, bookmarkB, bookmarkC, bookmarkD]);
-
-  const afterRemoval = await put(4000, [bookmarkA, bookmarkB, bookmarkD], [{
-    ...bookmarkC,
-    bookmarked: false,
-    updatedAt: 4000,
-  }]);
-  assert.deepEqual(afterRemoval.bookmarks, [bookmarkA, bookmarkB, bookmarkD]);
-
-  const afterStaleDevice = await put(5000, [bookmarkA, bookmarkB, bookmarkC, bookmarkD]);
-  assert.deepEqual(afterStaleDevice.bookmarks, [bookmarkA, bookmarkB, bookmarkD]);
-
-  const afterIntentionalReAdd = await put(6000, [bookmarkA, bookmarkB, bookmarkC, bookmarkD], [{
-    ...bookmarkC,
-    bookmarked: true,
-    updatedAt: 6000,
-  }]);
-  assert.deepEqual(afterIntentionalReAdd.bookmarks, [bookmarkA, bookmarkB, bookmarkC, bookmarkD]);
 });

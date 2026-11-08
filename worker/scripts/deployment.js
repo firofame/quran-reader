@@ -160,8 +160,8 @@ export async function verifyWorker(api, snapshot) {
   }
 }
 
-async function syncRequest(endpoint, key, data) {
-  return requestJson(globalThis.fetch, `${endpoint}/api/sync`, {
+async function syncRequest(endpoint, key, data, fetch = globalThis.fetch) {
+  return requestJson(fetch, `${endpoint}/api/sync`, {
     method: data ? "PUT" : "GET",
     headers: { Authorization: `Bearer ${key}`, "X-Sync-Key": key, "Content-Type": "application/json" },
     body: data ? JSON.stringify(data) : undefined,
@@ -173,6 +173,14 @@ function assertCanary(actual, expected) {
   for (const field of ["chapter", "verse", "translation", "updatedAt"]) {
     if (actual[field] !== expected[field]) throw new Error("Production sync canary did not preserve its reading state.");
   }
+}
+
+export async function seedCanary({ endpoint, key, state, fetch = globalThis.fetch }) {
+  if ((await syncRequest(endpoint, key, undefined, fetch)).empty !== true) {
+    throw new Error("The fresh production canary key unexpectedly has existing state.");
+  }
+  // Older Workers require bookmarks; this canary-only field is ignored by the new API.
+  assertCanary(await syncRequest(endpoint, key, { ...state, bookmarks: [] }, fetch), state);
 }
 
 async function main(command) {
@@ -206,11 +214,8 @@ async function main(command) {
     const canaryKey = generateSyncKey();
     console.log(`::add-mask::${canaryKey}`);
     const endpoint = DEFAULT_SYNC_ENDPOINT.replace("://quran.", `://${worker.name}.`);
-    if ((await syncRequest(endpoint, canaryKey)).empty !== true) {
-      throw new Error("The fresh production canary key unexpectedly has existing state.");
-    }
     const canary = { chapter: 2, verse: 255, translation: "en.sahih", updatedAt: Date.now() };
-    assertCanary(await syncRequest(endpoint, canaryKey, canary), canary);
+    await seedCanary({ endpoint, key: canaryKey, state: canary });
     await writeFile(statePath, JSON.stringify({
       workerId: worker.id,
       renamed: worker.name !== "quran",
@@ -242,13 +247,16 @@ async function main(command) {
     const setup = parseSyncSetupCode(createSyncSetupCode(DEFAULT_SYNC_ENDPOINT, snapshot.canaryKey));
     if (!setup) throw new Error("Production canary setup code failed to round-trip.");
     assertCanary(await syncRequest(setup.endpoint, setup.syncKey), snapshot.canary);
+    const nextState = { ...snapshot.canary, verse: 256, updatedAt: Math.max(Date.now(), snapshot.canary.updatedAt + 1) };
+    assertCanary(await syncRequest(setup.endpoint, setup.syncKey, nextState), nextState);
+    assertCanary(await syncRequest(setup.endpoint, setup.syncKey), nextState);
     const secondKey = generateSyncKey();
     console.log(`::add-mask::${secondKey}`);
     if ((await syncRequest(DEFAULT_SYNC_ENDPOINT, secondKey)).empty !== true) {
       throw new Error("Production sync keys are not isolated.");
     }
     await appendFile(env.GITHUB_STEP_SUMMARY,
-      `### Production sync Worker verified\n\n- Revision: \`${snapshot.sha}\`\n- URL: ${DEFAULT_SYNC_ENDPOINT}\n- Migration: ${snapshot.renamed ? "renamed in place" : "already named quran; same-name edit verified"}\n- Worker identity and Durable Object namespaces preserved.\n- Health, pre-deployment canary state, and independent-key isolation passed.\n`);
+      `### Production sync Worker verified\n\n- Revision: \`${snapshot.sha}\`\n- URL: ${DEFAULT_SYNC_ENDPOINT}\n- Migration: ${snapshot.renamed ? "renamed in place" : "already named quran; same-name edit verified"}\n- Worker identity and Durable Object namespaces preserved.\n- Health, pre-deployment canary state, new API read/write, and independent-key isolation passed.\n`);
     console.log("Production health, preserved reading state, and key isolation verified.");
     return;
   }

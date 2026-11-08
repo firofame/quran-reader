@@ -7,6 +7,7 @@ import {
   PRODUCTION_LABEL,
   readBindings,
   renameWorker,
+  seedCanary,
   verifyWorker,
 } from "../worker/scripts/deployment.js";
 
@@ -15,6 +16,39 @@ const repository = "firofame/quran-reader";
 const worker = { id: "existing-worker-id", name: "quran" };
 const binding = { type: "durable_object_namespace", name: "SYNC_DO", class_name: "SyncDurableObject", namespace_id: "existing-namespace" };
 const signature = [{ name: "SYNC_DO", className: "SyncDurableObject", namespaceId: "existing-namespace" }];
+
+test("production canary: seeds legacy bookmark-requiring Workers without changing the reader payload", async () => {
+  const state = { chapter: 2, verse: 255, translation: "en.sahih", updatedAt: Date.now() };
+  let captured;
+  await seedCanary({
+    endpoint: "https://quran.firofame.workers.dev",
+    key: "synthetic-private-key",
+    state,
+    fetch: async (url, options) => {
+      if (options.method === "GET") return Response.json({ empty: true, updatedAt: 0 });
+      captured = JSON.parse(options.body);
+      if (!Array.isArray(captured.bookmarks)) return Response.json({ error: "Invalid state payload." }, { status: 400 });
+      return Response.json({ empty: false, ...captured });
+    },
+  });
+  assert.deepEqual(captured, { ...state, bookmarks: [] });
+  assert.equal(Object.hasOwn(state, "bookmarks"), false);
+});
+
+test("production canary: rejects existing state and unsuccessful legacy writes", async () => {
+  const options = {
+    endpoint: "https://quran.firofame.workers.dev",
+    key: "synthetic-private-key",
+    state: { chapter: 2, verse: 255, translation: "en.sahih", updatedAt: Date.now() },
+  };
+  await assert.rejects(seedCanary({ ...options, fetch: async () => Response.json({ empty: false }) }), /existing state/);
+  await assert.rejects(seedCanary({
+    ...options,
+    fetch: async (url, options) => options.method === "GET"
+      ? Response.json({ empty: true })
+      : Response.json({ error: "Rejected" }, { status: 400 }),
+  }), /HTTP 400/);
+});
 
 function authorizationOptions() {
   const current = {

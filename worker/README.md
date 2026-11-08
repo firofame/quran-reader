@@ -105,7 +105,10 @@ Do not paste deployment tokens into setup codes, source files, or workflow logs.
 4. The job verifies edit permissions and preserves the existing Worker, deploys,
    and checks `/health` for `status: "ok"` and `service: "quran"`. It compares
    Worker/namespace identity, reads a synthetic private sync canary written before
-   deployment, and confirms a different fresh key has no state. Canary keys are
+   deployment, checks the new API's read/write payload, and confirms a different
+   fresh key has no state. The pre-deployment canary includes an empty legacy
+   bookmarks field for older Workers; normal reader requests do not include it.
+   Canary keys are
    masked in logs and the runner's private state file is removed on completion.
    These checks never use an existing reader's pairing key; the synthetic canary
    leaves only its isolated sample state in the service.

@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { createSyncClient, generateSyncKey, DEFAULT_SYNC_ENDPOINT, DEFAULT_SYNC_KEY } from "./sync-client.js";
+import { createSyncClient, generateSyncKey } from "./sync-client.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -38,8 +38,6 @@ let storageFailed = false;
 let loading = false;
 
 const syncClient = createSyncClient({
-  defaultEndpoint: DEFAULT_SYNC_ENDPOINT,
-  defaultSyncKey: DEFAULT_SYNC_KEY,
   storage: {
     getItem: key => {
       try { return globalThis.localStorage.getItem(key); } catch { return null; }
@@ -616,6 +614,7 @@ function renderSyncUI(statusInfo = syncClient.getStatus()) {
   const message = $("sync-message");
   const endpointInput = $("sync-endpoint");
   const keyInput = $("sync-key");
+  const copyBtn = $("copy-sync-key");
   const config = syncClient.getConfig();
 
   if (document.activeElement !== endpointInput) {
@@ -624,6 +623,7 @@ function renderSyncUI(statusInfo = syncClient.getStatus()) {
   if (document.activeElement !== keyInput) {
     keyInput.value = config.syncKey || "";
   }
+  copyBtn.disabled = !keyInput.value.trim();
 
   const configured = syncClient.isConfigured();
   quickBtn.hidden = !configured;
@@ -665,7 +665,7 @@ function renderSyncUI(statusInfo = syncClient.getStatus()) {
       message.textContent = "Connected. Ready to sync with cloud.";
     }
   } else {
-    message.textContent = "Enter your Cloudflare Worker URL and sync password to enable synchronization.";
+    message.textContent = "Sync is off. Enter a Worker URL and private pairing key, then choose Save & connect. No reading data is sent before then.";
   }
 }
 
@@ -675,6 +675,7 @@ function initSyncUI() {
   const quickBtn = $("sync-quick-btn");
   const nowBtn = $("sync-now-btn");
   const generateBtn = $("generate-sync-key");
+  const copyBtn = $("copy-sync-key");
   const toggleKeyBtn = $("toggle-sync-key");
   const keyInput = $("sync-key");
   const endpointInput = $("sync-endpoint");
@@ -707,15 +708,45 @@ function initSyncUI() {
   nowBtn.addEventListener("click", triggerSync);
 
   generateBtn.addEventListener("click", () => {
-    keyInput.value = generateSyncKey();
-    keyInput.type = "text";
-    keyInput.focus();
+    try {
+      keyInput.value = generateSyncKey();
+      keyInput.type = "text";
+      copyBtn.disabled = false;
+      keyInput.focus();
+      $("sync-message").className = "sync-message";
+      $("sync-message").textContent = "Key generated. Copy it and enter the same key on your other devices.";
+    } catch (error) {
+      $("sync-message").className = "sync-message is-error";
+      $("sync-message").textContent = error.message || "Could not generate a secure pairing key.";
+    }
+  });
+
+  copyBtn.addEventListener("click", async () => {
+    const syncKey = keyInput.value.trim();
+    if (!syncKey) return;
+    if (!navigator.clipboard?.writeText) {
+      $("sync-message").className = "sync-message is-error";
+      $("sync-message").textContent = "Clipboard access is unavailable. Select and copy the key manually.";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(syncKey);
+      $("sync-message").className = "sync-message";
+      $("sync-message").textContent = "Pairing key copied. Keep it private; anyone with it can access your synced data.";
+    } catch {
+      $("sync-message").className = "sync-message is-error";
+      $("sync-message").textContent = "Could not copy the key. Select and copy it manually.";
+    }
+  });
+
+  keyInput.addEventListener("input", () => {
+    copyBtn.disabled = !keyInput.value.trim();
   });
 
   toggleKeyBtn.addEventListener("click", () => {
     const isPassword = keyInput.type === "password";
     keyInput.type = isPassword ? "text" : "password";
-    toggleKeyBtn.setAttribute("aria-label", isPassword ? "Hide password" : "Show password");
+    toggleKeyBtn.setAttribute("aria-label", isPassword ? "Hide pairing key" : "Show pairing key");
   });
 
   form.addEventListener("submit", async event => {
@@ -731,7 +762,7 @@ function initSyncUI() {
     }
 
     if (!syncKey) {
-      $("sync-message").textContent = "Please enter a sync password.";
+      $("sync-message").textContent = "Please generate or enter a private pairing key.";
       $("sync-message").className = "sync-message is-error";
       keyInput.focus();
       return;
@@ -752,7 +783,7 @@ function initSyncUI() {
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && syncClient.isConfigured()) {
-      syncClient.pull();
+      syncClient.sync(state);
     }
   });
 
@@ -773,4 +804,3 @@ closeMenu();
 persist();
 loadReading();
 initSyncUI();
-

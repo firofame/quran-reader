@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   SYNC_STORAGE_KEY,
   loadSyncConfig,
@@ -23,7 +24,8 @@ test("sync config: loads defaults when storage is empty or corrupted", () => {
   assert.equal(emptyConfig.syncKey, "");
   assert.equal(emptyConfig.lastSyncedAt, 0);
   assert.equal(emptyConfig.lastUpdatedAt, 0);
-  assert.equal(emptyConfig.autoSync, true);
+  assert.equal(emptyConfig.bookmarkBaseline, null);
+  assert.equal(emptyConfig.autoSync, false);
 
   store.set(SYNC_STORAGE_KEY, "{corrupt-json");
   const corruptedConfig = loadSyncConfig(storage);
@@ -43,10 +45,12 @@ test("sync config: saves, loads, and clears valid configuration", () => {
   };
 
   const config = {
+    explicitlyConfigured: true,
     endpoint: "https://sync.example.workers.dev",
     syncKey: "secret-key-123",
     lastSyncedAt: 1000,
     lastUpdatedAt: 1000,
+    bookmarkBaseline: null,
     autoSync: true,
   };
 
@@ -57,6 +61,33 @@ test("sync config: saves, loads, and clears valid configuration", () => {
 
   clearSyncConfig(storage);
   assert.equal(store.has(SYNC_STORAGE_KEY), false);
+});
+
+test("sync config: clears legacy settings that did not record explicit consent", async () => {
+  const store = new Map([[SYNC_STORAGE_KEY, JSON.stringify({
+    endpoint: "https://sync.example.workers.dev",
+    syncKey: "legacy-shared-key",
+    autoSync: true,
+  })]]);
+  const storage = {
+    getItem: key => store.get(key) ?? null,
+    setItem: (key, val) => store.set(key, val),
+    removeItem: key => store.delete(key),
+  };
+
+  let fetchCalled = false;
+  const client = createSyncClient({
+    storage,
+    fetch: async () => { fetchCalled = true; throw new Error("Legacy configuration must not sync."); },
+  });
+
+  assert.equal(client.isConfigured(), false);
+  assert.equal(client.getConfig().syncKey, "");
+  assert.equal(store.has(SYNC_STORAGE_KEY), false);
+  const syncResult = await client.sync({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  assert.equal(syncResult.reason, "unconfigured");
+  client.queuePush({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
+  assert.equal(fetchCalled, false);
 });
 
 test("normalizeEndpoint: sanitizes worker URLs correctly", () => {
@@ -72,9 +103,19 @@ test("normalizeEndpoint: sanitizes worker URLs correctly", () => {
 test("generateSyncKey: generates distinct, formatted sync keys", () => {
   const key1 = generateSyncKey();
   const key2 = generateSyncKey();
-  assert.match(key1, /^quran-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/);
-  assert.match(key2, /^quran-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/);
+  assert.match(key1, /^quran-(?:[0-9a-f]{8}-){5}[0-9a-f]{8}$/);
+  assert.match(key2, /^quran-(?:[0-9a-f]{8}-){5}[0-9a-f]{8}$/);
   assert.notEqual(key1, key2);
+});
+
+test("generateSyncKey: refuses to fall back when Web Crypto is unavailable", () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  try {
+    Object.defineProperty(globalThis, "crypto", { configurable: true, value: undefined });
+    assert.throws(generateSyncKey, /Secure random key generation is unavailable/);
+  } finally {
+    Object.defineProperty(globalThis, "crypto", descriptor);
+  }
 });
 
 test("sync client: unconfigured client safely returns without making network requests", async () => {
@@ -91,6 +132,9 @@ test("sync client: unconfigured client safely returns without making network req
   });
 
   assert.equal(client.isConfigured(), false);
+  assert.equal(client.getConfig().endpoint, "");
+  assert.equal(client.getConfig().syncKey, "");
+  assert.equal(client.getConfig().autoSync, false);
   const pullRes = await client.pull();
   assert.equal(pullRes.success, false);
   assert.equal(pullRes.reason, "unconfigured");
@@ -103,6 +147,7 @@ test("sync client: unconfigured client safely returns without making network req
   assert.equal(syncRes.success, false);
   assert.equal(syncRes.reason, "unconfigured");
 
+  client.queuePush({ position: { chapter: 1, verse: 1 }, bookmarks: [] });
   assert.equal(fetchCalled, false);
 });
 
@@ -253,7 +298,7 @@ test("sync client: maps HTTP error codes to friendly messages", async () => {
     fetch: async () => ({
       ok: false,
       status: mockStatus,
-      text: async () => JSON.stringify({ error: "Unauthorized: Invalid sync password." }),
+      text: async () => JSON.stringify({ error: "Unauthorized: Invalid pairing key." }),
     }),
     onStatusChange: s => { lastStatus = s; },
   });
@@ -265,7 +310,7 @@ test("sync client: maps HTTP error codes to friendly messages", async () => {
 
   await client.pull();
   assert.equal(lastStatus.status, "error");
-  assert.match(lastStatus.message, /Incorrect sync password/);
+  assert.match(lastStatus.message, /Incorrect pairing key/);
 
   mockStatus = 404;
   await client.pull();
@@ -381,46 +426,13 @@ test("sync client: fresh device pairing pulls remote cloud progress", async () =
   assert.equal(client.getConfig().lastSyncedAt, 1000);
 });
 
-test("sync client: auto-connects with defaultEndpoint when no prior config exists", async () => {
-  const store = new Map();
-  const storage = {
-    getItem: key => store.get(key) ?? null,
-    setItem: (key, val) => store.set(key, val),
-    removeItem: key => store.delete(key),
-  };
+test("public sync JavaScript contains no shared authentication credential", async () => {
+  const source = await Promise.all([
+    "../app.js",
+    "../sync-client.js",
+  ].map(path => readFile(new URL(path, import.meta.url), "utf8")));
 
-  let fetchedUrl = "";
-  let fetchedAuth = "";
-  const client = createSyncClient({
-    storage,
-    defaultEndpoint: "https://quran-reader-sync.firofame.workers.dev",
-    defaultSyncKey: "firo-quran-sync",
-    fetch: async (url, options) => {
-      fetchedUrl = url;
-      fetchedAuth = options.headers?.Authorization || "";
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          empty: false,
-          chapter: 2,
-          verse: 255,
-          bookmarks: [],
-          updatedAt: 5000,
-        }),
-      };
-    },
-  });
-
-  assert.equal(client.isConfigured(), true);
-  const config = client.getConfig();
-  assert.equal(config.endpoint, "https://quran-reader-sync.firofame.workers.dev");
-  assert.equal(config.syncKey, "firo-quran-sync");
-
-  const pullRes = await client.pull();
-  assert.equal(pullRes.success, true);
-  assert.equal(fetchedUrl, "https://quran-reader-sync.firofame.workers.dev/api/sync");
-  assert.equal(fetchedAuth, "Bearer firo-quran-sync");
+  assert.doesNotMatch(source.join("\n"), /firo-quran-sync|DEFAULT_SYNC_KEY/);
 });
 
 test("static server serves sync-client.js", async t => {
@@ -434,4 +446,3 @@ test("static server serves sync-client.js", async t => {
   assert.match(response.headers.get("content-type"), /javascript/);
   assert.ok((await response.text()).includes("createSyncClient"));
 });
-

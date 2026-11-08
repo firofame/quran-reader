@@ -10,13 +10,13 @@ A Cloudflare Worker paired with a SQLite-backed Durable Object providing strongl
  [Mac Mini Opera]                       [Android Opera]
          │                                      │
          │ (GET/PUT /api/sync)                  │ (GET/PUT /api/sync)
-         │ Bearer: <sync-password>              │ Bearer: <sync-password>
+         │ Bearer: <private pairing key>        │ Bearer: <same private key>
          ▼                                      ▼
     ┌─────────────────────────────────────────────────┐
     │          Cloudflare Worker (Edge API)           │
     │  - CORS preflight & header validation           │
     │  - Authentication check                         │
-    │  - Hash sync password -> Durable Object ID      │
+    │  - Hash pairing key -> Durable Object ID        │
     └───────────────────────┬─────────────────────────┘
                             │
                             ▼
@@ -26,7 +26,8 @@ A Cloudflare Worker paired with a SQLite-backed Durable Object providing strongl
     │  - Transactional SQLite database storage:       │
     │      sync_state (chapter, verse, bookmarks,     │
     │                  translation, updated_at)       │
-    │  - Atomic conflict resolution (Last-Write-Wins) │
+    │  - Position/translation Last-Write-Wins          │
+    │  - Per-verse bookmark additions/removals        │
     └─────────────────────────────────────────────────┘
 ```
 
@@ -35,8 +36,8 @@ Workers KV is **eventually consistent**. Writes made from one location (e.g. mob
 
 **Durable Objects with SQLite storage** provide:
 - **Strong consistency**: Reads and writes go to the same globally unique SQLite instance.
-- **Transactional safety**: Uses `ON CONFLICT DO UPDATE WHERE excluded.updated_at >= sync_state.updated_at` to atomically reject out-of-order writes.
-- **Zero user accounts**: A shared sync password hashes directly to the DO ID, providing isolated storage per user without requiring traditional passwords, emails, or sessions.
+- **Transactional safety**: SQLite updates position and translation only when the incoming timestamp is current; bookmark changes merge independently per verse.
+- **No shared public credential**: Each user generates a private random pairing key. Its hash maps to an isolated Durable Object without traditional passwords, email addresses, or sessions.
 - **Included on the free tier**: 100,000 requests/day and 5 GB SQLite storage.
 
 ---
@@ -57,15 +58,12 @@ npx wrangler login
 
 A browser window will open asking you to authorize Wrangler.
 
-### 3. (Optional) Set a Master Secret
-If you wish to restrict your Worker so that only requests with a specific pre-shared secret can access it, set the secret:
+### 3. Keep per-key isolation enabled
 
-```bash
-npx wrangler secret put SYNC_SECRET
-```
-*When prompted, enter your secret password.*
-
-> If `SYNC_SECRET` is not set, each distinct sync key entered by users derives its own isolated SQLite Durable Object instance via SHA-256 hash.
+For normal use, do not set `SYNC_SECRET`. The Worker hashes each supplied
+pairing key to a different Durable Object ID. If `SYNC_SECRET` is configured,
+the Worker accepts only that exact value, so every accepted client would use
+the same sync space and generated per-device keys would not work.
 
 ### 4. Deploy to Cloudflare
 Deploy the Worker and create the SQLite Durable Object migration:
@@ -93,26 +91,32 @@ Local URL will typically be `http://localhost:8787`.
 
 1. Open your Quran Reader in the browser (e.g., Mac Mini Opera).
 2. Tap **Controls** in the header.
-3. In the **Cross-device sync** panel:
+3. On the first device, in the **Cross-device sync** panel:
    - **Worker URL**: Enter your deployed Worker URL (e.g. `https://quran-reader-sync.<subdomain>.workers.dev`).
-   - **Sync password**: Click **Generate key** (or enter a private secret password of your choice).
+   - **Pairing key**: Click **Generate key**, then **Copy key**. The key is generated with the browser's cryptographic random-number generator; keep it private.
    - Click **Save & connect**.
-4. The status badge will show **Synced** with the current reading position.
-5. On your second device (e.g., Android Opera):
+4. Nothing is sent to Cloudflare before **Save & connect**. After connecting, the reader sends reading position, bookmark changes, and the selected translation identifier to this Worker; translation text stays local. Sync then runs automatically.
+5. On each additional device (e.g., Android Opera):
    - Open Quran Reader -> **Controls** -> **Cross-device sync**.
-   - Enter the exact same **Worker URL** and **Sync password**.
+   - Enter the exact same **Worker URL** and paste the copied **Pairing key**.
    - Click **Save & connect**.
-   - Your reading position and bookmarks will immediately pull into the device.
+   - The device pulls the current state and joins automatic sync.
+
+Anyone with the pairing key can read or change the corresponding sync space.
+Different random keys map to separate Durable Objects.
 
 ---
 
 ## API Specification
 
+Authenticate each request with the private pairing key using `Authorization:
+Bearer <pairing-key>` or `X-Sync-Key: <pairing-key>`.
+
 ### `GET /api/sync`
 Fetches current reading progress and bookmarks.
 
 - **Headers:**
-  - `Authorization: Bearer <sync-password>` (or `X-Sync-Key: <sync-password>`)
+  - `Authorization: Bearer <pairing-key>` or `X-Sync-Key: <pairing-key>`.
 - **Response (200 OK):**
   ```json
   {
@@ -131,7 +135,7 @@ Fetches current reading progress and bookmarks.
 Updates reading progress and bookmarks.
 
 - **Headers:**
-  - `Authorization: Bearer <sync-password>` (or `X-Sync-Key: <sync-password>`)
+  - `Authorization: Bearer <pairing-key>` or `X-Sync-Key: <pairing-key>`.
   - `Content-Type: application/json`
 - **Body:**
   ```json
@@ -141,12 +145,23 @@ Updates reading progress and bookmarks.
     "bookmarks": [
       { "chapter": 1, "verse": 1 }
     ],
+    "bookmarkChanges": [
+      { "chapter": 1, "verse": 1, "bookmarked": true, "updatedAt": 1794123456789 }
+    ],
     "translation": "en.sahih",
     "updatedAt": 1794123456789
   }
   ```
 - **Response (200 OK):**
-  Returns the authoritative current state stored in SQLite.
+  Returns the authoritative current state stored in SQLite. When
+  `bookmarkChanges` is present, each per-verse add/remove is reconciled
+  independently; removal tombstones prevent older snapshots from restoring a
+  deleted bookmark. Clients that omit `bookmarkChanges` are treated as legacy
+  clients and can add bookmarks but cannot delete existing ones.
+- `updatedAt` and each bookmark-change timestamp must be positive safe integers
+  no more than five minutes ahead of Worker time. Unsafe or unreasonable future
+  values are rejected. Existing out-of-range stored timestamps are repaired on
+  read so they cannot permanently block updates.
 
 ### `GET /health`
 Health check endpoint returning `{ "status": "ok", "service": "quran-reader-sync" }`.

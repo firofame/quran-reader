@@ -6,6 +6,7 @@ import workerDefault, {
   extractAuthKey,
   getCorsHeaders,
   hashSyncKey,
+  MAX_FUTURE_SKEW_MS,
 } from "../worker/src/index.js";
 
 function createMockSqlStorage() {
@@ -74,6 +75,53 @@ test("hashSyncKey: creates deterministic 64-character SHA-256 hex string", async
   assert.notEqual(hash1, hash3);
 });
 
+test("Worker fetch: isolates data for independent sync keys", async () => {
+  const instances = new Map();
+  const binding = {
+    idFromName: name => name,
+    get: id => {
+      if (!instances.has(id)) {
+        instances.set(id, new SyncDurableObject({ storage: { sql: createMockSqlStorage() } }, {}));
+      }
+      return { fetch: request => instances.get(id).fetch(request) };
+    },
+  };
+  const env = { SYNC_DO: binding };
+  const put = async (syncKey, chapter) => workerDefault.fetch(
+    new Request("https://sync.example.com/api/sync", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${syncKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chapter,
+        verse: 1,
+        bookmarks: [],
+        updatedAt: Date.now(),
+      }),
+    }),
+    env,
+    {}
+  );
+  const get = async syncKey => workerDefault.fetch(
+    new Request("https://sync.example.com/api/sync", {
+      headers: { Authorization: `Bearer ${syncKey}` },
+    }),
+    env,
+    {}
+  );
+
+  assert.equal((await put("independent-key-a", 2)).status, 200);
+  assert.equal((await put("independent-key-b", 36)).status, 200);
+  const stateA = await (await get("independent-key-a")).json();
+  const stateB = await (await get("independent-key-b")).json();
+
+  assert.equal(instances.size, 2);
+  assert.equal(stateA.chapter, 2);
+  assert.equal(stateB.chapter, 36);
+});
+
 test("Worker fetch: handles OPTIONS preflight with 204", async () => {
   const request = new Request("https://sync.example.com/api/sync", {
     method: "OPTIONS",
@@ -135,7 +183,7 @@ test("Worker fetch: validates master secret when env.SYNC_SECRET is set", async 
   assert.equal(stubFetched, true);
 });
 
-test("SyncDurableObject (SQLite): handles full sync lifecycle with atomic LWW conflict resolution", async () => {
+test("SyncDurableObject (SQLite): handles position LWW and bookmark merging", async () => {
   const sql = createMockSqlStorage();
   const doInstance = new SyncDurableObject({ storage: { sql } }, {});
 
@@ -246,4 +294,117 @@ test("SyncDurableObject: isolated instances keep separate SQLite state", async (
 
   assert.equal(resA.chapter, 2);
   assert.equal(resB.chapter, 36);
+});
+
+test("SyncDurableObject rejects unsafe and unreasonable future timestamps", async () => {
+  const doInstance = new SyncDurableObject({ storage: { sql: createMockSqlStorage() } }, {});
+  const put = updatedAt => doInstance.fetch(new Request("https://internal/sync", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chapter: 2,
+      verse: 1,
+      bookmarks: [],
+      updatedAt,
+    }),
+  }));
+
+  const unsafeTimestamp = await put(Number.MAX_SAFE_INTEGER + 1);
+  const futureTimestamp = await put(Date.now() + MAX_FUTURE_SKEW_MS + 1);
+  assert.equal(unsafeTimestamp.status, 400);
+  assert.equal(futureTimestamp.status, 400);
+
+  const state = await (await doInstance.fetch(new Request("https://internal/sync"))).json();
+  assert.equal(state.empty, true);
+});
+
+test("SyncDurableObject repairs an already-stored unreasonable timestamp", async () => {
+  const sql = createMockSqlStorage();
+  const doInstance = new SyncDurableObject({ storage: { sql } }, {});
+  const poisonedTimestamp = Date.now() + MAX_FUTURE_SKEW_MS + 1000;
+  sql.exec(
+    "INSERT INTO sync_state (id, chapter, verse, bookmarks, translation, updated_at) VALUES (1, ?, ?, ?, ?, ?)",
+    2,
+    1,
+    JSON.stringify([{ chapter: 1, verse: 1 }]),
+    "en.sahih",
+    poisonedTimestamp
+  );
+
+  const repaired = await (await doInstance.fetch(new Request("https://internal/sync"))).json();
+  assert.equal(repaired.chapter, 2);
+  assert.ok(repaired.updatedAt < poisonedTimestamp);
+
+  const updated = await (await doInstance.fetch(new Request("https://internal/sync", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chapter: 3,
+      verse: 1,
+      bookmarks: [{ chapter: 1, verse: 1 }],
+      bookmarkChanges: [],
+      updatedAt: Date.now() + 1000,
+    }),
+  }))).json();
+  assert.equal(updated.chapter, 3);
+});
+
+test("SyncDurableObject merges independent bookmark edits and retains removal tombstones", async () => {
+  const doInstance = new SyncDurableObject({ storage: { sql: createMockSqlStorage() } }, {});
+  const bookmarkA = { chapter: 1, verse: 1 };
+  const bookmarkB = { chapter: 2, verse: 1 };
+  const bookmarkC = { chapter: 3, verse: 1 };
+  const bookmarkD = { chapter: 4, verse: 1 };
+  const put = async (updatedAt, bookmarks, bookmarkChanges = [], chapter = 1) => {
+    const response = await doInstance.fetch(new Request("https://internal/sync", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chapter,
+        verse: 1,
+        bookmarks,
+        bookmarkChanges,
+        updatedAt,
+      }),
+    }));
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+
+  await put(1000, [bookmarkA, bookmarkB], [bookmarkA, bookmarkB].map(item => ({
+    ...item,
+    bookmarked: true,
+    updatedAt: 1000,
+  })));
+  const bookmarkOnlyUpdate = await put(900, [bookmarkA, bookmarkB, bookmarkC], [{
+    ...bookmarkC,
+    bookmarked: true,
+    updatedAt: 2000,
+  }], 2);
+  assert.equal(bookmarkOnlyUpdate.chapter, 1);
+  assert.equal(bookmarkOnlyUpdate.updatedAt, 1000);
+
+  const afterConcurrentAddition = await put(
+    3000,
+    [bookmarkA, bookmarkB, bookmarkD],
+    [{ ...bookmarkD, bookmarked: true, updatedAt: 3000 }]
+  );
+  assert.deepEqual(afterConcurrentAddition.bookmarks, [bookmarkA, bookmarkB, bookmarkC, bookmarkD]);
+
+  const afterRemoval = await put(4000, [bookmarkA, bookmarkB, bookmarkD], [{
+    ...bookmarkC,
+    bookmarked: false,
+    updatedAt: 4000,
+  }]);
+  assert.deepEqual(afterRemoval.bookmarks, [bookmarkA, bookmarkB, bookmarkD]);
+
+  const afterStaleDevice = await put(5000, [bookmarkA, bookmarkB, bookmarkC, bookmarkD]);
+  assert.deepEqual(afterStaleDevice.bookmarks, [bookmarkA, bookmarkB, bookmarkD]);
+
+  const afterIntentionalReAdd = await put(6000, [bookmarkA, bookmarkB, bookmarkC, bookmarkD], [{
+    ...bookmarkC,
+    bookmarked: true,
+    updatedAt: 6000,
+  }]);
+  assert.deepEqual(afterIntentionalReAdd.bookmarks, [bookmarkA, bookmarkB, bookmarkC, bookmarkD]);
 });

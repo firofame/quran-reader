@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
-import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition, swipeDirection } from "../reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition } from "../reader.js";
 import { reduceReaderState } from "../reader-state.js";
 import { createPreferencesStore, PREFERENCES_KEY } from "../preferences-store.js";
 import { createTranslationRepository } from "../translation-repository.js";
@@ -155,20 +155,123 @@ test("ayah navigation crosses chapter boundaries without skipping any of the 6,2
   assert.throws(() => adjacentPosition({ chapter: 1, verse: 1 }, 0, chapters), /invalid/);
 });
 
-test("horizontal swipes move forward on the left and backward on the right", () => {
-  assert.equal(swipeDirection(-120, 10), 1);
-  assert.equal(swipeDirection(120, -10), -1);
-  assert.equal(swipeDirection(-50, 0), 1);
-  assert.equal(swipeDirection(50, 0), -1);
-  assert.equal(swipeDirection(-75, 50), 1);
-  assert.equal(swipeDirection(75, -50), -1);
+test("bottom previous and next buttons navigate consecutively and disable at boundaries", () => {
+  let state = { translation: "en.sahih", position: { chapter: 1, verse: 1 }, bookmarks: [], fontSize: 21, theme: "light" };
+
+  // At the start of the Quran, previous button has no target (disabled)
+  const prevAtStart = adjacentPosition(state.position, -1, chapters);
+  assert.equal(prevAtStart, null);
+
+  // Next button navigates to next ayah in chapter
+  const nextTarget = adjacentPosition(state.position, 1, chapters);
+  assert.deepEqual(nextTarget, { chapter: 1, verse: 2 });
+  state = reduceReaderState(state, { type: "position/set", position: nextTarget }, chapters);
+  assert.deepEqual(state.position, { chapter: 1, verse: 2 });
+
+  // Previous button navigates back
+  const prevTarget = adjacentPosition(state.position, -1, chapters);
+  assert.deepEqual(prevTarget, { chapter: 1, verse: 1 });
+  state = reduceReaderState(state, { type: "position/set", position: prevTarget }, chapters);
+  assert.deepEqual(state.position, { chapter: 1, verse: 1 });
+
+  // At the final ayah of the Quran (114:6), next button has no target (disabled)
+  const finalPosition = { chapter: 114, verse: 6 };
+  assert.equal(adjacentPosition(finalPosition, 1, chapters), null);
+  assert.deepEqual(adjacentPosition(finalPosition, -1, chapters), { chapter: 114, verse: 5 });
 });
 
-test("taps, short drags, vertical scrolling, and diagonal gestures do not navigate", () => {
-  for (const [deltaX, deltaY] of [[0, 0], [49, 0], [-49, 0], [0, 150], [0, -150],
-    [60, 100], [-60, -100], [100, 100], [-100, 100], [74, 50], [-74, -50]]) {
-    assert.equal(swipeDirection(deltaX, deltaY), 0, `${deltaX}, ${deltaY}`);
+test("bottom navigation handles chapter boundaries seamlessly in both directions", () => {
+  // End of chapter 1 to start of chapter 2
+  const endOfCh1 = { chapter: 1, verse: 7 };
+  const startOfCh2 = adjacentPosition(endOfCh1, 1, chapters);
+  assert.deepEqual(startOfCh2, { chapter: 2, verse: 1 });
+
+  // Start of chapter 2 back to end of chapter 1
+  const backToCh1 = adjacentPosition(startOfCh2, -1, chapters);
+  assert.deepEqual(backToCh1, { chapter: 1, verse: 7 });
+
+  // Traversing all chapter boundaries forward and backward
+  for (let c = 1; c < chapters.length; c++) {
+    const lastVerse = { chapter: c, verse: chapters[c - 1].verses };
+    const nextChapterFirstVerse = adjacentPosition(lastVerse, 1, chapters);
+    assert.deepEqual(nextChapterFirstVerse, { chapter: c + 1, verse: 1 });
+    assert.deepEqual(adjacentPosition(nextChapterFirstVerse, -1, chapters), lastVerse);
   }
+});
+
+test("search navigation moves between search matches and disables at ends", () => {
+  const verses = [
+    { chapter: 2, verse: 1, text: "Alif, Lam, Meem." },
+    { chapter: 2, verse: 2, text: "This is the Book about which there is no doubt, guidance for the conscious of Allah." },
+    { chapter: 2, verse: 3, text: "Who believe in the unseen..." },
+    { chapter: 2, verse: 4, text: "And who believe in what has been revealed to you..." },
+    { chapter: 2, verse: 5, text: "Those are upon guidance from their Lord..." },
+  ];
+  // Search for "guidance" matches verses 2 and 5 (indices 0 and 1)
+  const search1 = selectAyah(verses, 2, "guidance");
+  assert.equal(search1.matches.length, 2);
+  assert.equal(search1.index, 0);
+  assert.equal(search1.ayah.verse, 2);
+
+  // At first match, previous match is undefined (button disabled: "No more matches")
+  const prevMatch = search1.matches[search1.index - 1];
+  assert.equal(prevMatch, undefined);
+
+  // Next match is verse 5
+  const nextMatch = search1.matches[search1.index + 1];
+  assert.deepEqual(nextMatch, verses[4]);
+
+  // Navigating to verse 5
+  const search2 = selectAyah(verses, nextMatch.verse, "guidance");
+  assert.equal(search2.index, 1);
+  assert.equal(search2.ayah.verse, 5);
+
+  // At last match, next match is undefined (button disabled: "No more matches")
+  assert.equal(search2.matches[search2.index + 1], undefined);
+  // Previous match is verse 2
+  assert.deepEqual(search2.matches[search2.index - 1], verses[1]);
+});
+
+test("touch scrolling and swipe gestures do not trigger navigation", async () => {
+  const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const readerSource = await readFile(new URL("../reader.js", import.meta.url), "utf8");
+
+  // Ensure no touch event listeners exist in app.js
+  assert.doesNotMatch(appSource, /addEventListener\(\s*["']touch/i);
+  // Ensure no pointer dragging listeners exist in app.js
+  assert.doesNotMatch(appSource, /addEventListener\(\s*["']pointer/i);
+  // Ensure no gesture/swipe helper or tracking state exists
+  assert.doesNotMatch(appSource, /swipeDirection/);
+  assert.doesNotMatch(appSource, /ayahTouch/);
+  assert.doesNotMatch(readerSource, /swipeDirection/);
+});
+
+test("text selection and copying work normally without dragging or selection locks", async () => {
+  const cssSource = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
+
+  // No user-select: none disabling selection in reader or verses
+  assert.doesNotMatch(cssSource, /user-select:\s*none/i);
+  // No grab/grabbing cursors on reading content or verses
+  assert.doesNotMatch(cssSource, /cursor:\s*grab/i);
+  assert.doesNotMatch(cssSource, /cursor:\s*grabbing/i);
+  assert.doesNotMatch(appSource, /is-dragging/i);
+});
+
+test("no page-flip animation or 3D transform is applied during navigation", async () => {
+  const cssSource = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
+
+  // No 3D rotation, page-turn, or page-preview CSS classes
+  assert.doesNotMatch(cssSource, /page-turn/i);
+  assert.doesNotMatch(cssSource, /page-preview/i);
+  assert.doesNotMatch(cssSource, /rotateY/i);
+  assert.doesNotMatch(cssSource, /perspective:/i);
+  // No animation classes or turn routines in app.js
+  assert.doesNotMatch(appSource, /pageTurn/i);
+  assert.doesNotMatch(appSource, /page-turn/i);
+  assert.doesNotMatch(appSource, /beginPageTurn/i);
+  assert.doesNotMatch(appSource, /settlePageTurn/i);
 });
 
 test("chapter search supports names, punctuation, meaning, Arabic, and numbers", () => {

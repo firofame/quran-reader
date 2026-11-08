@@ -33,10 +33,6 @@ because browsers restrict fetching local translation files.
   ruku, filling at its last ayah and resetting when you enter another ruku.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
-- On touchscreens, swipe left over the verse to continue or right to go back.
-  Swipes follow search matches when searching, just like the navigation buttons.
-  Vertical scrolling, pinch-to-zoom, text selection, and bookmark taps remain
-  available; swiping does not navigate in **Saved**.
 - Search the entire current chapter and move through matching ayahs one at a
   time. Saved verses remain a browsable collection.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
@@ -72,7 +68,7 @@ Pull requests targeting `main` run these checks automatically through the
 
 Tests verify all 6,236 verses in each translation, metadata alignment, malformed
 data handling, focused ayah selection, navigation across chapter boundaries,
-swipe thresholds and directions, search, deep links, saved preferences, and
+bottom button navigation, search, deep links, saved preferences, and
 static server routes.
 
 ## Publish

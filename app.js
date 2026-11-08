@@ -32,33 +32,7 @@ let requestId = 0;
 let noticeTimer;
 let storageFailed = false;
 let loading = false;
-let ayahPointer = null;
-let pageTurn = null;
-const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
-
-function cancelPageTurn() {
-  const turn = pageTurn;
-  pageTurn = null;
-  turn?.animation?.cancel();
-  turn?.sheet.remove();
-  turn?.preview.remove();
-  $("reading-content").classList.remove("is-turning");
-  $("reading-content").style.removeProperty("min-height");
-}
-
-function releaseAyahPointer() {
-  const pointer = ayahPointer;
-  ayahPointer = null;
-  const content = $("reading-content");
-  content.classList.remove("is-dragging");
-  if (pointer && content.hasPointerCapture(pointer.id)) content.releasePointerCapture(pointer.id);
-  return pointer;
-}
-
-function cancelAyahDrag() {
-  releaseAyahPointer();
-  cancelPageTurn();
-}
+let ayahTouch = null;
 
 function notify(message, persistent = false) {
   if (storageFailed && !persistent) {
@@ -176,7 +150,7 @@ function isBookmarked(chapter, verse) {
 }
 
 function renderVerses() {
-  cancelAyahDrag();
+  ayahTouch = null;
   const data = translations.getLoaded(state.translation);
   if (!data) return;
   const query = $("verse-search").value.trim();
@@ -342,7 +316,7 @@ function renderPagination(selection) {
 }
 
 async function loadReading({ scroll = false } = {}) {
-  cancelAyahDrag();
+  ayahTouch = null;
   const request = ++requestId;
   loading = true;
   updateTabs();
@@ -411,97 +385,9 @@ function ayahTarget(direction) {
     : adjacentPosition(state.position, direction, chapters);
 }
 
-function beginPageTurn(direction, target) {
-  cancelPageTurn();
-  const content = $("reading-content");
-  const previous = content.querySelector(".verse").cloneNode(true);
-  previous.removeAttribute("id");
-  const sheet = document.createElement("div");
-  sheet.className = `page-turn ${direction === 1 ? "page-turn-forward" : "page-turn-backward"}`;
-  const shade = document.createElement("div");
-  shade.className = "page-turn-shade";
-  sheet.append(previous, shade);
-  const preview = document.createElement("div");
-  preview.className = "page-preview";
-  const next = createVerse(translations.getLoaded(state.translation)[target.chapter - 1][target.verse - 1]);
-  next.removeAttribute("id");
-  preview.append(next);
-  for (const layer of [sheet, preview]) {
-    layer.setAttribute("aria-hidden", "true");
-    layer.inert = true;
-  }
-  const height = content.getBoundingClientRect().height;
-  content.append(preview, sheet);
-  // A longer preview must not resize the page underneath an active drag.
-  content.style.minHeight = `${height}px`;
-  content.classList.add("is-turning");
-  pageTurn = { sheet, preview, shade, direction, target, progress: 0 };
-  updatePageTurn(0);
-}
-
-function pageTurnFrame(progress, direction) {
-  return {
-    transform: `rotateY(${-direction * progress * 105}deg)`,
-    boxShadow: `${direction * progress * 12}px 8px ${progress * 32}px rgb(0 0 0 / ${progress * 0.22})`,
-  };
-}
-
-function updatePageTurn(progress) {
-  pageTurn.progress = progress;
-  Object.assign(pageTurn.sheet.style, pageTurnFrame(progress, pageTurn.direction));
-  pageTurn.shade.style.opacity = progress * 0.65;
-}
-
-function finishPageTurn(commit) {
-  const target = pageTurn?.target;
-  cancelAyahDrag();
-  if (commit && target) showAyah(target);
-}
-
-function interruptPageTurn() {
-  if (pageTurn?.committing) finishPageTurn(true);
-  else cancelAyahDrag();
-}
-
-function settlePageTurn(commit) {
-  if (!pageTurn) return;
-  if (reducedMotion.matches) {
-    finishPageTurn(commit);
-    return;
-  }
-  const turn = pageTurn;
-  const end = commit ? 1 : 0;
-  const options = {
-    duration: Math.max(140, Math.abs(end - turn.progress) * 460),
-    easing: "cubic-bezier(.2, .75, .25, 1)",
-    fill: "forwards",
-  };
-  turn.committing = commit;
-  turn.shade.animate([{ opacity: turn.progress * 0.65 }, { opacity: end * 0.65 }], options);
-  turn.animation = turn.sheet.animate([
-    pageTurnFrame(turn.progress, turn.direction), pageTurnFrame(end, turn.direction),
-  ], options);
-  turn.animation.finished.then(() => {
-    if (pageTurn === turn) finishPageTurn(commit);
-  }, error => {
-    if (error.name !== "AbortError") {
-      console.error("Unable to finish page turn:", error);
-      notify("The page animation could not finish. You can keep reading normally.");
-      if (pageTurn === turn) finishPageTurn(commit);
-    }
-  });
-}
-
 function moveAyah(direction) {
-  if (pageTurn?.animation) finishPageTurn(pageTurn.committing);
-  cancelAyahDrag();
   const target = ayahTarget(direction);
-  if (!target) return;
-  if (reducedMotion.matches) showAyah(target);
-  else {
-    beginPageTurn(direction, target);
-    settlePageTurn(true);
-  }
+  if (target) showAyah(target);
 }
 
 function closeMenu() {
@@ -530,60 +416,37 @@ $("ayah-navigation").addEventListener("click", event => {
   const button = event.target.closest("[data-direction]");
   if (button) moveAyah(Number(button.dataset.direction));
 });
-$("reading-content").addEventListener("pointerdown", event => {
-  if (!event.isPrimary || event.button !== 0 || pageTurn?.animation || loading ||
-    view !== "read" || $("ayah-navigation").hidden ||
+$("reading-content").addEventListener("touchstart", event => {
+  ayahTouch = null;
+  if (event.touches.length !== 1 || loading || view !== "read" || $("ayah-navigation").hidden ||
     $("sidebar").classList.contains("is-open") || window.getSelection()?.isCollapsed === false ||
     event.target.closest("a, button, input, select, textarea, [contenteditable]")) return;
-  // Mouse drags start outside the text so selecting a passage still works.
-  if (event.pointerType === "mouse" && event.target.closest(".verse-body")) return;
-  ayahPointer = { id: event.pointerId, x: event.clientX, y: event.clientY, dragging: false };
-});
-document.addEventListener("pointerdown", event => {
-  if (event.pointerType === "touch" && !event.isPrimary) cancelAyahDrag();
-});
-document.addEventListener("pointermove", event => {
-  const start = ayahPointer;
-  if (!start || start.id !== event.pointerId) return;
-  const deltaX = event.clientX - start.x;
-  const deltaY = event.clientY - start.y;
-  if (window.getSelection()?.isCollapsed === false || (!start.dragging &&
-    Math.abs(deltaY) > 10 && Math.abs(deltaY) >= Math.abs(deltaX))) {
-    cancelAyahDrag();
+  const touch = event.touches[0];
+  ayahTouch = { id: touch.identifier, x: touch.clientX, y: touch.clientY };
+}, { passive: true });
+$("reading-content").addEventListener("touchmove", event => {
+  if (!ayahTouch) return;
+  const touch = event.touches[0];
+  if (event.touches.length !== 1 || touch.identifier !== ayahTouch.id) {
+    ayahTouch = null;
     return;
   }
-  if (!start.dragging) {
-    if (Math.abs(deltaX) < 10 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
-    start.dragging = true;
-    $("reading-content").classList.add("is-dragging");
-    $("reading-content").setPointerCapture(start.id);
-  }
-  event.preventDefault();
-  const direction = deltaX < 0 ? 1 : -1;
-  if (pageTurn?.direction !== direction) {
-    cancelPageTurn();
-    const target = ayahTarget(direction);
-    if (target && !reducedMotion.matches) beginPageTurn(direction, target);
-  }
-  if (pageTurn) updatePageTurn(Math.min(0.95, Math.abs(deltaX) / ($("reading-content").clientWidth * 0.75)));
-});
-document.addEventListener("pointerup", event => {
-  if (ayahPointer?.id !== event.pointerId) return;
-  const start = releaseAyahPointer();
-  const direction = swipeDirection(event.clientX - start.x, event.clientY - start.y);
-  const allowed = !$("sidebar").classList.contains("is-open") && window.getSelection()?.isCollapsed !== false;
-  if (pageTurn) settlePageTurn(allowed && direction === pageTurn.direction);
-  else if (allowed && direction && start.dragging) moveAyah(direction);
-});
-document.addEventListener("pointercancel", event => {
-  if (ayahPointer?.id === event.pointerId) cancelAyahDrag();
-});
-$("reading-content").addEventListener("lostpointercapture", event => {
-  if (event.target === event.currentTarget && ayahPointer?.id === event.pointerId &&
-    !event.currentTarget.hasPointerCapture(event.pointerId)) cancelAyahDrag();
-});
-window.addEventListener("blur", interruptPageTurn);
-window.addEventListener("resize", interruptPageTurn);
+  const deltaX = Math.abs(touch.clientX - ayahTouch.x);
+  const deltaY = Math.abs(touch.clientY - ayahTouch.y);
+  // Once a gesture becomes a vertical scroll, it must not turn the page.
+  if (deltaY > 10 && deltaY >= deltaX) ayahTouch = null;
+}, { passive: true });
+$("reading-content").addEventListener("touchend", event => {
+  const start = ayahTouch;
+  ayahTouch = null;
+  if (!start || event.touches.length || loading || view !== "read" ||
+    $("sidebar").classList.contains("is-open") || window.getSelection()?.isCollapsed !== false) return;
+  const touch = Array.from(event.changedTouches).find(item => item.identifier === start.id);
+  if (!touch) return;
+  const direction = swipeDirection(touch.clientX - start.x, touch.clientY - start.y);
+  if (direction) moveAyah(direction);
+}, { passive: true });
+$("reading-content").addEventListener("touchcancel", () => { ayahTouch = null; }, { passive: true });
 $("chapter-search").addEventListener("input", renderChapters);
 $("verse-search").addEventListener("input", () => {
   if (loading) return;
@@ -664,7 +527,6 @@ document.addEventListener("keydown", event => {
     moveAyah(event.key === "ArrowRight" ? 1 : -1);
   }
   if (event.key === "Escape") {
-    cancelAyahDrag();
     if ($("sidebar").classList.contains("is-open")) { closeMenu(); $("open-menu").focus(); }
     if (event.target instanceof HTMLInputElement && event.target.value) {
       event.target.value = "";
@@ -694,12 +556,8 @@ window.addEventListener("hashchange", () => {
   if (position) navigate(position.chapter, position.verse);
   else notify("That verse link isn't valid. Choose a chapter or verse to continue.");
 });
-window.addEventListener("pagehide", () => {
-  interruptPageTurn();
-  persist();
-});
+window.addEventListener("pagehide", persist);
 matchMedia("(max-width: 760px)").addEventListener("change", closeMenu);
-reducedMotion.addEventListener("change", interruptPageTurn);
 
 applyPreferences();
 closeMenu();

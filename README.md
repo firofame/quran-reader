@@ -40,20 +40,34 @@ because browsers restrict fetching local translation files.
   return to its chapter.
 - Adjust text size and switch between light and dark themes.
 - The exact selected ayah, bookmarks, and preferences are saved in this browser's local
-  storage. No reading data is sent to a server. Clearing browser data removes it.
+  storage by default. Optional cross-device synchronization can be enabled to keep your
+  reading position and bookmarks synced across desktop and mobile browsers via a Cloudflare
+  Worker (see [Cross-Device Sync](#cross-device-sync)).
 - Press `/` to find a chapter, and Escape to clear a focused search or close
   the controls or mobile chapter drawer.
 
 Translations are loaded from the supplied local files and retained in memory
-while the page is open. There are no external API calls. This is a translation
-reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
+while the page is open. There are no external API calls unless cloud sync is configured.
+This is a translation reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
+
+## Cross-Device Sync
+
+To seamlessly synchronize reading progress and bookmarks across multiple devices (for example, Opera on macOS and Opera on Android) without introducing traditional user accounts or email registrations:
+
+- Open **Controls** in the reader and navigate to **Cross-device sync**.
+- Enter your deployed Cloudflare Worker URL and a shared sync password (or generate a random key).
+- The reader stores state in `localStorage` first for instant, offline-capable interactions, and synchronizes with a **Cloudflare Worker backed by a SQLite Durable Object** in the background.
+- Because Durable Objects are globally addressable and SQLite-backed, synchronization is strongly consistent with atomic last-write-wins conflict resolution.
+
+See [`worker/README.md`](worker/README.md) for complete Cloudflare Worker configuration, SQLite Durable Object schema, and deployment instructions using Wrangler.
 
 ## Architecture
 
 The app remains a dependency-free static site. `reader.js` contains pure Quran
 data, parsing, search, and navigation logic. `reader-state.js` owns validated
-state transitions; `preferences-store.js` isolates browser persistence; and
-`translation-repository.js` loads, validates, and caches translation data.
+state transitions; `preferences-store.js` isolates browser persistence;
+`sync-client.js` manages background cross-device synchronization and conflict resolution;
+and `translation-repository.js` loads, validates, and caches translation data.
 `app.js` connects those modules to the browser UI and interaction behavior.
 
 ## Validate

@@ -81,6 +81,44 @@
                   </label>
                   <span id="search-count" class="search-count" aria-live="polite" hidden></span>
                 </div>
+                <div id="sync-panel" class="sync-panel">
+                  <div class="sync-header">
+                    <div class="sync-title-group">
+                      <span data-icon="cloud"></span>
+                      <span>Cross-device sync</span>
+                      <span id="sync-badge" class="sync-badge">Off</span>
+                    </div>
+                    <div class="sync-header-actions">
+                      <button id="sync-quick-btn" type="button" class="secondary-button sync-quick-btn" title="Sync reading progress now" hidden><span data-icon="refresh"></span>Sync now</button>
+                      <button id="sync-toggle-panel" type="button" class="sync-toggle-btn" aria-expanded="false" aria-controls="sync-details">Configure</button>
+                    </div>
+                  </div>
+                  <div id="sync-details" class="sync-details" hidden>
+                    <p class="sync-description">Sync reading progress and bookmarks across devices via Cloudflare Durable Objects.</p>
+                    <form id="sync-form" class="sync-form" autocomplete="off">
+                      <div class="sync-fields">
+                        <label class="sync-field">
+                          <span class="sync-field-label">Worker URL</span>
+                          <input id="sync-endpoint" type="url" placeholder="https://quran-sync.<worker>.workers.dev" autocomplete="off" spellcheck="false">
+                        </label>
+                        <label class="sync-field">
+                          <span class="sync-field-label">Sync password</span>
+                          <div class="input-wrap sync-key-wrap">
+                            <input id="sync-key" type="password" placeholder="Sync password" autocomplete="off" spellcheck="false">
+                            <button id="toggle-sync-key" type="button" class="sync-icon-btn" aria-label="Show password" title="Show/hide password" data-icon="key"></button>
+                          </div>
+                        </label>
+                      </div>
+                      <div class="sync-actions">
+                        <button id="generate-sync-key" type="button" class="secondary-button">Generate key</button>
+                        <button id="sync-save-btn" type="submit" class="primary-button sync-save-btn">Save &amp; connect</button>
+                        <button id="sync-now-btn" type="button" class="secondary-button sync-now-btn" hidden><span data-icon="refresh"></span>Sync now</button>
+                        <button id="sync-disconnect-btn" type="button" class="disconnect-button" hidden>Disconnect</button>
+                      </div>
+                      <div id="sync-message" class="sync-message" role="status" aria-live="polite"></div>
+                    </form>
+                  </div>
+                </div>
               </div>
             </details>
           </div>

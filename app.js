@@ -2,6 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
+import { createSyncClient, generateSyncKey, DEFAULT_SYNC_ENDPOINT, DEFAULT_SYNC_KEY } from "./sync-client.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -15,9 +16,12 @@ const icons = {
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   left: '<path d="m14 6-6 6 6 6M8 12h12"/>',
   right: '<path d="m10 6 6 6-6 6M16 12H4"/>',
+  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  refresh: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/>',
+  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m11.5 11.5 8.5-8.5M16 7l2 2M18 5l2 2"/>',
 };
 const $ = id => document.getElementById(id);
-const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
+const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || ""}</svg>`;
 document.querySelectorAll("[data-icon]").forEach(element => { element.innerHTML = icon(element.dataset.icon); });
 
 const chapters = createChapters(globalThis.QuranData.Sura);
@@ -32,6 +36,83 @@ let requestId = 0;
 let noticeTimer;
 let storageFailed = false;
 let loading = false;
+
+const syncClient = createSyncClient({
+  defaultEndpoint: DEFAULT_SYNC_ENDPOINT,
+  defaultSyncKey: DEFAULT_SYNC_KEY,
+  storage: {
+    getItem: key => {
+      try { return globalThis.localStorage.getItem(key); } catch { return null; }
+    },
+    setItem: (key, value) => {
+      try { globalThis.localStorage.setItem(key, value); } catch {}
+    },
+    removeItem: key => {
+      try { globalThis.localStorage.removeItem(key); } catch {}
+    },
+  },
+  onRemoteUpdate(data) {
+    let stateChanged = false;
+    let positionChanged = false;
+    let bookmarksChanged = false;
+    let translationChanged = false;
+
+    if (data.chapter && data.verse && (data.chapter !== state.position.chapter || data.verse !== state.position.verse)) {
+      if (validPosition({ chapter: data.chapter, verse: data.verse }, chapters)) {
+        state = reduceReaderState(state, { type: "position/set", position: { chapter: data.chapter, verse: data.verse } }, chapters);
+        stateChanged = true;
+        positionChanged = true;
+      }
+    }
+    if (Array.isArray(data.bookmarks)) {
+      const seen = new Set();
+      const validBookmarks = [];
+      for (const b of data.bookmarks) {
+        if (validPosition(b, chapters)) {
+          const key = `${b.chapter}:${b.verse}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            validBookmarks.push({ chapter: b.chapter, verse: b.verse });
+          }
+        }
+      }
+      const currentKeys = new Set(state.bookmarks.map(b => `${b.chapter}:${b.verse}`));
+      let differs = currentKeys.size !== seen.size;
+      if (!differs) {
+        for (const k of currentKeys) {
+          if (!seen.has(k)) { differs = true; break; }
+        }
+      }
+      if (differs) {
+        state = { ...state, bookmarks: validBookmarks };
+        stateChanged = true;
+        bookmarksChanged = true;
+      }
+    }
+    if (data.translation && data.translation !== state.translation && Object.hasOwn(TRANSLATIONS, data.translation)) {
+      state = reduceReaderState(state, { type: "translation/set", translation: data.translation }, chapters);
+      stateChanged = true;
+      translationChanged = true;
+    }
+
+    if (stateChanged) {
+      persist();
+      applyPreferences();
+      history.replaceState(null, "", `#${state.position.chapter}:${state.position.verse}`);
+      loadReading();
+      if (positionChanged) {
+        notify(`Synced with cloud: opened verse ${state.position.chapter}:${state.position.verse}.`);
+      } else if (bookmarksChanged) {
+        notify("Synced with cloud: bookmarks updated.");
+      } else if (translationChanged) {
+        notify("Synced with cloud: translation updated.");
+      }
+    }
+  },
+  onStatusChange(statusInfo) {
+    renderSyncUI(statusInfo);
+  },
+});
 
 function notify(message, persistent = false) {
   if (storageFailed && !persistent) {
@@ -67,6 +148,7 @@ function persist() {
 function dispatch(action) {
   state = reduceReaderState(state, action, chapters);
   persist();
+  syncClient.queuePush(state);
 }
 
 const initialPosition = parseHash(location.hash, chapters);
@@ -348,6 +430,7 @@ function savePosition(position) {
   state = reduceReaderState(state, { type: "position/set", position }, chapters);
   history.replaceState(null, "", `#${position.chapter}:${position.verse}`);
   persist();
+  syncClient.queuePush(state);
 }
 
 function synchronizeSearchPosition(data) {
@@ -525,7 +608,169 @@ window.addEventListener("hashchange", () => {
 window.addEventListener("pagehide", persist);
 matchMedia("(max-width: 760px)").addEventListener("change", closeMenu);
 
+function renderSyncUI(statusInfo = syncClient.getStatus()) {
+  const badge = $("sync-badge");
+  const quickBtn = $("sync-quick-btn");
+  const nowBtn = $("sync-now-btn");
+  const disconnectBtn = $("sync-disconnect-btn");
+  const message = $("sync-message");
+  const endpointInput = $("sync-endpoint");
+  const keyInput = $("sync-key");
+  const config = syncClient.getConfig();
+
+  if (document.activeElement !== endpointInput) {
+    endpointInput.value = config.endpoint || "";
+  }
+  if (document.activeElement !== keyInput) {
+    keyInput.value = config.syncKey || "";
+  }
+
+  const configured = syncClient.isConfigured();
+  quickBtn.hidden = !configured;
+  nowBtn.hidden = !configured;
+  disconnectBtn.hidden = !configured;
+
+  badge.className = "sync-badge";
+  switch (statusInfo.status) {
+    case "synced":
+      badge.textContent = "Synced";
+      badge.classList.add("is-synced");
+      break;
+    case "syncing":
+      badge.textContent = "Syncing…";
+      badge.classList.add("is-syncing");
+      break;
+    case "error":
+      badge.textContent = "Error";
+      badge.classList.add("is-error");
+      break;
+    case "offline":
+      badge.textContent = "Offline";
+      badge.classList.add("is-offline");
+      break;
+    default:
+      badge.textContent = configured ? "Idle" : "Off";
+      break;
+  }
+
+  message.className = `sync-message${statusInfo.status === "error" ? " is-error" : ""}`;
+  if (statusInfo.message) {
+    message.textContent = statusInfo.message;
+  } else if (configured) {
+    if (statusInfo.lastSyncedAt) {
+      const date = new Date(statusInfo.lastSyncedAt);
+      const timeStr = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      message.textContent = `Last synced at ${timeStr} · Chapter ${state.position.chapter}:${state.position.verse}`;
+    } else {
+      message.textContent = "Connected. Ready to sync with cloud.";
+    }
+  } else {
+    message.textContent = "Enter your Cloudflare Worker URL and sync password to enable synchronization.";
+  }
+}
+
+function initSyncUI() {
+  const toggleBtn = $("sync-toggle-panel");
+  const details = $("sync-details");
+  const quickBtn = $("sync-quick-btn");
+  const nowBtn = $("sync-now-btn");
+  const generateBtn = $("generate-sync-key");
+  const toggleKeyBtn = $("toggle-sync-key");
+  const keyInput = $("sync-key");
+  const endpointInput = $("sync-endpoint");
+  const form = $("sync-form");
+  const disconnectBtn = $("sync-disconnect-btn");
+
+  toggleBtn.addEventListener("click", () => {
+    const isHidden = details.hidden;
+    details.hidden = !isHidden;
+    toggleBtn.setAttribute("aria-expanded", String(isHidden));
+    toggleBtn.textContent = isHidden ? "Close" : "Configure";
+    if (isHidden) {
+      if (!endpointInput.value) endpointInput.focus();
+      else if (!keyInput.value) keyInput.focus();
+    }
+  });
+
+  const triggerSync = async () => {
+    quickBtn.disabled = true;
+    nowBtn.disabled = true;
+    try {
+      await syncClient.sync(state);
+    } finally {
+      quickBtn.disabled = false;
+      nowBtn.disabled = false;
+    }
+  };
+
+  quickBtn.addEventListener("click", triggerSync);
+  nowBtn.addEventListener("click", triggerSync);
+
+  generateBtn.addEventListener("click", () => {
+    keyInput.value = generateSyncKey();
+    keyInput.type = "text";
+    keyInput.focus();
+  });
+
+  toggleKeyBtn.addEventListener("click", () => {
+    const isPassword = keyInput.type === "password";
+    keyInput.type = isPassword ? "text" : "password";
+    toggleKeyBtn.setAttribute("aria-label", isPassword ? "Hide password" : "Show password");
+  });
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const endpoint = endpointInput.value.trim();
+    const syncKey = keyInput.value.trim();
+
+    if (!endpoint) {
+      $("sync-message").textContent = "Please enter your Cloudflare Worker URL.";
+      $("sync-message").className = "sync-message is-error";
+      endpointInput.focus();
+      return;
+    }
+
+    if (!syncKey) {
+      $("sync-message").textContent = "Please enter a sync password.";
+      $("sync-message").className = "sync-message is-error";
+      keyInput.focus();
+      return;
+    }
+
+    syncClient.updateConfig({ endpoint, syncKey, autoSync: true });
+    renderSyncUI();
+    await triggerSync();
+  });
+
+  disconnectBtn.addEventListener("click", () => {
+    syncClient.clearConfig();
+    endpointInput.value = "";
+    keyInput.value = "";
+    renderSyncUI();
+    notify("Cloud sync disconnected. Your progress and bookmarks are saved locally.");
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && syncClient.isConfigured()) {
+      syncClient.pull();
+    }
+  });
+
+  window.addEventListener("online", () => {
+    if (syncClient.isConfigured()) {
+      syncClient.sync(state);
+    }
+  });
+
+  renderSyncUI();
+  if (syncClient.isConfigured()) {
+    syncClient.sync(state);
+  }
+}
+
 applyPreferences();
 closeMenu();
 persist();
 loadReading();
+initSyncUI();
+

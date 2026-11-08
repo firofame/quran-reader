@@ -3,10 +3,8 @@
  *
  * Provides strongly consistent, zero-lag cross-device synchronization of:
  * - Current reading position (chapter & verse)
- * - Saved bookmarks
  * - Active translation preference
  * - Timestamp-based position and translation conflict resolution
- * - Per-bookmark add/remove versions with retained tombstones
  */
 
 let BaseDurableObject = class {};
@@ -23,116 +21,6 @@ export const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
 function isValidTimestamp(value, now = Date.now()) {
   return Number.isSafeInteger(value) && value > 0 && value <= now + MAX_FUTURE_SKEW_MS;
-}
-
-function isValidBookmarkPosition(item) {
-  return Boolean(
-    item &&
-    Number.isSafeInteger(item.chapter) &&
-    item.chapter >= 1 &&
-    item.chapter <= 114 &&
-    Number.isSafeInteger(item.verse) &&
-    item.verse >= 1
-  );
-}
-
-function sanitizeBookmarks(bookmarks) {
-  const seen = new Set();
-  const result = [];
-  for (const item of bookmarks) {
-    if (!isValidBookmarkPosition(item)) continue;
-    const key = `${item.chapter}:${item.verse}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push({ chapter: item.chapter, verse: item.verse });
-    }
-  }
-  return result;
-}
-
-function parseBookmarkState(raw, legacyUpdatedAt = 0, now = Date.now()) {
-  let parsed = raw;
-  if (typeof raw === "string") {
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return [];
-    }
-  }
-
-  if (Array.isArray(parsed)) {
-    return sanitizeBookmarks(parsed).map(item => ({
-      ...item,
-      bookmarked: true,
-      updatedAt: isValidTimestamp(legacyUpdatedAt, now) ? legacyUpdatedAt : 0,
-    }));
-  }
-
-  if (!parsed || typeof parsed !== "object" || parsed.version !== 1 || !Array.isArray(parsed.items)) {
-    return [];
-  }
-
-  const states = new Map();
-  for (const item of parsed.items) {
-    if (!isValidBookmarkPosition(item) || typeof item.bookmarked !== "boolean") continue;
-    const key = `${item.chapter}:${item.verse}`;
-    const updatedAt = Number.isSafeInteger(item.updatedAt) &&
-      item.updatedAt >= 0 &&
-      item.updatedAt <= now + MAX_FUTURE_SKEW_MS
-      ? item.updatedAt
-      : 0;
-    const previous = states.get(key);
-    if (!previous || updatedAt >= previous.updatedAt) {
-      states.set(key, {
-        chapter: item.chapter,
-        verse: item.verse,
-        bookmarked: item.bookmarked,
-        updatedAt,
-      });
-    }
-  }
-  return [...states.values()].sort((first, second) =>
-    first.chapter - second.chapter || first.verse - second.verse);
-}
-
-function isLegacyBookmarkState(raw) {
-  let parsed = raw;
-  if (typeof raw === "string") {
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return false;
-    }
-  }
-  return Array.isArray(parsed);
-}
-
-function serializeBookmarkState(items) {
-  return JSON.stringify({ version: 1, items });
-}
-
-function activeBookmarks(items) {
-  return items.filter(item => item.bookmarked).map(({ chapter, verse }) => ({ chapter, verse }));
-}
-
-function mergeBookmarkChanges(existing, changes) {
-  const states = new Map(existing.map(item => [`${item.chapter}:${item.verse}`, item]));
-  for (const change of changes) {
-    const key = `${change.chapter}:${change.verse}`;
-    const previous = states.get(key);
-    if (!previous || change.updatedAt >= previous.updatedAt) {
-      states.set(key, change);
-    }
-  }
-  return [...states.values()].sort((first, second) =>
-    first.chapter - second.chapter || first.verse - second.verse);
-}
-
-function legacyBookmarkChanges(bookmarks, existing, updatedAt) {
-  const known = new Set(existing.map(item => `${item.chapter}:${item.verse}`));
-  return bookmarks
-    .filter(item => !known.has(`${item.chapter}:${item.verse}`))
-    .map(item => ({ ...item, bookmarked: true, updatedAt }));
 }
 
 export class SyncDurableObject extends BaseDurableObject {
@@ -160,11 +48,13 @@ export class SyncDurableObject extends BaseDurableObject {
         id INTEGER PRIMARY KEY CHECK (id = 1),
         chapter INTEGER NOT NULL,
         verse INTEGER NOT NULL,
-        bookmarks TEXT NOT NULL,
         translation TEXT,
         updated_at INTEGER NOT NULL
       );
     `);
+    try {
+      this.sql.exec("ALTER TABLE sync_state DROP COLUMN bookmarks;");
+    } catch {}
   }
 
   async fetch(request) {
@@ -190,7 +80,7 @@ export class SyncDurableObject extends BaseDurableObject {
   getState() {
     if (this.sql) {
       const cursor = this.sql.exec(
-        "SELECT chapter, verse, bookmarks, translation, updated_at FROM sync_state WHERE id = 1"
+        "SELECT chapter, verse, translation, updated_at FROM sync_state WHERE id = 1"
       );
       const rows = typeof cursor.toArray === "function" ? cursor.toArray() : [...cursor];
 
@@ -203,15 +93,10 @@ export class SyncDurableObject extends BaseDurableObject {
       const storedUpdatedAt = Number(row.updated_at);
       const validStoredTimestamp = isValidTimestamp(storedUpdatedAt, now);
       const updatedAt = validStoredTimestamp ? storedUpdatedAt : now;
-      const bookmarkItems = parseBookmarkState(
-        row.bookmarks,
-        validStoredTimestamp ? storedUpdatedAt : 0,
-        now
-      );
-      if (!validStoredTimestamp || isLegacyBookmarkState(row.bookmarks)) {
+
+      if (!validStoredTimestamp) {
         this.sql.exec(
-          "UPDATE sync_state SET bookmarks = ?, updated_at = ? WHERE id = 1",
-          serializeBookmarkState(bookmarkItems),
+          "UPDATE sync_state SET updated_at = ? WHERE id = 1",
           updatedAt
         );
       }
@@ -220,7 +105,6 @@ export class SyncDurableObject extends BaseDurableObject {
         empty: false,
         chapter: row.chapter,
         verse: row.verse,
-        bookmarks: activeBookmarks(bookmarkItems),
         translation: row.translation || null,
         updatedAt,
       });
@@ -238,24 +122,10 @@ export class SyncDurableObject extends BaseDurableObject {
     const storedUpdatedAt = Number(record.updatedAt);
     const validStoredTimestamp = isValidTimestamp(storedUpdatedAt, now);
     const updatedAt = validStoredTimestamp ? storedUpdatedAt : now;
-    const rawBookmarkState = record.bookmarkState ?? record.bookmarks;
-    const bookmarkItems = parseBookmarkState(
-      rawBookmarkState,
-      validStoredTimestamp ? storedUpdatedAt : 0,
-      now
-    );
-    if (!validStoredTimestamp || isLegacyBookmarkState(rawBookmarkState)) {
-      await this.state.storage?.put?.("sync_state", {
-        ...record,
-        bookmarkState: { version: 1, items: bookmarkItems },
-        updatedAt,
-      });
-    }
     return Response.json({
       empty: false,
       chapter: record.chapter,
       verse: record.verse,
-      bookmarks: activeBookmarks(bookmarkItems),
       translation: record.translation || null,
       updatedAt,
     });
@@ -266,88 +136,46 @@ export class SyncDurableObject extends BaseDurableObject {
       return Response.json({ error: "Invalid state payload." }, { status: 400 });
     }
 
-    const { chapter, verse, bookmarks, translation, updatedAt } = data;
+    const { chapter, verse, translation, updatedAt } = data;
     const now = Date.now();
 
     if (
       !Number.isSafeInteger(chapter) || chapter < 1 || chapter > 114 ||
       !Number.isSafeInteger(verse) || verse < 1 ||
-      !Array.isArray(bookmarks) ||
       !isValidTimestamp(updatedAt, now)
     ) {
       return Response.json({ error: "Invalid state payload." }, { status: 400 });
-    }
-
-    const isBookmarkOnly = Boolean(data.isBookmarkOnly || data.positionUpdated === false);
-    const sanitizedBookmarks = sanitizeBookmarks(bookmarks);
-    const hasBookmarkChanges = Object.hasOwn(data, "bookmarkChanges");
-    let bookmarkChanges = null;
-    if (hasBookmarkChanges) {
-      if (!Array.isArray(data.bookmarkChanges)) {
-        return Response.json({ error: "Invalid bookmark changes." }, { status: 400 });
-      }
-      const changesByKey = new Map();
-      for (const item of data.bookmarkChanges) {
-        if (!isValidBookmarkPosition(item) || typeof item.bookmarked !== "boolean") {
-          return Response.json({ error: "Invalid bookmark changes." }, { status: 400 });
-        }
-        const changeUpdatedAt = item.updatedAt === undefined ? updatedAt : item.updatedAt;
-        if (!isValidTimestamp(changeUpdatedAt, now)) {
-          return Response.json({ error: "Invalid bookmark change timestamp." }, { status: 400 });
-        }
-        changesByKey.set(`${item.chapter}:${item.verse}`, {
-          chapter: item.chapter,
-          verse: item.verse,
-          bookmarked: item.bookmarked,
-          updatedAt: changeUpdatedAt,
-        });
-      }
-      bookmarkChanges = [...changesByKey.values()];
     }
 
     const safeTranslation = typeof translation === "string" ? translation.slice(0, 50) : null;
 
     if (this.sql) {
       const cursor = this.sql.exec(
-        "SELECT chapter, verse, bookmarks, translation, updated_at FROM sync_state WHERE id = 1"
+        "SELECT chapter, verse, translation, updated_at FROM sync_state WHERE id = 1"
       );
       const rows = typeof cursor.toArray === "function" ? cursor.toArray() : [...cursor];
       const existing = rows[0] || null;
       const existingUpdatedAt = existing ? Number(existing.updated_at) : 0;
       const validExistingTimestamp = Boolean(existing) && isValidTimestamp(existingUpdatedAt, now);
-      const existingBookmarks = existing
-        ? parseBookmarkState(
-          existing.bookmarks,
-          validExistingTimestamp ? existingUpdatedAt : 0,
-          now
-        )
-        : [];
-      const changes = hasBookmarkChanges
-        ? bookmarkChanges
-        : legacyBookmarkChanges(sanitizedBookmarks, existingBookmarks, updatedAt);
-      const mergedBookmarks = mergeBookmarkChanges(existingBookmarks, changes);
-      const positionWins = !isBookmarkOnly && (!existing || !validExistingTimestamp || updatedAt >= existingUpdatedAt);
-      const mergedUpdatedAt = positionWins ? updatedAt : existingUpdatedAt;
+      const positionWins = !existing || !validExistingTimestamp || updatedAt >= existingUpdatedAt;
+      const nextUpdatedAt = positionWins ? updatedAt : existingUpdatedAt;
 
       const nextState = {
         chapter: positionWins || !existing ? chapter : existing.chapter,
         verse: positionWins || !existing ? verse : existing.verse,
-        bookmarks: serializeBookmarkState(mergedBookmarks),
         translation: positionWins || !existing ? safeTranslation : existing.translation,
-        updatedAt: !existing ? updatedAt : mergedUpdatedAt,
+        updatedAt: !existing ? updatedAt : nextUpdatedAt,
       };
       this.sql.exec(
-        `INSERT INTO sync_state (id, chapter, verse, bookmarks, translation, updated_at)
-         VALUES (1, ?, ?, ?, ?, ?)
+        `INSERT INTO sync_state (id, chapter, verse, translation, updated_at)
+         VALUES (1, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            chapter = excluded.chapter,
            verse = excluded.verse,
-           bookmarks = excluded.bookmarks,
            translation = excluded.translation,
            updated_at = excluded.updated_at;`,
         nextState.chapter,
         nextState.verse,
-        nextState.bookmarks,
         nextState.translation,
         nextState.updatedAt
       );
@@ -358,10 +186,6 @@ export class SyncDurableObject extends BaseDurableObject {
     return this.putStateFallback({
       chapter,
       verse,
-      bookmarks: sanitizedBookmarks,
-      bookmarkChanges,
-      hasBookmarkChanges,
-      isBookmarkOnly,
       translation: safeTranslation,
       updatedAt,
     });
@@ -372,26 +196,12 @@ export class SyncDurableObject extends BaseDurableObject {
     const now = Date.now();
     const existingUpdatedAt = existing ? Number(existing.updatedAt) : 0;
     const validExistingTimestamp = Boolean(existing) && isValidTimestamp(existingUpdatedAt, now);
-    const rawBookmarkState = existing?.bookmarkState ?? existing?.bookmarks;
-    const existingBookmarks = existing
-      ? parseBookmarkState(
-        rawBookmarkState,
-        validExistingTimestamp ? existingUpdatedAt : 0,
-        now
-      )
-      : [];
-    const changes = newState.hasBookmarkChanges
-      ? newState.bookmarkChanges
-      : legacyBookmarkChanges(newState.bookmarks, existingBookmarks, newState.updatedAt);
-    const mergedBookmarks = mergeBookmarkChanges(existingBookmarks, changes);
-    const isBookmarkOnly = Boolean(newState.isBookmarkOnly || newState.positionUpdated === false);
-    const positionWins = !isBookmarkOnly && (!existing || !validExistingTimestamp || newState.updatedAt >= existingUpdatedAt);
+    const positionWins = !existing || !validExistingTimestamp || newState.updatedAt >= existingUpdatedAt;
     const mergedUpdatedAt = positionWins ? newState.updatedAt : existingUpdatedAt;
 
     const record = {
       chapter: positionWins || !existing ? newState.chapter : existing.chapter,
       verse: positionWins || !existing ? newState.verse : existing.verse,
-      bookmarkState: { version: 1, items: mergedBookmarks },
       translation: positionWins || !existing ? newState.translation : existing.translation,
       updatedAt: !existing ? newState.updatedAt : mergedUpdatedAt,
     };
@@ -400,7 +210,6 @@ export class SyncDurableObject extends BaseDurableObject {
       empty: false,
       chapter: record.chapter,
       verse: record.verse,
-      bookmarks: activeBookmarks(mergedBookmarks),
       translation: record.translation || null,
       updatedAt: record.updatedAt,
     });

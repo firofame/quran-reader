@@ -131,19 +131,15 @@ export function decodeState(raw, chapters) {
   const defaults = {
     translation: "en.sahih",
     position: { chapter: 1, verse: 1 },
-    bookmarks: [],
     fontSize: 21,
     theme: "light",
   };
   if (raw === null) return defaults;
   const value = JSON.parse(raw);
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Saved preferences are not valid.");
-  const bookmarks = Array.isArray(value.bookmarks) ? value.bookmarks.filter(item => validPosition(item, chapters)) : [];
   return {
     translation: Object.hasOwn(TRANSLATIONS, value.translation) ? value.translation : defaults.translation,
     position: validPosition(value.position, chapters) ? value.position : defaults.position,
-    bookmarks: bookmarks.filter((item, index) =>
-      bookmarks.findIndex(other => other.chapter === item.chapter && other.verse === item.verse) === index),
     fontSize: Number.isInteger(value.fontSize) ? Math.max(17, Math.min(29, value.fontSize)) : defaults.fontSize,
     theme: value.theme === "dark" ? "dark" : "light",
   };

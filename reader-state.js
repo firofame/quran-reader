@@ -20,19 +20,6 @@ export function reduceReaderState(state, action, chapters) {
         throw new Error("Cannot select an unsupported translation.");
       }
       return { ...state, translation: action.translation };
-    case "bookmark/toggle": {
-      if (!validPosition(action.position, chapters)) {
-        throw new Error("Cannot bookmark an invalid ayah.");
-      }
-      const { chapter, verse } = action.position;
-      const bookmarked = state.bookmarks.some(item => item.chapter === chapter && item.verse === verse);
-      return {
-        ...state,
-        bookmarks: bookmarked
-          ? state.bookmarks.filter(item => item.chapter !== chapter || item.verse !== verse)
-          : [...state.bookmarks, { chapter, verse }],
-      };
-    }
     case "font-size/adjust":
       if (!Number.isInteger(action.delta)) {
         throw new Error("The reading text size adjustment must be an integer.");

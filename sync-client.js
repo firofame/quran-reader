@@ -6,33 +6,8 @@ const DEFAULT_CONFIG = {
   syncKey: "",
   lastSyncedAt: 0,
   lastUpdatedAt: 0,
-  bookmarkBaseline: null,
   autoSync: false,
 };
-
-function normalizeBookmarks(bookmarks) {
-  if (!Array.isArray(bookmarks)) return [];
-  const seen = new Set();
-  const result = [];
-  for (const bookmark of bookmarks) {
-    if (
-      !bookmark ||
-      !Number.isSafeInteger(bookmark.chapter) ||
-      bookmark.chapter < 1 ||
-      bookmark.chapter > 114 ||
-      !Number.isSafeInteger(bookmark.verse) ||
-      bookmark.verse < 1
-    ) {
-      continue;
-    }
-    const key = `${bookmark.chapter}:${bookmark.verse}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push({ chapter: bookmark.chapter, verse: bookmark.verse });
-    }
-  }
-  return result;
-}
 
 function normalizePosition(pos) {
   if (
@@ -62,26 +37,6 @@ function positionsMatch(first, second) {
   );
 }
 
-function getBookmarkChanges(bookmarks, baseline, updatedAt) {
-  const currentBookmarks = normalizeBookmarks(bookmarks);
-  const previousBookmarks = normalizeBookmarks(baseline);
-  const currentKeys = new Set(currentBookmarks.map(item => `${item.chapter}:${item.verse}`));
-  const previousKeys = new Set(previousBookmarks.map(item => `${item.chapter}:${item.verse}`));
-  const changes = [];
-
-  for (const bookmark of currentBookmarks) {
-    if (!previousKeys.has(`${bookmark.chapter}:${bookmark.verse}`)) {
-      changes.push({ ...bookmark, bookmarked: true, updatedAt });
-    }
-  }
-  for (const bookmark of previousBookmarks) {
-    if (!currentKeys.has(`${bookmark.chapter}:${bookmark.verse}`)) {
-      changes.push({ ...bookmark, bookmarked: false, updatedAt });
-    }
-  }
-  return changes;
-}
-
 export function loadSyncConfig(storage) {
   try {
     const raw = storage.getItem(SYNC_STORAGE_KEY);
@@ -100,7 +55,6 @@ export function loadSyncConfig(storage) {
       syncKey,
       lastSyncedAt: Number.isSafeInteger(parsed.lastSyncedAt) && parsed.lastSyncedAt >= 0 ? parsed.lastSyncedAt : 0,
       lastUpdatedAt: Number.isSafeInteger(parsed.lastUpdatedAt) && parsed.lastUpdatedAt >= 0 ? parsed.lastUpdatedAt : 0,
-      bookmarkBaseline: Array.isArray(parsed.bookmarkBaseline) ? normalizeBookmarks(parsed.bookmarkBaseline) : null,
       autoSync: typeof parsed.autoSync === "boolean" ? parsed.autoSync : Boolean(endpoint && syncKey),
     };
     if (parsed.disabled !== undefined) {
@@ -221,7 +175,6 @@ export function createSyncClient({
     if (pairingChanged) {
       config.lastSyncedAt = Number.isSafeInteger(newFields.lastSyncedAt) ? newFields.lastSyncedAt : 0;
       config.lastUpdatedAt = Number.isSafeInteger(newFields.lastUpdatedAt) ? newFields.lastUpdatedAt : 0;
-      config.bookmarkBaseline = normalizeBookmarks(newFields.bookmarkBaseline);
       config.lastPosition = normalizePosition(newFields.lastPosition);
     } else if (newFields.lastPosition !== undefined) {
       config.lastPosition = normalizePosition(newFields.lastPosition);
@@ -235,34 +188,6 @@ export function createSyncClient({
     saveSyncConfig(storage, config);
     clearTimeout(debounceTimer);
     notifyStatus("unconfigured", "");
-  }
-
-  function ensureBookmarkBaseline(localState) {
-    let changed = false;
-    if (config.bookmarkBaseline === null) {
-      config.bookmarkBaseline = config.lastSyncedAt > 0
-        ? normalizeBookmarks(localState.bookmarks)
-        : [];
-      changed = true;
-    }
-    if (config.lastPosition === null && localState?.position) {
-      config.lastPosition = normalizePosition({
-        ...localState.position,
-        translation: localState.translation,
-      });
-      changed = true;
-    }
-    if (changed) {
-      saveSyncConfig(storage, config);
-    }
-  }
-
-  function hasBookmarkChanges(bookmarks) {
-    return getBookmarkChanges(bookmarks, config.bookmarkBaseline || [], 0).length > 0;
-  }
-
-  function bookmarkListsDiffer(first, second) {
-    return getBookmarkChanges(first, second, 0).length > 0;
   }
 
   function hasPositionChanges(localState) {
@@ -288,25 +213,14 @@ export function createSyncClient({
         translation: typeof remoteData.translation === "string" ? remoteData.translation : undefined,
       };
     }
-    if (Array.isArray(remoteData.bookmarks)) {
-      config.bookmarkBaseline = normalizeBookmarks(remoteData.bookmarks);
-    }
     if (latestLocalState && Number.isSafeInteger(remoteData.chapter) && Number.isSafeInteger(remoteData.verse)) {
       latestLocalState = {
         ...latestLocalState,
         position: { chapter: remoteData.chapter, verse: remoteData.verse },
         translation: typeof remoteData.translation === "string" ? remoteData.translation : latestLocalState.translation,
-        bookmarks: Array.isArray(remoteData.bookmarks) ? normalizeBookmarks(remoteData.bookmarks) : latestLocalState.bookmarks,
       };
     }
     saveSyncConfig(storage, config);
-  }
-
-  function recordRemoteBookmarks(remoteData) {
-    if (Array.isArray(remoteData.bookmarks)) {
-      config.bookmarkBaseline = normalizeBookmarks(remoteData.bookmarks);
-      saveSyncConfig(storage, config);
-    }
   }
 
   function nextUpdatedAt() {
@@ -359,7 +273,6 @@ export function createSyncClient({
       const remoteData = await response.json();
 
       if (remoteData.empty || !remoteData.updatedAt) {
-        config.bookmarkBaseline = [];
         saveSyncConfig(storage, config);
         notifyStatus("synced", "Ready (no remote data yet)");
         return { success: true, empty: true };
@@ -373,16 +286,8 @@ export function createSyncClient({
         return { success: true, updated: true, data: remoteData };
       }
 
-      const bookmarksChanged = bookmarkListsDiffer(remoteData.bookmarks, config.bookmarkBaseline || []);
-      if (bookmarksChanged) {
-        recordRemoteBookmarks(remoteData);
-        config.lastSyncedAt = Math.max(config.lastSyncedAt, remoteData.updatedAt);
-        saveSyncConfig(storage, config);
-        onRemoteUpdate({ bookmarks: remoteData.bookmarks });
-      }
-      saveSyncConfig(storage, config);
-      notifyStatus("synced", bookmarksChanged ? "Merged bookmarks from cloud." : "Already up to date.");
-      return { success: true, updated: bookmarksChanged, data: remoteData };
+      notifyStatus("synced", "Already up to date.");
+      return { success: true, updated: false, data: remoteData };
     } catch (err) {
       const message = err?.message || "Network request failed.";
       notifyStatus("offline", `Sync unreachable: ${message}`);
@@ -390,7 +295,7 @@ export function createSyncClient({
     }
   }
 
-  async function push(localState, { updatedAt: suppliedUpdatedAt, bookmarkUpdatedAt, isBookmarkOnly: explicitBookmarkOnly } = {}) {
+  async function push(localState, { updatedAt: suppliedUpdatedAt } = {}) {
     if (!isConfigured() || destroyed) {
       return { success: false, reason: "unconfigured" };
     }
@@ -400,15 +305,10 @@ export function createSyncClient({
     latestLocalState = localState;
     localRevision++;
     const pushRevision = localRevision;
-    ensureBookmarkBaseline(localState);
     notifyStatus("syncing", "Saving progress to cloud…");
     try {
       const url = `${normalizeEndpoint(config.endpoint)}/api/sync`;
       const positionChanged = hasPositionChanges(localState);
-      const isBookmarkOnly = explicitBookmarkOnly !== undefined
-        ? explicitBookmarkOnly
-        : (!positionChanged && hasBookmarkChanges(localState.bookmarks));
-      const normalizedBookmarks = normalizeBookmarks(localState.bookmarks);
 
       let updatedAt = suppliedUpdatedAt;
       if (updatedAt === undefined) {
@@ -427,21 +327,11 @@ export function createSyncClient({
         });
       }
 
-      const effectiveBookmarkUpdatedAt = bookmarkUpdatedAt ?? nextUpdatedAt();
-
       const payload = {
         chapter: localState.position.chapter,
         verse: localState.position.verse,
-        bookmarks: normalizedBookmarks,
-        bookmarkChanges: getBookmarkChanges(
-          normalizedBookmarks,
-          config.bookmarkBaseline || [],
-          effectiveBookmarkUpdatedAt
-        ),
         translation: localState.translation || "en.sahih",
         updatedAt,
-        isBookmarkOnly,
-        positionUpdated: !isBookmarkOnly,
       };
 
       const response = await fetch(url, {
@@ -465,8 +355,7 @@ export function createSyncClient({
       if (
         !responseData ||
         typeof responseData !== "object" ||
-        !Number.isSafeInteger(responseData.updatedAt) ||
-        !Array.isArray(responseData.bookmarks)
+        !Number.isSafeInteger(responseData.updatedAt)
       ) {
         throw new Error("Worker returned an invalid sync state.");
       }
@@ -475,41 +364,12 @@ export function createSyncClient({
       const localChangedInFlight = localRevision > pushRevision;
 
       if (localChangedInFlight) {
-        // Newer local changes were made while this push was in flight.
-        // Update baseline and synced time, but do NOT overwrite the newer local position.
         config.lastSyncedAt = Math.max(config.lastSyncedAt, responseData.updatedAt);
-        if (Array.isArray(responseData.bookmarks)) {
-          config.bookmarkBaseline = normalizeBookmarks(responseData.bookmarks);
-        }
         saveSyncConfig(storage, config);
-        if (bookmarkListsDiffer(responseData.bookmarks, latestLocalState?.bookmarks || [])) {
-          onRemoteUpdate({ bookmarks: responseData.bookmarks });
-        }
         return { success: true, supersededLocally: true, data: responseData };
       }
 
-      const positionMatchesLocal = Boolean(
-        localState?.position &&
-        Number.isSafeInteger(localState.position.chapter) &&
-        Number.isSafeInteger(localState.position.verse) &&
-        localState.position.chapter === responseData.chapter &&
-        localState.position.verse === responseData.verse
-      );
-
-      if (isBookmarkOnly && !positionMatchesLocal && responseData.updatedAt <= updatedAt) {
-        config.lastSyncedAt = Math.max(config.lastSyncedAt, responseData.updatedAt);
-        if (Array.isArray(responseData.bookmarks)) {
-          config.bookmarkBaseline = normalizeBookmarks(responseData.bookmarks);
-        }
-        saveSyncConfig(storage, config);
-        if (bookmarkListsDiffer(responseData.bookmarks, latestLocalState?.bookmarks || [])) {
-          onRemoteUpdate({ bookmarks: responseData.bookmarks });
-        }
-        notifyStatus("synced", "Bookmarks synchronized.");
-        return { success: true, data: responseData };
-      }
-
-      const remoteWon = !isBookmarkOnly && responseData.updatedAt > updatedAt;
+      const remoteWon = responseData.updatedAt > updatedAt;
       recordRemoteState(responseData);
       onRemoteUpdate(responseData);
       if (remoteWon) {
@@ -534,7 +394,6 @@ export function createSyncClient({
 
     latestLocalState = localState;
     localRevision++;
-    ensureBookmarkBaseline(localState);
     if (activePromise) return activePromise;
 
     activePromise = (async () => {
@@ -561,7 +420,6 @@ export function createSyncClient({
 
         // Reconcile against the latest local state after the async GET operation
         const effectiveLocalState = latestLocalState || localState;
-        ensureBookmarkBaseline(effectiveLocalState);
 
         const localChangedInFlight = localRevision > syncRevision;
         const positionChangedInFlight = !positionsMatch(
@@ -577,8 +435,6 @@ export function createSyncClient({
           saveSyncConfig(storage, config);
           return await push(effectiveLocalState, {
             updatedAt: freshUpdatedAt,
-            bookmarkUpdatedAt: nextUpdatedAt(),
-            isBookmarkOnly: false,
           });
         }
 
@@ -586,25 +442,12 @@ export function createSyncClient({
         if (remoteData.empty || !remoteData.updatedAt) {
           config.lastSyncedAt = 0;
           config.lastUpdatedAt = 0;
-          config.bookmarkBaseline = [];
           saveSyncConfig(storage, config);
           return await push(effectiveLocalState);
         }
 
         // If this device has never synced before, adopt existing cloud state
         if (config.lastSyncedAt === 0) {
-          if (hasBookmarkChanges(effectiveLocalState.bookmarks)) {
-            const adoptedState = {
-              ...effectiveLocalState,
-              position: { chapter: remoteData.chapter, verse: remoteData.verse },
-              translation: remoteData.translation || effectiveLocalState.translation,
-            };
-            return await push(adoptedState, {
-              updatedAt: remoteData.updatedAt,
-              bookmarkUpdatedAt: nextUpdatedAt(),
-              isBookmarkOnly: true,
-            });
-          }
           recordRemoteState(remoteData);
           onRemoteUpdate(remoteData);
           notifyStatus("synced", `Synced with cloud (Ayah ${remoteData.chapter}:${remoteData.verse})`);
@@ -612,22 +455,9 @@ export function createSyncClient({
         }
 
         const localUpdatedAt = config.lastUpdatedAt || 0;
-        const localHasBookmarkChanges = hasBookmarkChanges(effectiveLocalState.bookmarks);
 
         if (remoteData.updatedAt > localUpdatedAt) {
           // Remote reading position is newer than local
-          if (localHasBookmarkChanges) {
-            const adoptedState = {
-              ...effectiveLocalState,
-              position: { chapter: remoteData.chapter, verse: remoteData.verse },
-              translation: remoteData.translation || effectiveLocalState.translation,
-            };
-            return await push(adoptedState, {
-              updatedAt: remoteData.updatedAt,
-              bookmarkUpdatedAt: nextUpdatedAt(),
-              isBookmarkOnly: true,
-            });
-          }
           recordRemoteState(remoteData);
           onRemoteUpdate(remoteData);
           notifyStatus("synced", `Updated to Ayah ${remoteData.chapter}:${remoteData.verse}`);
@@ -636,25 +466,11 @@ export function createSyncClient({
           // Local reading position is newer than remote
           return await push(effectiveLocalState, {
             updatedAt: localUpdatedAt,
-            bookmarkUpdatedAt: nextUpdatedAt(),
-            isBookmarkOnly: false,
           });
         } else {
           // Equal timestamps (position unchanged on both sides)
-          if (localHasBookmarkChanges) {
-            return await push(effectiveLocalState, {
-              updatedAt: localUpdatedAt > 0 ? localUpdatedAt : remoteData.updatedAt,
-              bookmarkUpdatedAt: nextUpdatedAt(),
-              isBookmarkOnly: true,
-            });
-          }
           recordRemoteState(remoteData);
           saveSyncConfig(storage, config);
-          if (bookmarkListsDiffer(remoteData.bookmarks, effectiveLocalState.bookmarks)) {
-            onRemoteUpdate({ bookmarks: remoteData.bookmarks });
-            notifyStatus("synced", "Merged bookmarks from cloud.");
-            return { success: true, direction: "pulled", data: remoteData };
-          }
           notifyStatus("synced", "Up to date");
           return { success: true, direction: "equal", data: remoteData };
         }
@@ -675,7 +491,6 @@ export function createSyncClient({
     if (!isConfigured() || !config.autoSync || destroyed) return;
 
     localRevision++;
-    ensureBookmarkBaseline(localState);
     const positionChanged = hasPositionChanges(localState);
     if (positionChanged) {
       config.lastPosition = normalizePosition({

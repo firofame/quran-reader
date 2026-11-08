@@ -156,7 +156,7 @@ test("ayah navigation crosses chapter boundaries without skipping any of the 6,2
 });
 
 test("bottom previous and next buttons navigate consecutively and disable at boundaries", () => {
-  let state = { translation: "en.sahih", position: { chapter: 1, verse: 1 }, bookmarks: [], fontSize: 21, theme: "light" };
+  let state = { translation: "en.sahih", position: { chapter: 1, verse: 1 }, fontSize: 21, theme: "light" };
 
   // At the start of the Quran, previous button has no target (disabled)
   const prevAtStart = adjacentPosition(state.position, -1, chapters);
@@ -287,13 +287,11 @@ test("saved preferences are validated, clamped, and deduplicated", () => {
   const saved = decodeState(JSON.stringify({
     translation: "missing",
     position: { chapter: 200, verse: 1 },
-    bookmarks: [{ chapter: 1, verse: 2 }, { chapter: 1, verse: 2 }, { chapter: 1, verse: 8 }, null],
     fontSize: 100,
     theme: "dark",
   }), chapters);
   assert.equal(saved.translation, "en.sahih");
   assert.deepEqual(saved.position, { chapter: 1, verse: 1 });
-  assert.deepEqual(saved.bookmarks, [{ chapter: 1, verse: 2 }]);
   assert.equal(saved.fontSize, 29);
   assert.equal(saved.theme, "dark");
   assert.equal(decodeState(null, chapters).fontSize, 21);
@@ -306,7 +304,6 @@ test("new and removed translation preferences use Saheeh International without l
   const saved = {
     translation: "en.itani",
     position: { chapter: 2, verse: 255 },
-    bookmarks: [{ chapter: 1, verse: 2 }],
     fontSize: 25,
     theme: "dark",
   };
@@ -329,17 +326,8 @@ test("reader state changes are validated, immutable, and bounded", () => {
     type: "translation/set",
     translation: "ml.abdulhameed",
   }, chapters);
-  const bookmarked = reduceReaderState(translated, {
-    type: "bookmark/toggle",
-    position: { chapter: 2, verse: 255 },
-  }, chapters);
-  assert.equal(bookmarked.translation, "ml.abdulhameed");
-  assert.deepEqual(bookmarked.bookmarks, [{ chapter: 2, verse: 255 }]);
-  assert.deepEqual(
-    reduceReaderState(bookmarked, { type: "bookmark/toggle", position: { chapter: 2, verse: 255 } }, chapters).bookmarks,
-    [],
-  );
-  assert.equal(reduceReaderState(bookmarked, { type: "font-size/adjust", delta: 20 }, chapters).fontSize, 29);
+  assert.equal(translated.translation, "ml.abdulhameed");
+  assert.equal(reduceReaderState(translated, { type: "font-size/adjust", delta: 20 }, chapters).fontSize, 29);
   assert.equal(reduceReaderState(initial, { type: "font-size/adjust", delta: -20 }, chapters).fontSize, 17);
   assert.equal(reduceReaderState(initial, { type: "theme/toggle" }, chapters).theme, "dark");
   assert.throws(() => reduceReaderState(initial, { type: "position/set", position: { chapter: 1, verse: 8 } }, chapters), /invalid ayah/);
@@ -359,7 +347,6 @@ test("preference storage keeps the existing key and propagates storage failures"
   const saved = {
     ...decodeState(null, chapters),
     position: { chapter: 2, verse: 255 },
-    bookmarks: [{ chapter: 1, verse: 2 }],
   };
   preferences.save(saved);
   assert.equal(values.has("quran-reader:v1"), true);

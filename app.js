@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, selectAyah, adjacentPosition, matchesChapter, decodeState } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, selectAyah, adjacentPosition, matchesChapter, decodeState, validPosition } from "./reader.js";
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
@@ -6,7 +6,6 @@ import { createSyncClient, generateSyncKey, normalizeEndpoint } from "./sync-cli
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
-  bookmark: '<path d="M6 4h12v17l-6-4-6 4V4Z"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/>',
   moon: '<path d="M20 14A8.5 8.5 0 0 1 10 4a8.5 8.5 0 1 0 10 10Z"/>',
@@ -31,7 +30,6 @@ const preferences = createPreferencesStore({
 }, chapters);
 const translations = createTranslationRepository();
 let state;
-let view = "read";
 let requestId = 0;
 let noticeTimer;
 let storageFailed = false;
@@ -52,7 +50,6 @@ const syncClient = createSyncClient({
   onRemoteUpdate(data) {
     let stateChanged = false;
     let positionChanged = false;
-    let bookmarksChanged = false;
     let translationChanged = false;
 
     if (data.chapter && data.verse && (data.chapter !== state.position.chapter || data.verse !== state.position.verse)) {
@@ -60,31 +57,6 @@ const syncClient = createSyncClient({
         state = reduceReaderState(state, { type: "position/set", position: { chapter: data.chapter, verse: data.verse } }, chapters);
         stateChanged = true;
         positionChanged = true;
-      }
-    }
-    if (Array.isArray(data.bookmarks)) {
-      const seen = new Set();
-      const validBookmarks = [];
-      for (const b of data.bookmarks) {
-        if (validPosition(b, chapters)) {
-          const key = `${b.chapter}:${b.verse}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            validBookmarks.push({ chapter: b.chapter, verse: b.verse });
-          }
-        }
-      }
-      const currentKeys = new Set(state.bookmarks.map(b => `${b.chapter}:${b.verse}`));
-      let differs = currentKeys.size !== seen.size;
-      if (!differs) {
-        for (const k of currentKeys) {
-          if (!seen.has(k)) { differs = true; break; }
-        }
-      }
-      if (differs) {
-        state = { ...state, bookmarks: validBookmarks };
-        stateChanged = true;
-        bookmarksChanged = true;
       }
     }
     if (data.translation && data.translation !== state.translation && Object.hasOwn(TRANSLATIONS, data.translation)) {
@@ -100,8 +72,6 @@ const syncClient = createSyncClient({
       loadReading();
       if (positionChanged) {
         notify(`Synced with cloud: opened verse ${state.position.chapter}:${state.position.verse}.`);
-      } else if (bookmarksChanged) {
-        notify("Synced with cloud: bookmarks updated.");
       } else if (translationChanged) {
         notify("Synced with cloud: translation updated.");
       }
@@ -137,7 +107,7 @@ function persist() {
   } catch (error) {
     if (!storageFailed) {
       console.error("Unable to save Quran reader preferences:", error);
-      notify("Browser storage is unavailable. Your reading progress and bookmarks won't be saved.", true);
+      notify("Browser storage is unavailable. Your reading progress won't be saved.", true);
       storageFailed = true;
     }
   }
@@ -185,34 +155,18 @@ function renderChapters() {
   $("chapter-list").replaceChildren(fragment);
 }
 
-function updateTabs() {
-  const reading = view === "read";
-  $("read-tab").classList.toggle("active", reading);
-  $("saved-tab").classList.toggle("active", !reading);
-  $("read-tab").toggleAttribute("aria-current", reading);
-  $("saved-tab").toggleAttribute("aria-current", !reading);
-  if (reading) $("read-tab").setAttribute("aria-current", "page");
-  else $("saved-tab").setAttribute("aria-current", "page");
-  $("saved-count").textContent = state.bookmarks.length;
-}
-
 function renderHeading() {
   $("reading-metadata").hidden = true;
   $("reading-metadata").replaceChildren();
   const chapter = chapters[state.position.chapter - 1];
-  if (view === "saved") {
-    $("chapter-heading").innerHTML = `<div><h1>Saved verses</h1><p>A collection to come back to.</p></div>`;
-    document.title = "Saved verses — The Quran";
-  } else {
-    $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
-    document.title = `${chapter.name} — The Quran`;
-  }
+  $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
+  document.title = `${chapter.name} — The Quran`;
   const jumpOptions = Array.from({ length: chapter.verses }, (_, index) => new Option(index + 1, index + 1));
   $("verse-jump").replaceChildren(...jumpOptions);
   $("verse-jump").value = state.position.verse;
-  $("jump-control").hidden = view !== "read";
-  $("verse-search").placeholder = view === "read" ? "Search in this chapter…" : "Search saved verses…";
-  $("verse-search").setAttribute("aria-label", view === "read" ? "Search verses in this chapter" : "Search saved verses");
+  $("jump-control").hidden = Boolean($("verse-search").value.trim());
+  $("verse-search").placeholder = "Search in this chapter…";
+  $("verse-search").setAttribute("aria-label", "Search verses in this chapter");
   const translation = TRANSLATIONS[state.translation];
   const attribution = $("attribution");
   attribution.replaceChildren(document.createTextNode(`${translation.name} · `));
@@ -224,31 +178,25 @@ function renderHeading() {
   attribution.append(source);
 }
 
-function isBookmarked(chapter, verse) {
-  return state.bookmarks.some(item => item.chapter === chapter && item.verse === verse);
-}
-
 function renderVerses() {
   const data = translations.getLoaded(state.translation);
   if (!data) return;
   const query = $("verse-search").value.trim();
-  const verses = view === "read"
-    ? data[state.position.chapter - 1]
-    : state.bookmarks.map(item => data[item.chapter - 1][item.verse - 1]);
+  const verses = data[state.position.chapter - 1];
   const selection = selectAyah(verses, state.position.verse, query);
-  const filtered = view === "read" ? (selection.ayah ? [selection.ayah] : []) : selection.matches;
+  const filtered = selection.ayah ? [selection.ayah] : [];
   const chapter = chapters[state.position.chapter - 1];
-  renderReadingMetadata(view === "read" ? selection.ayah : null);
-  if (view === "read" && selection.ayah) {
+  renderReadingMetadata(selection.ayah);
+  if (selection.ayah) {
     $("verse-jump").value = state.position.verse;
     document.title = `${chapter.name} ${chapter.id}:${state.position.verse} — The Quran`;
   }
-  $("reading-content").classList.toggle("focused", view === "read");
-  $("reading-content").setAttribute("aria-live", view === "read" ? "polite" : "off");
-  $("ayah-status").hidden = view !== "read" || !selection.ayah;
+  $("reading-content").classList.add("focused");
+  $("reading-content").setAttribute("aria-live", "polite");
+  $("ayah-status").hidden = !selection.ayah;
   $("ayah-status").textContent = `AYAH ${state.position.verse} OF ${chapter.verses}`;
-  $("ruku-progress").hidden = view !== "read" || !selection.ayah;
-  if (view === "read" && selection.ayah) {
+  $("ruku-progress").hidden = !selection.ayah;
+  if (selection.ayah) {
     const progress = getRukuProgress(selection.ayah, globalThis.QuranData, chapters);
     $("ruku-progress").max = progress.max;
     $("ruku-progress").value = progress.value;
@@ -258,26 +206,26 @@ function renderVerses() {
   if (!filtered.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.innerHTML = `${icon(query ? "search" : "bookmark")}<h3>${query ? "No verses found" : "A place for meaningful words."}</h3><p>${query ? "Try a different word or clear your search." : "Tap the bookmark beside any verse to save it here."}</p>`;
+    empty.innerHTML = `${icon("search")}<h3>No verses found</h3><p>Try a different word or clear your search.</p>`;
     fragment.append(empty);
   }
   for (const verse of filtered) fragment.append(createVerse(verse));
   $("reading-content").replaceChildren(fragment);
   $("reading-content").setAttribute("aria-busy", "false");
   $("search-count").hidden = !query;
-  $("search-count").textContent = view === "read" && selection.ayah
+  $("search-count").textContent = selection.ayah
     ? `${selection.index + 1} of ${selection.matches.length} matches`
     : `${selection.matches.length} ${selection.matches.length === 1 ? "verse" : "verses"}`;
   $("active-search").hidden = !query;
   $("active-search-label").textContent = query ? `Search: “${query}” · ${$("search-count").textContent}` : "";
-  $("jump-control").hidden = view !== "read" || Boolean(query);
+  $("jump-control").hidden = Boolean(query);
   renderPagination(selection);
 }
 
 function renderReadingMetadata(verse) {
   const container = $("reading-metadata");
   container.replaceChildren();
-  if (view !== "read" || !verse) {
+  if (!verse) {
     container.hidden = true;
     return;
   }
@@ -323,37 +271,18 @@ function createVerse(verse) {
   article.id = `verse-${verse.chapter}-${verse.verse}`;
   article.dataset.chapter = verse.chapter;
   article.dataset.verse = verse.verse;
-  const saved = isBookmarked(verse.chapter, verse.verse);
-  const number = document.createElement(view === "saved" ? "button" : "a");
+  const number = document.createElement("a");
   number.className = "verse-number";
   number.textContent = `${verse.chapter}:${verse.verse}`;
-  if (view === "saved") {
-    number.dataset.openChapter = verse.chapter;
-    number.dataset.openVerse = verse.verse;
-    number.setAttribute("aria-label", `Read ${chapters[verse.chapter - 1].name}, verse ${verse.verse}`);
-  } else {
-    number.href = `#${verse.chapter}:${verse.verse}`;
-    number.setAttribute("aria-label", `Link to verse ${verse.chapter}:${verse.verse}`);
-  }
+  number.href = `#${verse.chapter}:${verse.verse}`;
+  number.setAttribute("aria-label", `Link to verse ${verse.chapter}:${verse.verse}`);
   const textContainer = document.createElement("div");
   textContainer.className = "verse-body";
-  if (view === "saved") {
-    const label = document.createElement("span");
-    label.className = "saved-chapter-name";
-    label.textContent = chapters[verse.chapter - 1].name;
-    textContainer.append(label);
-  }
   const text = document.createElement("p");
   text.lang = TRANSLATIONS[state.translation].language;
   text.textContent = verse.text;
   textContainer.append(text);
-  const bookmark = document.createElement("button");
-  bookmark.className = `icon-button verse-bookmark${saved ? " is-saved" : ""}`;
-  bookmark.dataset.bookmark = `${verse.chapter}:${verse.verse}`;
-  bookmark.setAttribute("aria-label", `${saved ? "Remove bookmark for" : "Bookmark"} verse ${verse.chapter}:${verse.verse}`);
-  bookmark.setAttribute("aria-pressed", String(saved));
-  bookmark.innerHTML = icon("bookmark");
-  article.append(number, textContainer, bookmark);
+  article.append(number, textContainer);
   return article;
 }
 
@@ -361,7 +290,7 @@ function renderPagination(selection) {
   const nav = $("ayah-navigation");
   const focusedDirection = document.activeElement?.getAttribute("data-direction");
   const searching = Boolean($("verse-search").value.trim());
-  nav.hidden = view !== "read" || !selection.ayah;
+  nav.hidden = !selection.ayah;
   $("navigation-hint").hidden = nav.hidden;
   nav.replaceChildren();
   if (nav.hidden) return;
@@ -396,7 +325,6 @@ function renderPagination(selection) {
 async function loadReading({ scroll = false } = {}) {
   const request = ++requestId;
   loading = true;
-  updateTabs();
   renderChapters();
   renderHeading();
   $("ayah-navigation").hidden = true;
@@ -432,7 +360,6 @@ function savePosition(position) {
 }
 
 function synchronizeSearchPosition(data) {
-  if (view !== "read") return;
   const query = $("verse-search").value.trim();
   if (!query) return;
   const selection = selectAyah(data[state.position.chapter - 1], state.position.verse, query);
@@ -452,7 +379,7 @@ function showAyah(position) {
 }
 
 function ayahTarget(direction) {
-  if (loading || view !== "read") return null;
+  if (loading) return null;
   const data = translations.getLoaded(state.translation);
   if (!data) return null;
   const query = $("verse-search").value.trim();
@@ -479,7 +406,6 @@ function closeMenu() {
 
 function navigate(chapter, verse = 1) {
   savePosition({ chapter, verse });
-  view = "read";
   $("verse-search").value = "";
   $("reading-controls").open = false;
   closeMenu();
@@ -515,36 +441,7 @@ $("translation").addEventListener("change", () => {
   dispatch({ type: "translation/set", translation: $("translation").value });
   loadReading();
 });
-$("reading-content").addEventListener("click", event => {
-  const open = event.target.closest("[data-open-chapter]");
-  if (open) {
-    navigate(Number(open.dataset.openChapter), Number(open.dataset.openVerse));
-    return;
-  }
-  const button = event.target.closest("[data-bookmark]");
-  if (!button) return;
-  const [chapter, verse] = button.dataset.bookmark.split(":").map(Number);
-  const saved = isBookmarked(chapter, verse);
-  dispatch({ type: "bookmark/toggle", position: { chapter, verse } });
-  updateTabs();
-  if (view === "saved") renderVerses();
-  else {
-    button.classList.toggle("is-saved", !saved);
-    button.setAttribute("aria-pressed", String(!saved));
-    button.setAttribute("aria-label", `${saved ? "Bookmark" : "Remove bookmark for"} verse ${chapter}:${verse}`);
-  }
-  notify(saved ? `Verse ${chapter}:${verse} removed from saved verses.` : `Verse ${chapter}:${verse} saved for later.`);
-});
 
-for (const [id, value] of [["read-tab", "read"], ["saved-tab", "saved"]]) {
-  $(id).addEventListener("click", () => {
-    if (view === value) return;
-    view = value;
-    $("verse-search").value = "";
-    $("reading-controls").open = false;
-    loadReading({ scroll: true });
-  });
-}
 for (const [id, increment] of [["font-down", -2], ["font-up", 2]]) {
   $(id).addEventListener("click", () => {
     dispatch({ type: "font-size/adjust", delta: increment });
@@ -569,7 +466,7 @@ $("sidebar-backdrop").addEventListener("click", closeMenu);
 document.addEventListener("keydown", event => {
   if (["ArrowLeft", "ArrowRight"].includes(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey &&
     !["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) && !event.target.isContentEditable &&
-    !$("sidebar").classList.contains("is-open") && view === "read") {
+    !$("sidebar").classList.contains("is-open")) {
     event.preventDefault();
     moveAyah(event.key === "ArrowRight" ? 1 : -1);
   }
@@ -786,7 +683,7 @@ function initSyncUI() {
     endpointInput.value = "";
     keyInput.value = "";
     renderSyncUI();
-    notify("Cloud sync disconnected. Your progress and bookmarks are saved locally.");
+    notify("Cloud sync disconnected. Your progress is saved locally.");
   });
 
   document.addEventListener("visibilitychange", () => {

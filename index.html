@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f8f7f2">
-    <meta name="description" content="A quiet space to read and reflect on Quran translations. Explore 114 chapters in English and Malayalam, and save the verses you want to return to.">
+    <meta name="description" content="A quiet space to read and reflect on Quran translations. Explore 114 chapters in English and Malayalam.">
     <title>The Quran — A space for reflection</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
@@ -42,10 +42,6 @@
           <button id="open-menu" class="icon-button open-menu" aria-label="Open chapters" aria-controls="sidebar" aria-expanded="false" data-icon="menu"></button>
           <span class="topbar-label">A SPACE FOR REFLECTION</span>
         </div>
-        <nav class="view-tabs" aria-label="Reader views">
-          <button id="read-tab" class="view-tab active" aria-current="page"><span data-icon="book"></span>Read</button>
-          <button id="saved-tab" class="view-tab"><span data-icon="bookmark"></span>Saved<span id="saved-count" class="count">0</span></button>
-        </nav>
         <button id="theme-toggle" class="icon-button theme-toggle" aria-label="Switch to dark theme" data-icon="moon"></button>
       </header>
       <main id="main" tabindex="-1">
@@ -94,8 +90,8 @@
                     </div>
                   </div>
                   <div id="sync-details" class="sync-details" hidden>
-                    <p class="sync-description">Nothing is sent to Cloudflare until you choose Save &amp; connect. Afterward, your reading position, bookmarks, and selected translation are synced to this Worker. Generate a private key on one device, copy it, then use the same key and Worker URL on your other devices. Anyone with the key can access your synced data.</p>
-                    <form id="sync-form" class="sync-form" autocomplete="off">
+                    <p class="sync-description">Nothing is sent to Cloudflare until you choose Save &amp; connect. Afterward, your reading position and selected translation are synced to this Worker. Generate a private key on one device, copy it, then use the same key and Worker URL on your other devices. Anyone with the key can access your synced data.</p>
+                    <form id="sync-form" class="sync-form" autocomplete=\"off\">
                       <div class="sync-fields">
                         <label class="sync-field">
                           <span class="sync-field-label">Worker URL</span>

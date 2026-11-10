@@ -64,7 +64,6 @@
         <section class="reader" aria-label="Quran translation">
           <div class="reader-header">
             <div id="chapter-heading" class="chapter-heading"></div>
-            <div id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></div>
             <details id="reading-controls" class="reading-controls">
               <summary><span data-icon="settings"></span>Controls</summary>
               <div class="reading-options">
@@ -99,16 +98,15 @@
                   <label>Verse<select id="goto-verse" aria-label="Go to verse"></select></label>
                   <button type="submit" class="secondary-button">Go to…</button>
                 </form>
-                <button type="button" class="secondary-button settings-shortcut" data-page="settings">Reading and habit settings</button>
                 <div id="mark-read-block" class="reading-history-block" hidden>
                   <button id="mark-read-btn" type="button" class="secondary-button">Mark earlier rukus as read</button>
                   <p class="muted-copy">For when you have already read further on another device. It catches up the overall progress and the lifetime totals. The daily and weekly history stays as it is, because the days are not known.</p>
                 </div>
                 <div id="sync-panel" class="sync-panel">
                   <div class="sync-header">
-                    <div class="sync-title-group">
+                    <div class="sync-title-group" title="Cross-device sync">
                       <span data-icon="cloud"></span>
-                      <span>Cross-device sync</span>
+                      <span>Sync</span>
                       <span id="sync-badge" class="sync-badge">Off</span>
                     </div>
                     <div class="sync-header-actions">

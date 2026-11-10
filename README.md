@@ -37,6 +37,19 @@ browser blocks the reader's local data-file requests.
   time.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes.
+- Read in a centered column no wider than 680px, with start-aligned translation
+  text (left for English and Malayalam), normal letter spacing, and 26px between
+  paragraphs. Default English text is 22px with 1.8 line height, or 20px on
+  phones up to 430px wide. Text-size controls still apply; Malayalam retains its
+  script-specific font and more generous line height.
+- Long translations (500 or more characters) are grouped at locale-aware
+  sentence boundaries, aiming for about 300 characters per paragraph. Quoted
+  passages and individual sentences can exceed that target rather than being
+  split. All source wording, punctuation, and whitespace are preserved; these
+  are display-only reading pauses, not editorial interpretations of meaning.
+- A small progress bar beneath the current ayah count tracks the surah, while
+  the existing gold bar continues to track the ruku. A brief, motion-free fade
+  signals a new ayah; reduced-motion preferences disable it.
 - The exact selected ayah and preferences are saved in this browser's local
   storage by default. Cross-device synchronization is off until you choose to
   start or join it; see [Cross-Device Sync](#cross-device-sync).
@@ -48,7 +61,10 @@ while the page is open. A fresh installation makes no cloud requests. After you
 choose **Start syncing** or **Join sync**, the app sends your reading position
 and selected translation identifier to the Quran Reader sync service;
 translation text remains local.
-This is a translation reader, not an Arabic Quran text reader. Translation text is displayed unchanged.
+This is a translation reader, not an Arabic Quran text reader. Translation wording
+is unchanged; paragraph breaks are added only for display. Arabic chapter labels
+retain their RTL direction. Optional sentence-by-sentence Focus Reading is not
+implemented: complete ayahs remain visible.
 
 ## Cross-Device Sync
 
@@ -85,6 +101,7 @@ state transitions; `preferences-store.js` isolates browser persistence;
 `sync-client.js` manages background cross-device synchronization and conflict resolution;
 and `translation-repository.js` loads, validates, and caches translation data.
 `app.js` connects those modules to the browser UI and interaction behavior.
+Paragraph grouping uses the browser's standard `Intl.Segmenter` API.
 
 ## Validate
 

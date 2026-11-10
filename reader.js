@@ -91,6 +91,25 @@ export function parseTranslation(text, chapters) {
   return result;
 }
 
+export function splitTranslationParagraphs(text, language) {
+  if (text.length < 500) return [text];
+  const paragraphs = [];
+  let paragraph = "";
+  let quoted = false;
+  for (const { segment } of new Intl.Segmenter(language, { granularity: "sentence" }).segment(text)) {
+    if (paragraph && paragraph.length + segment.length > 300 && !quoted) {
+      paragraphs.push(paragraph);
+      paragraph = "";
+    }
+    paragraph += segment;
+    for (const character of segment) {
+      if ('"\u201c\u201d'.includes(character)) quoted = !quoted;
+    }
+  }
+  if (paragraph) paragraphs.push(paragraph);
+  return paragraphs;
+}
+
 export function parseHash(hash, chapters) {
   const match = /^#(\d+):(\d+)$/.exec(hash);
   if (!match) return null;

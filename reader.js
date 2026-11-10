@@ -1,3 +1,5 @@
+import { READER_SCHEMA_VERSION, normalizeReadingData } from "./reading-data.js";
+
 export const TRANSLATIONS = {
   "en.sahih": { name: "Saheeh International", language: "en", file: "en.sahih.txt" },
   "ml.abdulhameed": {
@@ -148,18 +150,22 @@ export function matchesChapter(chapter, query) {
 
 export function decodeState(raw, chapters) {
   const defaults = {
+    schemaVersion: READER_SCHEMA_VERSION,
     translation: "en.sahih",
     position: { chapter: 1, verse: 1 },
     fontSize: 21,
     theme: "light",
+    readingData: normalizeReadingData(null, chapters),
   };
   if (raw === null) return defaults;
   const value = JSON.parse(raw);
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Saved preferences are not valid.");
   return {
+    schemaVersion: READER_SCHEMA_VERSION,
     translation: Object.hasOwn(TRANSLATIONS, value.translation) ? value.translation : defaults.translation,
     position: validPosition(value.position, chapters) ? value.position : defaults.position,
     fontSize: Number.isInteger(value.fontSize) ? Math.max(17, Math.min(29, value.fontSize)) : defaults.fontSize,
     theme: value.theme === "dark" ? "dark" : "light",
+    readingData: normalizeReadingData(value.readingData, chapters),
   };
 }

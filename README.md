@@ -29,8 +29,8 @@ browser blocks the reader's local data-file requests.
 
 - See the current ayah's page, ruku, manzil, hizb, and juz; sajda ayahs carry a
   subtle ۩ marker.
-- The gold bar below the reader tracks your ayah position within the current
-  ruku, filling at its last ayah and resetting when you enter another ruku.
+- The gold bar above the ayah tracks your position within the current ruku,
+  filling at its last ayah and resetting when you enter another ruku.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - Search the entire current chapter and move through matching ayahs one at a
@@ -47,9 +47,8 @@ browser blocks the reader's local data-file requests.
   passages and individual sentences can exceed that target rather than being
   split. All source wording, punctuation, and whitespace are preserved; these
   are display-only reading pauses, not editorial interpretations of meaning.
-- A small progress bar beneath the current ayah count tracks the surah, while
-  the existing gold bar continues to track the ruku. A brief, motion-free fade
-  signals a new ayah; reduced-motion preferences disable it.
+- A small progress bar beneath the current ayah count tracks the surah. A brief,
+  motion-free fade signals a new ayah; reduced-motion preferences disable it.
 - The exact selected ayah and preferences are saved in this browser's local
   storage by default. Cross-device synchronization is off until you choose to
   start or join it; see [Cross-Device Sync](#cross-device-sync).

@@ -3,7 +3,7 @@ import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
 import { createSyncClient, createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "./sync-client.js";
-import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getModeTotals, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getModeTotals, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -44,6 +44,7 @@ let reminderTimer;
 let reflectionTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
+let currentAyah = null;
 const repeatCounts = new Map();
 
 const syncClient = createSyncClient({
@@ -137,6 +138,19 @@ function recordCurrentVerse(mode = getTodayStats(state.readingData).mode) {
   if (currentRuku) renderRukuSummary(currentRuku);
 }
 
+/** Counts the rukus before the current one that are not recorded as read yet. */
+function pendingEarlierRukus() {
+  const currentRuku = findRuku(state.position, rukus);
+  if (!currentRuku || currentRuku.id <= 1) return 0;
+  const completed = new Set(state.readingData.completedRukuIds);
+  let pending = 0;
+  for (const ruku of rukus) {
+    if (ruku.id >= currentRuku.id) break;
+    if (!completed.has(ruku.id)) pending++;
+  }
+  return pending;
+}
+
 function stopVerseAudio() {
   audioRequestId++;
   const audio = $("verse-audio");
@@ -222,6 +236,9 @@ function updateDocumentChrome() {
   $("overall-progress-label").textContent = `${progress} / ${rukus.length} rukus · ${percent}%`;
   $("overall-progress-bar").max = rukus.length;
   $("overall-progress-bar").value = progress;
+  const pendingEarlier = pendingEarlierRukus();
+  $("mark-read-block").hidden = pendingEarlier === 0;
+  $("mark-read-btn").textContent = `Mark ${pendingEarlier} earlier ruku${pendingEarlier === 1 ? "" : "s"} as read`;
 
   try {
     const canvas = document.createElement("canvas");
@@ -311,13 +328,13 @@ function renderChapters() {
 }
 
 function renderHeading() {
-  $("reading-metadata").hidden = true;
-  $("reading-metadata").replaceChildren();
   const chapter = chapters[state.position.chapter - 1];
+  if (currentAyah && currentAyah.chapter !== chapter.id) currentAyah = null;
   const currentRuku = findRuku(state.position, rukus);
   const surahProgress = getSurahRukuProgress(chapter.id, state.readingData, rukus);
   const localRuku = currentRuku?.localNumber ?? 0;
-  $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed</p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
+  $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed<span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
+  renderReadingMetadata(currentAyah);
   const jumpOptions = Array.from({ length: chapter.verses }, (_, index) => new Option(index + 1, index + 1));
   $("verse-jump").replaceChildren(...jumpOptions);
   $("verse-jump").value = state.position.verse;
@@ -347,7 +364,8 @@ function renderVerses() {
     ? versesInRuku(data, currentRuku)
     : selection.ayah ? [selection.ayah] : [];
   const chapter = chapters[state.position.chapter - 1];
-  renderReadingMetadata(selection.ayah);
+  currentAyah = selection.ayah;
+  renderReadingMetadata(currentAyah);
   if (selection.ayah) {
     $("verse-jump").value = state.position.verse;
   }
@@ -406,6 +424,7 @@ function versesInRuku(data, ruku) {
 
 function renderReadingMetadata(verse) {
   const container = $("reading-metadata");
+  if (!container) return;
   container.replaceChildren();
   if (!verse) {
     container.hidden = true;
@@ -413,6 +432,7 @@ function renderReadingMetadata(verse) {
   }
 
   const metadata = getVerseMetadata(verse, globalThis.QuranData);
+  const parts = [];
   for (const [label, value] of [
     ["Page", metadata.page],
     ["Ruku", metadata.ruku],
@@ -430,7 +450,7 @@ function renderReadingMetadata(verse) {
     number.className = "reading-metadata-value";
     number.textContent = value;
     item.append(name, number);
-    container.append(item);
+    parts.push(item);
   }
   if (metadata.sajda) {
     const item = document.createElement("span");
@@ -442,9 +462,16 @@ function renderReadingMetadata(verse) {
     const label = document.createElement("span");
     label.textContent = "Sajda";
     item.append(symbol, label);
-    container.append(item);
+    parts.push(item);
   }
-  container.hidden = false;
+  for (const part of parts) {
+    const separator = document.createElement("span");
+    separator.className = "reading-metadata-separator";
+    separator.setAttribute("aria-hidden", "true");
+    separator.textContent = "·";
+    container.append(separator, part);
+  }
+  container.hidden = parts.length === 0;
 }
 
 function createVerse(verse, showActions = true) {
@@ -694,9 +721,12 @@ function renderJourney() {
     manzilList.append(row);
   }
   const pace = getRecentPace(state.readingData);
+  const completedOverall = state.readingData.completedRukuIds.length;
   $("pace-summary").textContent = pace.activeDays
     ? `Last 14 days: ${pace.activeDayAverage.toFixed(1)} rukus per active day across ${pace.activeDays} reading ${pace.activeDays === 1 ? "day" : "days"}.`
-    : "There are no completed rukus in the last 14 days yet. Estimates will appear after a ruku is finished.";
+    : completedOverall > 0
+      ? `No ruku was finished in the last 14 days, but ${completedOverall} ${completedOverall === 1 ? "ruku is" : "rukus are"} recorded overall.`
+      : "There are no completed rukus in the last 14 days yet. Estimates will appear after a ruku is finished.";
   if (!$("what-if-target").dataset.initialized) {
     $("what-if-target").value = String(pace.activeDays ? Math.max(1, Math.round(pace.activeDayAverage)) : state.readingData.settings.dailyTarget);
     $("what-if-target").dataset.initialized = "true";
@@ -1472,6 +1502,17 @@ function initializeFeatureInteractions() {
     renderVerses();
   });
   $("minimal-bookmark").addEventListener("click", () => toggleBookmark(state.position));
+  $("mark-read-btn").addEventListener("click", () => {
+    const currentRuku = findRuku(state.position, rukus);
+    const pending = pendingEarlierRukus();
+    if (!currentRuku || pending === 0) return;
+    const plural = pending === 1 ? "ruku" : "rukus";
+    if (!confirm(`Mark ${pending} earlier ${plural} as read? The overall progress and the lifetime totals catch up. The daily and weekly history stays unchanged.`)) return;
+    const updated = recordRukusAsRead(state.readingData, currentRuku.id, rukus);
+    updateReadingData(() => updated);
+    renderHeading();
+    notify(`Marked ${pending} earlier ${plural} as read.`);
+  });
   $("focus-mode-exit").addEventListener("click", () => {
     updateSetting("focusMode", false);
     applyPreferences();

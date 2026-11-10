@@ -235,6 +235,50 @@ export function recordVerseVisit(readingData, position, mode, date = new Date())
   };
 }
 
+/** Lists every verse covered by a ruku, as `chapter:verse` keys. */
+function rukuVerseKeys(ruku) {
+  const keys = [];
+  for (let chapter = ruku.start.chapter; chapter <= ruku.end.chapter; chapter++) {
+    const first = chapter === ruku.start.chapter ? ruku.start.verse : 1;
+    const last = chapter === ruku.end.chapter ? ruku.end.verse : Number.MAX_SAFE_INTEGER;
+    const max = Math.min(last, Number.MAX_SAFE_INTEGER);
+    const chapterVerseCount = ruku.chapters[chapter - 1]?.verses ?? max;
+    for (let verse = first; verse <= Math.min(max, chapterVerseCount); verse++) {
+      keys.push(`${chapter}:${verse}`);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Marks every ruku before `currentRukuId` as read.
+ *
+ * This is a one-time backfill for a reader who has already read further than
+ * this device knows about. The days are unknown, so only the cumulative facts
+ * are updated: the completed rukus, the verses read, and the lifetime totals.
+ * The daily and weekly activity is left untouched rather than inventing a
+ * reading timeline.
+ */
+export function recordRukusAsRead(readingData, currentRukuId, rukus) {
+  const completed = new Set(readingData.completedRukuIds);
+  const verseReadKeys = new Set(readingData.verseReadKeys);
+  const pending = rukus.filter(ruku => ruku.id < currentRukuId && !completed.has(ruku.id));
+  for (const ruku of pending) {
+    completed.add(ruku.id);
+    for (const key of rukuVerseKeys(ruku)) verseReadKeys.add(key);
+  }
+  return {
+    ...readingData,
+    completedRukuIds: [...completed].sort((a, b) => a - b),
+    verseReadKeys: [...verseReadKeys],
+    totals: {
+      ...readingData.totals,
+      rukuRead: readingData.totals.rukuRead + pending.length,
+      verseRead: verseReadKeys.size,
+    },
+  };
+}
+
 export function recordRukuCompletion(readingData, ruku, mode = "deep", date = new Date()) {
   const day = getDayKey(date, readingData.settings.dayBoundaryHour);
   const prior = readingData.activityByDay[day] ?? {
@@ -242,15 +286,8 @@ export function recordRukuCompletion(readingData, ruku, mode = "deep", date = ne
     modeCounts: { deep: 0, light: 0, flow: 0 }, sessionStarts: [], lastReadAt: 0,
   };
   let verseReadKeys = new Set(readingData.verseReadKeys);
-  for (let chapter = ruku.start.chapter; chapter <= ruku.end.chapter; chapter++) {
-    const first = chapter === ruku.start.chapter ? ruku.start.verse : 1;
-    const last = chapter === ruku.end.chapter ? ruku.end.verse : Number.MAX_SAFE_INTEGER;
-    const max = Math.min(last, Number.MAX_SAFE_INTEGER);
-    const chapterVerseCount = ruku.chapters[chapter - 1]?.verses ?? max;
-    for (let verse = first; verse <= Math.min(max, chapterVerseCount); verse++) {
-      const key = `${chapter}:${verse}`;
-      verseReadKeys.add(key);
-    }
+  for (const key of rukuVerseKeys(ruku)) {
+    verseReadKeys.add(key);
   }
   const isNewDailyRuku = !prior.rukuIds.includes(ruku.id);
   const isNewDailyReadingDay = !prior.active;

@@ -15,6 +15,7 @@ import {
 	getWeeklySummary,
 	normalizeReadingData,
 	recordRukuCompletion,
+	recordRukusAsRead,
 	recordVerseVisit,
 	resolveStartupPosition,
 } from "../../public/reading-data.js";
@@ -240,6 +241,59 @@ describe("resume position", () => {
 			rukus,
 		});
 		expect(optedOut).toEqual({ position: saved, source: "saved" });
+	});
+});
+
+describe("backfill", () => {
+	it("marks every earlier ruku as read and catches up the totals", () => {
+		const reading = createDefaultReadingData();
+		const updated = recordRukusAsRead(reading, 33, rukus);
+
+		expect(updated.completedRukuIds).toEqual(Array.from({ length: 32 }, (_, index) => index + 1));
+		expect(updated.totals.rukuRead).toBe(32);
+		// Rukus 1 to 32 cover Al-Fatihah and the first 242 verses of Al-Baqarah.
+		expect(updated.verseReadKeys.length).toBe(249);
+		expect(updated.verseReadKeys).toContain("1:1");
+		expect(updated.verseReadKeys).toContain("2:242");
+		// The ruku the reader is in the middle of is not completed yet.
+		expect(updated.verseReadKeys).not.toContain("2:243");
+	});
+
+	it("leaves the daily and weekly history untouched", () => {
+		const reading = createDefaultReadingData();
+		const updated = recordRukusAsRead(reading, 33, rukus);
+
+		expect(updated.activityByDay).toEqual({});
+		expect(updated.sessions).toEqual([]);
+		expect(updated.totals.readingDays).toBe(0);
+	});
+
+	it("keeps the verses that were already read and skips the current ruku", () => {
+		let reading = createDefaultReadingData();
+		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, "deep", new Date(2026, 10, 10, 8));
+		const updated = recordRukusAsRead(reading, 3, rukus);
+
+		expect(updated.completedRukuIds).toEqual([1, 2]);
+		expect(updated.verseReadKeys).toContain("1:1");
+		expect(updated.totals.verseRead).toBe(updated.verseReadKeys.length);
+	});
+
+	it("does nothing when the earlier rukus are already recorded", () => {
+		const reading = createDefaultReadingData();
+		const once = recordRukusAsRead(reading, 5, rukus);
+		const twice = recordRukusAsRead(once, 5, rukus);
+
+		expect(twice.completedRukuIds).toEqual(once.completedRukuIds);
+		expect(twice.totals.rukuRead).toBe(once.totals.rukuRead);
+		expect(twice.verseReadKeys.length).toBe(once.verseReadKeys.length);
+	});
+
+	it("marks nothing before the first ruku", () => {
+		const reading = createDefaultReadingData();
+		const updated = recordRukusAsRead(reading, 1, rukus);
+
+		expect(updated.completedRukuIds).toEqual([]);
+		expect(updated.totals.rukuRead).toBe(0);
 	});
 });
 

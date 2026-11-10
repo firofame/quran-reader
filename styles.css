@@ -371,8 +371,8 @@ select option { background: var(--paper); color: var(--text); }
 .week-bar-row { display: grid; grid-template-columns: 52px 1fr 24px; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
 .week-bar-track { height: 8px; border-radius: 8px; background: var(--line); overflow: hidden; }
 .week-bar-fill { display: block; height: 100%; border-radius: inherit; background: var(--green); }
-.heatmap { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; max-width: 420px; }
-.heatmap-day { aspect-ratio: 1; border-radius: 3px; background: var(--line); }
+.heatmap { display: grid; grid-template-columns: repeat(7, 26px); gap: 5px; justify-content: start; }
+.heatmap-day { width: 26px; height: 26px; border-radius: 3px; background: var(--line); }
 .heat-1 { background: color-mix(in srgb, var(--green) 28%, var(--paper)); }
 .heat-2 { background: color-mix(in srgb, var(--green) 46%, var(--paper)); }
 .heat-3 { background: color-mix(in srgb, var(--green) 68%, var(--paper)); }

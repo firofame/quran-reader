@@ -7,6 +7,7 @@ import {
   createDefaultReadingData,
   findRuku,
   getDayKey,
+  getModeTotals,
   getResumePosition,
   getRukuIndex,
   getSectionRukus,
@@ -99,6 +100,25 @@ test("weekly summary counts reading days and current and previous week totals", 
   assert.equal(summary.thisWeekRukus, 2);
   assert.equal(summary.readDays, 1);
   assert.equal(summary.previousWeekRukus, 0);
+});
+
+test("weekly summary separates deep, light and flow reading and counts notes written", () => {
+  let reading = createDefaultReadingData();
+  const rukus = getRukuIndex(data, chapters);
+  reading = recordRukuCompletion(reading, rukus[0], "deep", new Date(2026, 10, 10, 8));
+  reading = recordRukuCompletion(reading, rukus[1], "light", new Date(2026, 10, 10, 9));
+  reading = recordRukuCompletion(reading, rukus[2], "flow", new Date(2026, 10, 10, 10));
+  reading = {
+    ...reading,
+    notes: [
+      { id: "n1", rukuId: 1, text: "This week", createdAt: new Date(2026, 10, 10, 11).getTime() },
+      { id: "n2", rukuId: 2, text: "Last week", createdAt: new Date(2026, 10, 3, 11).getTime() },
+    ],
+  };
+  const summary = getWeeklySummary(reading, new Date(2026, 10, 10, 12));
+  assert.deepEqual(summary.modes, { deep: 1, light: 1, flow: 1 });
+  assert.equal(summary.notes, 1);
+  assert.deepEqual(getModeTotals(reading), { deep: 1, light: 1, flow: 1 });
 });
 
 test("reading data migration keeps valid saved fields and drops invalid records", () => {

@@ -399,16 +399,38 @@ export function getWeekKeys(date = new Date(), boundaryHour = 0) {
   return Array.from({ length: 7 }, (_, index) => shiftDayKey(monday, index));
 }
 
+export function getModeTotals(readingData) {
+  const modes = { deep: 0, light: 0, flow: 0 };
+  for (const session of readingData.sessions) {
+    if (Object.hasOwn(modes, session.mode)) modes[session.mode] += 1;
+  }
+  return modes;
+}
+
 export function getWeeklySummary(readingData, date = new Date()) {
   const thisWeek = getWeekKeys(date, readingData.settings.dayBoundaryHour);
   const previousWeek = thisWeek.map(day => shiftDayKey(day, -7));
   const sumWeek = days => days.reduce((total, day) => total + (readingData.activityByDay[day]?.rukuCompletions ?? 0), 0);
   const readDays = thisWeek.filter(day => readingData.activityByDay[day]?.active).length;
+  const modes = { deep: 0, light: 0, flow: 0 };
+  for (const day of thisWeek) {
+    const counts = readingData.activityByDay[day]?.modeCounts;
+    if (!counts) continue;
+    modes.deep += counts.deep ?? 0;
+    modes.light += counts.light ?? 0;
+    modes.flow += counts.flow ?? 0;
+  }
+  const weekSet = new Set(thisWeek);
+  const notes = readingData.notes.filter(note => Number.isSafeInteger(note.createdAt)
+    && note.createdAt > 0
+    && weekSet.has(getDayKey(new Date(note.createdAt), readingData.settings.dayBoundaryHour))).length;
   return {
     days: thisWeek.map(day => ({ date: day, activity: readingData.activityByDay[day] ?? null })),
     readDays,
     thisWeekRukus: sumWeek(thisWeek),
     previousWeekRukus: sumWeek(previousWeek),
+    modes,
+    notes,
   };
 }
 

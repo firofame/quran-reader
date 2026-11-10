@@ -3,7 +3,7 @@ import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
 import { createSyncClient, createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "./sync-client.js";
-import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getModeTotals, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -805,6 +805,8 @@ function renderWeekly() {
     bars.append(row);
   }
   $("week-comparison").textContent = `This week: ${summary.thisWeekRukus} rukus · Previous week: ${summary.previousWeekRukus} rukus.`;
+  $("week-modes").textContent = `Deep reading: ${summary.modes.deep} · Light days: ${summary.modes.light} · Flow reading: ${summary.modes.flow}.`;
+  $("week-notes").textContent = `Notes written this week: ${summary.notes}.`;
   const suggestedTarget = summary.readDays
     ? Math.max(1, Math.min(10, Math.round(summary.thisWeekRukus / summary.readDays)))
     : state.readingData.settings.dailyTarget;
@@ -822,6 +824,8 @@ function renderWeekly() {
   }
   const totals = state.readingData.totals;
   $("lifetime-totals").innerHTML = `<span><strong>${totals.rukuRead}</strong> rukus read</span><span><strong>${totals.verseRead}</strong> verses read</span><span><strong>${totals.readingDays}</strong> reading days</span>`;
+  const modes = getModeTotals(state.readingData);
+  $("lifetime-modes").textContent = `Deep reading: ${modes.deep} · Light days: ${modes.light} · Flow reading: ${modes.flow}.`;
 }
 
 function renderPlan() {

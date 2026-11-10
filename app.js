@@ -590,7 +590,6 @@ function renderProgressSummary() {
   $("kahf-week-summary").textContent = kahfWeekProgress(readingData).text;
   $("kahf-progress").textContent = `Friday · ${kahfWeekProgress(readingData).text}`;
   const planEnabled = readingData.settings.weeklyPlanEnabled;
-  $("plan-page").hidden = !planEnabled;
   document.querySelector('[data-page="plan"]').hidden = !planEnabled;
   if (!planEnabled && activePage === "plan") showPage("reader");
 }

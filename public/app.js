@@ -44,6 +44,7 @@ let reminderTimer;
 let reflectionTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
+let currentAyah = null;
 const repeatCounts = new Map();
 
 const syncClient = createSyncClient({
@@ -327,13 +328,13 @@ function renderChapters() {
 }
 
 function renderHeading() {
-  $("reading-metadata").hidden = true;
-  $("reading-metadata").replaceChildren();
   const chapter = chapters[state.position.chapter - 1];
+  if (currentAyah && currentAyah.chapter !== chapter.id) currentAyah = null;
   const currentRuku = findRuku(state.position, rukus);
   const surahProgress = getSurahRukuProgress(chapter.id, state.readingData, rukus);
   const localRuku = currentRuku?.localNumber ?? 0;
-  $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed</p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
+  $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed<span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
+  renderReadingMetadata(currentAyah);
   const jumpOptions = Array.from({ length: chapter.verses }, (_, index) => new Option(index + 1, index + 1));
   $("verse-jump").replaceChildren(...jumpOptions);
   $("verse-jump").value = state.position.verse;
@@ -363,7 +364,8 @@ function renderVerses() {
     ? versesInRuku(data, currentRuku)
     : selection.ayah ? [selection.ayah] : [];
   const chapter = chapters[state.position.chapter - 1];
-  renderReadingMetadata(selection.ayah);
+  currentAyah = selection.ayah;
+  renderReadingMetadata(currentAyah);
   if (selection.ayah) {
     $("verse-jump").value = state.position.verse;
   }
@@ -422,6 +424,7 @@ function versesInRuku(data, ruku) {
 
 function renderReadingMetadata(verse) {
   const container = $("reading-metadata");
+  if (!container) return;
   container.replaceChildren();
   if (!verse) {
     container.hidden = true;
@@ -429,6 +432,7 @@ function renderReadingMetadata(verse) {
   }
 
   const metadata = getVerseMetadata(verse, globalThis.QuranData);
+  const parts = [];
   for (const [label, value] of [
     ["Page", metadata.page],
     ["Ruku", metadata.ruku],
@@ -446,7 +450,7 @@ function renderReadingMetadata(verse) {
     number.className = "reading-metadata-value";
     number.textContent = value;
     item.append(name, number);
-    container.append(item);
+    parts.push(item);
   }
   if (metadata.sajda) {
     const item = document.createElement("span");
@@ -458,9 +462,16 @@ function renderReadingMetadata(verse) {
     const label = document.createElement("span");
     label.textContent = "Sajda";
     item.append(symbol, label);
-    container.append(item);
+    parts.push(item);
   }
-  container.hidden = false;
+  for (const part of parts) {
+    const separator = document.createElement("span");
+    separator.className = "reading-metadata-separator";
+    separator.setAttribute("aria-hidden", "true");
+    separator.textContent = "·";
+    container.append(separator, part);
+  }
+  container.hidden = parts.length === 0;
 }
 
 function createVerse(verse, showActions = true) {

@@ -15,7 +15,9 @@ Malayalam translations.
   optional reflection. Reading progress, bookmarks, notes, settings, and recent
   activity stay in this browser by default.
 - Journey, weekly review, Friday Al-Kahf progress, manual reading anchors,
-  optional browser reminders, and a separate seven-day Flow plan.
+  optional browser reminders, and a separate seven-day Flow plan. The weekly
+  review separates deep reading, light days, and flow reading, and counts the
+  reflections written.
 - Optional one-ayah recitation is off by default and only plays after a direct
   click. The reader never starts audio automatically.
 - Installable PWA with an offline cache for the reader, text, and translations.
@@ -61,8 +63,13 @@ browser blocks the reader's local data-file requests.
 - The exact selected ayah and preferences are saved in this browser's local
   storage by default. Cross-device synchronization is off until you choose to
   start or join it; see [Cross-Device Sync](#cross-device-sync).
-- Press `/` to find a chapter, and Escape to clear a focused search or close
-  the controls or mobile chapter drawer.
+- Reopening the app opens the next unread ayah, so a new sitting starts with
+  nothing to click. An ayah that has not been read yet is reopened exactly as
+  it was, and an explicit ayah link still wins. This can be turned off in
+  Settings.
+- Press `/` to find a chapter, `Space` or `→` for the next ayah, `←` for the
+  previous one, `b` to bookmark the current ayah, `r` to read it again, and
+  `Escape` for the small reading menu.
 
 Translations are loaded from the supplied local files and retained in memory
 while the page is open. A fresh installation makes no cloud requests. After you

@@ -322,6 +322,8 @@ select option { background: var(--paper); color: var(--text); }
 .goto-form label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 9px; }
 .goto-form select { min-width: 92px; height: 33px; padding: 0 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--text); font-size: 10px; }
 .settings-shortcut { margin: 0 24px 12px; }
+.reading-history-block { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 24px 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.reading-history-block p { flex: 1 1 220px; margin: 0; }
 .ruku-progress-wrap { padding: 0 35px; }
 .ruku-progress-label { display: block; padding: 7px 0 4px; color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
 .ruku-summary { margin: 0 35px; padding: 9px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; }

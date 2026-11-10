@@ -3,7 +3,7 @@ import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
 import { createSyncClient, createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "./sync-client.js";
-import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getModeTotals, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getModeTotals, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -137,6 +137,19 @@ function recordCurrentVerse(mode = getTodayStats(state.readingData).mode) {
   if (currentRuku) renderRukuSummary(currentRuku);
 }
 
+/** Counts the rukus before the current one that are not recorded as read yet. */
+function pendingEarlierRukus() {
+  const currentRuku = findRuku(state.position, rukus);
+  if (!currentRuku || currentRuku.id <= 1) return 0;
+  const completed = new Set(state.readingData.completedRukuIds);
+  let pending = 0;
+  for (const ruku of rukus) {
+    if (ruku.id >= currentRuku.id) break;
+    if (!completed.has(ruku.id)) pending++;
+  }
+  return pending;
+}
+
 function stopVerseAudio() {
   audioRequestId++;
   const audio = $("verse-audio");
@@ -222,6 +235,9 @@ function updateDocumentChrome() {
   $("overall-progress-label").textContent = `${progress} / ${rukus.length} rukus · ${percent}%`;
   $("overall-progress-bar").max = rukus.length;
   $("overall-progress-bar").value = progress;
+  const pendingEarlier = pendingEarlierRukus();
+  $("mark-read-block").hidden = pendingEarlier === 0;
+  $("mark-read-btn").textContent = `Mark ${pendingEarlier} earlier ruku${pendingEarlier === 1 ? "" : "s"} as read`;
 
   try {
     const canvas = document.createElement("canvas");
@@ -694,9 +710,12 @@ function renderJourney() {
     manzilList.append(row);
   }
   const pace = getRecentPace(state.readingData);
+  const completedOverall = state.readingData.completedRukuIds.length;
   $("pace-summary").textContent = pace.activeDays
     ? `Last 14 days: ${pace.activeDayAverage.toFixed(1)} rukus per active day across ${pace.activeDays} reading ${pace.activeDays === 1 ? "day" : "days"}.`
-    : "There are no completed rukus in the last 14 days yet. Estimates will appear after a ruku is finished.";
+    : completedOverall > 0
+      ? `No ruku was finished in the last 14 days, but ${completedOverall} ${completedOverall === 1 ? "ruku is" : "rukus are"} recorded overall.`
+      : "There are no completed rukus in the last 14 days yet. Estimates will appear after a ruku is finished.";
   if (!$("what-if-target").dataset.initialized) {
     $("what-if-target").value = String(pace.activeDays ? Math.max(1, Math.round(pace.activeDayAverage)) : state.readingData.settings.dailyTarget);
     $("what-if-target").dataset.initialized = "true";
@@ -1472,6 +1491,17 @@ function initializeFeatureInteractions() {
     renderVerses();
   });
   $("minimal-bookmark").addEventListener("click", () => toggleBookmark(state.position));
+  $("mark-read-btn").addEventListener("click", () => {
+    const currentRuku = findRuku(state.position, rukus);
+    const pending = pendingEarlierRukus();
+    if (!currentRuku || pending === 0) return;
+    const plural = pending === 1 ? "ruku" : "rukus";
+    if (!confirm(`Mark ${pending} earlier ${plural} as read? The overall progress and the lifetime totals catch up. The daily and weekly history stays unchanged.`)) return;
+    const updated = recordRukusAsRead(state.readingData, currentRuku.id, rukus);
+    updateReadingData(() => updated);
+    renderHeading();
+    notify(`Marked ${pending} earlier ${plural} as read.`);
+  });
   $("focus-mode-exit").addEventListener("click", () => {
     updateSetting("focusMode", false);
     applyPreferences();

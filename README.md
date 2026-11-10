@@ -74,6 +74,10 @@ emulated in a local SQLite database.
 - The exact selected ayah and preferences are saved in this browser's local
   storage by default. Cross-device synchronization is off until you choose to
   start or join it; see [Cross-Device Sync](#cross-device-sync).
+- If you have already read further on another device, **Mark earlier rukus as
+  read** in the Controls panel catches up the overall progress and the lifetime
+  totals on this device. The daily and weekly history is left unchanged,
+  because the days are not known.
 - Reopening the app opens the next unread ayah, so a new sitting starts with
   nothing to click. An ayah that has not been read yet is reopened exactly as
   it was, and an explicit ayah link still wins. This can be turned off in

@@ -34,9 +34,9 @@
 ## Screens and navigation
 
 - One reading screen shows one complete translated ayah at a time. Chapter navigation is in the left drawer, and controls include translation, text size, search, and an ayah jump.
-- Previous/Continue buttons and left/right arrows navigate ayahs, including across chapter boundaries. Direct verse links use `#chapter:verse`.
+- Previous/Continue buttons and left/right arrows navigate ayahs, including across chapter boundaries. Direct verse links use `#chapter:verse`. The last ayah of a ruku turns the next action into "Finish ruku". Space, `b`, `r` and `Escape` cover the rest of the reading shortcuts.
 - Current metadata includes page, ruku, manzil, hizb, juz, and sajda. A thin bar tracks the current ayah within its ruku.
-- The reader also has Journey, Notes & bookmarks, Week, Khatam plan, and Settings views. Focus mode and continuous-ruku Flow mode preserve the one-ayah deep-reading default.
+- The reader also has Journey, Notes & bookmarks, Week, Khatam plan, and Settings views. Focus mode and continuous-ruku Flow mode preserve the one-ayah deep-reading default. The weekly view separates deep reading, light days and flow reading, and counts the reflections written.
 - Browser reminders request notification permission only when enabled and only schedule while the page is open. The app is an installable PWA; the service worker caches its local reading assets for offline use.
 - One-verse recitation is optional and off by default. It streams Alafasy 128 kbps from Al Quran Cloud after a direct user action. See the provider's current [terms](https://alquran.cloud/terms-and-conditions).
 - Ruku summaries and word-by-word meanings remain unpopulated because no sufficiently suitable and attributable source was selected. The app does not generate religious content.
@@ -46,4 +46,4 @@
 - Tests use Node's built-in test runner: `npm test`.
 - Syntax validation runs with `npm run check`.
 - Existing coverage includes metadata and verse parsing, navigation, state validation, local storage, synchronization, Worker behavior, deployment, and static asset serving.
-- New reading-data coverage checks the selected 556 Ruku convention, all per-surah counts, Juz and Manzil boundaries, local day boundaries, energy mode, daily and lifetime totals, weekly summaries, schema migration, and the bundled Arabic verse count and Tanzil notice.
+- New reading-data coverage checks the selected 556 Ruku convention, all per-surah counts, Juz and Manzil boundaries, local day boundaries, energy mode, daily and lifetime totals, weekly summaries and their deep, light and flow split, schema migration, the resume and startup position rules, and the bundled Arabic verse count and Tanzil notice.

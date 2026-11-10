@@ -2,9 +2,7 @@ import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import { createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "../../sync-client.js";
-
-export const PRODUCTION_LABEL = "deploy-sync-production";
+import { createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "../public/sync-client.js";
 
 async function requestJson(fetch, url, options = {}) {
   const response = await fetch(url, {
@@ -23,6 +21,13 @@ async function requestJson(fetch, url, options = {}) {
   }
 }
 
+/**
+ * Confirms that the running workflow may deploy to production.
+ *
+ * Production is deployed from `main` only: a push to `main` or a manual run
+ * on `main`, at the exact revision that is still the head of `main`, by
+ * someone with repository write access.
+ */
 export async function authorizeProduction({ eventName, event, ref, sha, repository, actor, token, fetch = globalThis.fetch }) {
   if (!token || !/^[\w.-]+\/[\w.-]+$/.test(repository) || !/^[a-f0-9]{40}$/.test(sha)) {
     throw new Error("Production authorization is missing repository, revision, or GitHub credentials.");
@@ -30,27 +35,7 @@ export async function authorizeProduction({ eventName, event, ref, sha, reposito
   const get = path => requestJson(fetch, `https://api.github.com/repos/${repository}/${path}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
   });
-  if (eventName === "pull_request") {
-    if (
-      event.action !== "labeled" ||
-      event.label?.name !== PRODUCTION_LABEL ||
-      event.pull_request?.base?.ref !== "main" ||
-      event.pull_request?.head?.repo?.full_name !== repository ||
-      event.pull_request?.head?.sha !== sha
-    ) {
-      throw new Error("Production requires an explicitly labeled, same-repository PR targeting main.");
-    }
-    const current = await get(`pulls/${event.pull_request.number}`);
-    if (
-      current.state !== "open" ||
-      current.base?.ref !== "main" ||
-      current.head?.repo?.full_name !== repository ||
-      current.head?.sha !== sha ||
-      !current.labels?.some(label => label.name === PRODUCTION_LABEL)
-    ) {
-      throw new Error("Production authorization expired: PR closed, label removed, or head changed.");
-    }
-  } else if ((eventName === "push" || eventName === "workflow_dispatch") && ref === "refs/heads/main") {
+  if ((eventName === "push" || eventName === "workflow_dispatch") && ref === "refs/heads/main") {
     const current = await get("git/ref/heads/main");
     if (current.object?.sha !== sha) throw new Error("Production revision is no longer the current main head.");
   } else {
@@ -63,7 +48,7 @@ export async function authorizeProduction({ eventName, event, ref, sha, reposito
     }
     const result = await get(`collaborators/${encodeURIComponent(login)}/permission`);
     if (!["admin", "maintain", "write"].includes(result.permission)) {
-      throw new Error("The production label sender and triggering actor must both have repository write access.");
+      throw new Error("The production deploy must be triggered by someone with repository write access.");
     }
   }
 }

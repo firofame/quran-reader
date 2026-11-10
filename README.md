@@ -26,15 +26,26 @@ Malayalam translations.
 
 ## Getting Started
 
-Start the local static server:
+Install the dependencies and start the local Worker:
 
 ```sh
-npm start
+npm install
+npm run dev
 ```
 
-Then open `http://localhost:3000` in your browser.
-Opening `index.html` directly with a `file://` URL will not work because the
-browser blocks the reader's local data-file requests.
+Wrangler serves the reader and the sync API at `http://localhost:8787`. The
+Worker runs locally without a Cloudflare account, and the Durable Object is
+emulated in a local SQLite database.
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Runs the Worker and the reader locally with hot reload. |
+| `npm test` | Runs the Vitest suites for the Worker and the reader modules. |
+| `npm run check` | Syntax-checks the reader modules and type-checks the Worker. |
+| `npm run typecheck` | Type-checks `src/` and `test/` with the generated Worker types. |
+| `npm run cf-typegen` | Regenerates `worker-configuration.d.ts` after a config change. |
+| `npm run deploy` | Publishes the Worker, its assets, and the Durable Object. |
+
 
 ## Reader Features
 
@@ -131,20 +142,35 @@ and remain available offline. Position and translation updates use bounded
 timestamp-based conflict resolution.
 
 The sync service is hosted by the project, so readers do not need a Cloudflare
-account or a Worker URL. See [`worker/README.md`](worker/README.md) for maintainer
-deployment and service details.
+account or a Worker URL. See [`docs/sync-service.md`](docs/sync-service.md) for
+maintainer deployment and service details.
 
 ## Architecture
 
-The app remains a dependency-free static site. `reader.js` contains pure Quran
-data, parsing, search, and navigation logic. `reader-state.js` owns validated
+The project is a single Cloudflare Worker. [`public/`](public) holds the reader
+itself — plain HTML, CSS, and browser JavaScript modules with no build step —
+and is served as Workers Static Assets. [`src/`](src) holds the Worker:
+
+- `src/index.ts` routes requests with Hono. It serves the sync API, answers
+  `/health`, and falls through to the static assets.
+- `src/durable-object.ts` stores each reader's sync space in a SQLite-backed
+  Durable Object.
+- `src/sync-state.ts` validates payloads with Zod, and `src/auth.ts` turns a
+  pairing key into the Durable Object that owns its sync space.
+
+The reader modules keep their responsibilities: `reader.js` contains pure Quran
+data, parsing, search, and navigation logic; `reader-state.js` owns validated
 state transitions; `preferences-store.js` isolates browser persistence;
-`sync-client.js` manages background cross-device synchronization and conflict resolution;
-and `translation-repository.js` loads, validates, and caches translation data.
-`reading-data.js` validates the versioned local reading history and computes
-progress, pace, and section membership. `app.js` connects those modules to the
-browser UI and interaction behavior.
+`sync-client.js` manages background cross-device synchronization and conflict
+resolution; and `translation-repository.js` loads, validates, and caches
+translation data. `reading-data.js` validates the versioned local reading
+history and computes progress, pace, and section membership. `app.js` connects
+those modules to the browser UI and interaction behavior.
 Paragraph grouping uses the browser's standard `Intl.Segmenter` API.
+
+Tests run in two Vitest projects: `test/worker/` runs inside the Workers
+runtime against the real Durable Object, and `test/node/` covers the reader
+modules and the deployment helpers in Node.
 
 ## Validate
 
@@ -158,17 +184,20 @@ Pull requests targeting `main` run these checks automatically through the
 
 ## Publish
 
-[GitHub Pages](https://firofame.github.io/quran-reader/) is deployed automatically
-by [the Pages workflow](.github/workflows/pages.yml) when changes are pushed to
-`main`. It can also be run manually from the repository's Actions tab.
+The Worker, its static assets, and the Durable Object are published together
+by [the deploy workflow](.github/workflows/deploy.yml). Merging to `main`
+deploys automatically: the workflow validates the revision, confirms the
+maintainer authorization, checks that the existing Worker and its Durable Object
+namespace are preserved, deploys, and then verifies the production identity,
+health, and sync behaviour.
 
-The workflow runs the checks and tests, then publishes the HTML, CSS, browser
-JavaScript, Quran metadata and Arabic text, translations, manifest, icons, and
-service worker. The local server, tests, and project configuration are not
-included in the published site.
-The repository's **Settings → Pages → Source** must be set to **GitHub Actions**.
-Relative asset URLs support the `/quran-reader/` project path and direct ayah
-links such as <https://firofame.github.io/quran-reader/#2:255>.
+Production reuses the existing `quran` Worker, so the sync URL in
+`DEFAULT_SYNC_ENDPOINT` and the Durable Object namespaces stay the same, and
+the reader is served from the same host as the sync API.
+
+Pull requests get an isolated preview Worker, and the reader is never published
+from a fork.
+
 
 ## Sources
 

@@ -1,40 +1,26 @@
-name: Deploy Quran Reader sync Worker
+name: Deploy Quran Reader to Cloudflare
 
 on:
   push:
     branches: [main]
-    paths:
-      - "worker/**"
-      - ".github/workflows/deploy-worker.yml"
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, labeled, closed]
-    paths:
-      - "worker/**"
-      - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: cloudflare-production
+  cancel-in-progress: false
+
 jobs:
-  deploy-production:
-    if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.event.action == 'labeled' &&
-       github.event.label.name == 'deploy-sync-production' &&
-       github.event.pull_request.head.repo.full_name == github.repository)
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    concurrency:
-      group: sync-worker-production
-      cancel-in-progress: false
     env:
-      DEPLOY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      DEPLOY_SHA: ${{ github.sha }}
       ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
     steps:
-      - name: Check out the exact production revision
+      - name: Check out the exact revision
         uses: actions/checkout@v5
         with:
           ref: ${{ env.DEPLOY_SHA }}
@@ -44,36 +30,38 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
 
-      - name: Verify maintainer authorization
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node worker/scripts/deployment.js authorize
+      - name: Install dependencies
+        run: npm ci
 
       - name: Validate the exact revision before production changes
         run: |
           npm run check
-          npm --prefix worker run check
           npm test
+
+      - name: Verify maintainer authorization
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/deployment.js authorize
 
       - name: Verify permissions and preserve the existing Worker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node worker/scripts/deployment.js prepare
+        run: node scripts/deployment.js prepare
 
       - name: Deploy production Worker
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          wranglerVersion: "4.158.0"
-          workingDirectory: worker
+          wranglerVersion: "4.160.0"
           command: deploy
 
       - name: Verify production identity, health, and sync
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node worker/scripts/deployment.js verify
+        run: node scripts/deployment.js verify
 
       - name: Remove private canary credentials from the runner
         if: always()
@@ -82,7 +70,7 @@ jobs:
   preview:
     if: >-
       github.event_name == 'pull_request' &&
-      contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action) &&
+      contains(fromJSON('["opened", "synchronize", "reopened"]'), github.event.action) &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -99,21 +87,24 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Find the current Worker name
         id: worker
         env:
           ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node worker/scripts/deployment.js find
+        run: node scripts/deployment.js find
 
       - name: Deploy isolated Worker preview
         id: preview
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          wranglerVersion: "4.158.0"
-          workingDirectory: worker
+          wranglerVersion: "4.160.0"
           command: preview --name pr-${{ github.event.pull_request.number }} --worker-name ${{ steps.worker.outputs.name }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
@@ -125,7 +116,9 @@ jobs:
           echo "$PREVIEW_URL" >> "$GITHUB_STEP_SUMMARY"
 
   cleanup-preview:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -138,18 +131,21 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Find the current Worker name
         id: worker
         env:
           ACCOUNT_ID: d2c3c656cbf2f4e32a133ab2fa3dcd5a
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node worker/scripts/deployment.js find
+        run: node scripts/deployment.js find
 
       - name: Delete the pull request preview
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          wranglerVersion: "4.158.0"
-          workingDirectory: worker
+          wranglerVersion: "4.160.0"
           command: preview delete --name pr-${{ github.event.pull_request.number }} --worker-name ${{ steps.worker.outputs.name }} --skip-confirmation

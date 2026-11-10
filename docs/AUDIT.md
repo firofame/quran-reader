@@ -2,14 +2,15 @@
 
 ## Stack, run, and deployment
 
-- Dependency-free static web app using browser JavaScript modules, HTML, and CSS.
-- Run locally with `npm start` (Node static server at `http://localhost:3000`).
-- GitHub Actions checks and publishes the static site to GitHub Pages. The optional cross-device sync service is a separate Cloudflare Worker.
+- The reader is a dependency-free static web app using browser JavaScript modules, HTML, and CSS. It lives in `public/` and is served by a Cloudflare Worker as Workers Static Assets.
+- One Cloudflare Worker serves the reader and the cross-device sync API. The API is routed with Hono, its payloads are validated with Zod, and its state lives in a SQLite-backed Durable Object.
+- Run locally with `npm run dev` (Wrangler at `http://localhost:8787`); the Durable Object is emulated locally, and no Cloudflare account is needed.
+- GitHub Actions checks every pull request. Merging to `main` deploys the Worker, its assets, and the Durable Object to Cloudflare.
 
 ## Quran and translation data
 
-- Chapter names and structural metadata are bundled in `quran-data.js`, based on Tanzil Quran Metadata 1.0 (CC BY 3.0). It includes 114 chapters, verse counts, ruku starts, juz starts, manzil starts, pages, hizb quarters, and sajda locations.
-- The Uthmani Arabic text is now bundled verbatim as `ar.uthmani.txt`, with
+- Chapter names and structural metadata are bundled in `public/quran-data.js`, based on Tanzil Quran Metadata 1.0 (CC BY 3.0). It includes 114 chapters, verse counts, ruku starts, juz starts, manzil starts, pages, hizb quarters, and sajda locations.
+- The Uthmani Arabic text is now bundled verbatim as `public/ar.uthmani.txt`, with
   Tanzil's copyright and license block intact. The UI renders the Arabic ayah
   above the selected translation and links to the source/license.
 - English Saheeh International and Malayalam Cheriyamundam Abdul Hameed & Kunhi Mohammed Parappoor translations are supplied as local text files and loaded by the browser. Attribution and source are in the app and README.
@@ -19,7 +20,7 @@
 - The bundled Tanzil convention contains 556 ruku starts. Its per-surah ruku counts sum to 556; Al-Baqarah has 40. Automated checks verify all chapter counts and the 30 juz / 7 manzil assignments and boundaries.
 - This differs from the plan's requested 558 convention. The owner selected the documented Tanzil 556 convention because the available 558 resource did not state copyright terms. The app will display the convention it actually uses.
 - The bundled file has 30 juz starts and 7 manzil starts. Manzil starts match the seven chapter boundaries listed in the plan.
-- Source: [Tanzil Quran Metadata](https://tanzil.net/docs/Quran_Metadata), [Tanzil metadata file](https://tanzil.net/res/text/metadata/quran-data.js), and the attribution/license header in `quran-data.js`.
+- Source: [Tanzil Quran Metadata](https://tanzil.net/docs/Quran_Metadata), [Tanzil metadata file](https://tanzil.net/res/text/metadata/quran-data.js), and the attribution/license header in `public/quran-data.js`.
 
 ## Saved progress and implementation
 

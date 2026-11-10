@@ -41,6 +41,7 @@ let activePage = "reader";
 let flowMode = false;
 let completedRuku = null;
 let reminderTimer;
+let reflectionTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
 const repeatCounts = new Map();
@@ -933,6 +934,13 @@ function savePendingReflection() {
   notify("Reflection saved.");
 }
 
+function flushPendingReflection() {
+  if (!reflectionTimer) return;
+  clearTimeout(reflectionTimer);
+  reflectionTimer = null;
+  upsertReflection($("reflection-input").value);
+}
+
 function beginFlow(rukuId) {
   const ruku = rukus[rukuId - 1];
   if (!ruku) return;
@@ -1434,10 +1442,12 @@ function initializeFeatureInteractions() {
   });
   $("notes-search").addEventListener("input", renderNotes);
   $("what-if-target").addEventListener("input", renderFinishEstimate);
-  let reflectionTimer;
   $("reflection-input").addEventListener("input", () => {
     clearTimeout(reflectionTimer);
-    reflectionTimer = setTimeout(() => upsertReflection($("reflection-input").value), 600);
+    reflectionTimer = setTimeout(() => {
+      reflectionTimer = null;
+      upsertReflection($("reflection-input").value);
+    }, 600);
   });
   $("reflection-input").addEventListener("blur", () => {
     clearTimeout(reflectionTimer);
@@ -1472,6 +1482,7 @@ function initializeFeatureInteractions() {
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") scheduleAnchorReminder();
+    else flushPendingReflection();
   });
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" })
@@ -1589,7 +1600,10 @@ window.addEventListener("hashchange", () => {
   if (position) navigate(position.chapter, position.verse);
   else notify("That verse link isn't valid. Choose a chapter or verse to continue.");
 });
-window.addEventListener("pagehide", persist);
+window.addEventListener("pagehide", () => {
+  flushPendingReflection();
+  persist();
+});
 matchMedia("(max-width: 760px)").addEventListener("change", closeMenu);
 
 function renderSyncUI(statusInfo = syncClient.getStatus()) {

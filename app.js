@@ -215,7 +215,10 @@ function updateDocumentChrome() {
   const percent = progress === 0 || progress === rukus.length
     ? Math.round(progress / rukus.length * 100)
     : Number((progress / rukus.length * 100).toFixed(1));
-  document.title = `${currentRuku ? `Ruku ${currentRuku.id}` : `Ayah ${state.position.chapter}:${state.position.verse}`} · ${today.completed}/${today.target} today — The Quran`;
+  const dayLabel = today.reached
+    ? `${today.target}/${today.target}${today.bonus ? ` +${today.bonus}` : ""} today`
+    : `${today.completed}/${today.target} today`;
+  document.title = `${currentRuku ? `Ruku ${currentRuku.id}` : `Ayah ${state.position.chapter}:${state.position.verse}`} · ${dayLabel} — The Quran`;
   $("overall-progress-label").textContent = `${progress} / ${rukus.length} rukus · ${percent}%`;
   $("overall-progress-bar").max = rukus.length;
   $("overall-progress-bar").value = progress;

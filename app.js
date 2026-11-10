@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, selectAyah, adjacentPosition, matchesChapter, decodeState, validPosition } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, splitTranslationParagraphs, selectAyah, adjacentPosition, matchesChapter, decodeState, validPosition } from "./reader.js";
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
@@ -277,10 +277,14 @@ function createVerse(verse) {
   number.setAttribute("aria-label", `Link to verse ${verse.chapter}:${verse.verse}`);
   const textContainer = document.createElement("div");
   textContainer.className = "verse-body";
-  const text = document.createElement("p");
-  text.lang = TRANSLATIONS[state.translation].language;
-  text.textContent = verse.text;
-  textContainer.append(text);
+  const language = TRANSLATIONS[state.translation].language;
+  for (const paragraph of splitTranslationParagraphs(verse.text, language)) {
+    const text = document.createElement("p");
+    text.lang = language;
+    text.dir = "auto";
+    text.textContent = paragraph;
+    textContainer.append(text);
+  }
   article.append(number, textContainer);
   return article;
 }
@@ -313,6 +317,15 @@ function renderPagination(selection) {
       position.textContent = searching
         ? `${selection.index + 1} / ${selection.matches.length}`
         : `${state.position.verse} / ${chapters[state.position.chapter - 1].verses}`;
+      if (!searching) {
+        const progress = document.createElement("progress");
+        progress.className = "surah-progress";
+        progress.max = chapters[state.position.chapter - 1].verses;
+        progress.value = state.position.verse;
+        progress.setAttribute("aria-label", "Surah reading progress");
+        progress.setAttribute("aria-valuetext", `Ayah ${state.position.verse} of ${progress.max} in this surah`);
+        position.append(progress);
+      }
       nav.append(position);
     }
   }

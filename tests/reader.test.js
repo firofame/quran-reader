@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
-import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseTranslation, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition } from "../reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseTranslation, splitTranslationParagraphs, parseHash, validPosition, matchesChapter, decodeState, selectAyah, adjacentPosition } from "../reader.js";
 import { reduceReaderState } from "../reader-state.js";
 import { createPreferencesStore, PREFERENCES_KEY } from "../preferences-store.js";
 import { createTranslationRepository } from "../translation-repository.js";
@@ -91,6 +91,13 @@ for (const [id, translation] of Object.entries(TRANSLATIONS)) {
     const originalVerses = source.split(/\r?\n/).filter(line => /^\d+\|/.test(line));
     assert.equal(data.flat().length, 6236);
     assert.deepEqual(data.flat().map(item => `${item.chapter}|${item.verse}|${item.text}`), originalVerses);
+    for (const verse of data.flat()) {
+      const paragraphs = splitTranslationParagraphs(verse.text, translation.language);
+      assert.equal(paragraphs.join(""), verse.text, `${id} ${verse.chapter}:${verse.verse}`);
+      assert.ok(paragraphs.every(paragraph => paragraph.trim().length > 0));
+      if (verse.text.length < 500) assert.deepEqual(paragraphs, [verse.text]);
+    }
+    assert.ok(splitTranslationParagraphs(data[1][216].text, translation.language).length > 1);
     for (const chapter of chapters) {
       assert.equal(data[chapter.id - 1].length, chapter.verses);
       assert.equal(data.flat()[chapter.start].chapter, chapter.id);
@@ -98,6 +105,30 @@ for (const [id, translation] of Object.entries(TRANSLATIONS)) {
     assert.equal(data[113][5].verse, 6);
   });
 }
+
+test("paragraphs group complete sentences without splitting quoted passages or changing whitespace", () => {
+  const quotation = 'She said, "This first sentence belongs to the quotation. This second sentence belongs here too. This last sentence closes the quotation." ';
+  const sentence = "The next sentence begins another complete thought and remains unchanged. ";
+  for (const quote of [quotation, quotation.replace('"', "\u201c").replace('"', "\u201d")]) {
+    const text = sentence.repeat(3) + quote + "\t" + sentence.repeat(4);
+    const paragraphs = splitTranslationParagraphs(text, "en");
+    assert.ok(paragraphs.length > 1);
+    assert.equal(paragraphs.join(""), text);
+    assert.ok(paragraphs.some(paragraph => paragraph.includes(quote)));
+    assert.ok(paragraphs.slice(0, -1).every(paragraph => /[.!?]["\u201d]?\s+$/.test(paragraph)));
+  }
+});
+
+test("short ayahs, long single sentences, and open quotations stay intact", () => {
+  for (const text of [
+    "A brief sentence. Another brief sentence.",
+    "a".repeat(499),
+    "a".repeat(600) + ".",
+    '"An open quotation. ' + "Another sentence in the quotation. ".repeat(20),
+  ]) {
+    assert.deepEqual(splitTranslationParagraphs(text, "en"), [text]);
+  }
+});
 
 test("parser rejects truncated, duplicate, invalid, and out-of-order verses", () => {
   assert.throws(() => parseTranslation("1|1|Text", chapters), /incomplete/);

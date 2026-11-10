@@ -1,4 +1,4 @@
-export const READER_SCHEMA_VERSION = 3;
+export const READER_SCHEMA_VERSION = 4;
 export const DEFAULT_RUKU_COUNT = 556;
 
 const MODES = new Set(["deep", "light", "flow"]);
@@ -31,6 +31,7 @@ export function createDefaultReadingData() {
       listenEchoEnabled: false,
       lastBackupExportedAt: 0,
       shortcutsSeen: false,
+      resumeAtNextUnread: true,
     },
   };
 }
@@ -169,6 +170,7 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
       listenEchoEnabled: Boolean(settings.listenEchoEnabled),
       lastBackupExportedAt: Number.isSafeInteger(settings.lastBackupExportedAt) && settings.lastBackupExportedAt > 0 ? settings.lastBackupExportedAt : 0,
       shortcutsSeen: Boolean(settings.shortcutsSeen),
+      resumeAtNextUnread: settings.resumeAtNextUnread !== false,
     },
   };
 }
@@ -328,6 +330,45 @@ export function findRuku(position, rukus) {
 
 export function isRukuEnd(position, ruku) {
   return Boolean(ruku && position.chapter === ruku.end.chapter && position.verse === ruku.end.verse);
+}
+
+export function resolveStartupPosition({ hashPosition, savedPosition, readingData, chapters, rukus }) {
+  if (hashPosition && (hashPosition.chapter !== savedPosition.chapter || hashPosition.verse !== savedPosition.verse)) {
+    return { position: hashPosition, source: "link" };
+  }
+  if (!readingData.settings.resumeAtNextUnread) {
+    return { position: savedPosition, source: "saved" };
+  }
+  const resumePosition = getResumePosition(savedPosition, readingData, chapters, rukus);
+  const changed = resumePosition.chapter !== savedPosition.chapter || resumePosition.verse !== savedPosition.verse;
+  return { position: resumePosition, source: changed ? "resume" : "saved" };
+}
+
+export function getResumePosition(position, readingData, chapters, rukus) {
+  const key = `${position.chapter}:${position.verse}`;
+  if (!readingData.verseReadKeys.includes(key)) return position;
+  const currentRuku = findRuku(position, rukus);
+  if (!currentRuku) return position;
+  const isRead = (chapter, verse) => readingData.verseReadKeys.includes(`${chapter}:${verse}`);
+  const versesOf = ruku => {
+    const verses = [];
+    for (let chapter = ruku.start.chapter; chapter <= ruku.end.chapter; chapter++) {
+      const first = chapter === ruku.start.chapter ? ruku.start.verse : 1;
+      const last = chapter === ruku.end.chapter ? ruku.end.verse : chapters[chapter - 1].verses;
+      for (let verse = first; verse <= last; verse++) verses.push({ chapter, verse });
+    }
+    return verses;
+  };
+  const remaining = versesOf(currentRuku).filter(candidate => candidate.chapter !== position.chapter || candidate.verse > position.verse);
+  for (const candidate of remaining) {
+    if (!isRead(candidate.chapter, candidate.verse)) return candidate;
+  }
+  for (const ruku of rukus.slice(currentRuku.id)) {
+    for (const candidate of versesOf(ruku)) {
+      if (!isRead(candidate.chapter, candidate.verse)) return candidate;
+    }
+  }
+  return position;
 }
 
 export function getSurahRukuProgress(chapterId, readingData, rukus) {

@@ -3,7 +3,7 @@ import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
 import { createSyncClient, createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "./sync-client.js";
-import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordVerseVisit } from "./reading-data.js";
+import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -251,8 +251,21 @@ function dispatch(action) {
 }
 
 const initialPosition = parseHash(location.hash, chapters);
-if (initialPosition) state = reduceReaderState(state, { type: "position/set", position: initialPosition }, chapters);
-else if (location.hash && location.hash !== "#main") notify("That verse link isn't valid. Your last reading position has been opened.");
+const startup = resolveStartupPosition({
+  hashPosition: initialPosition,
+  savedPosition: state.position,
+  readingData: state.readingData,
+  chapters,
+  rukus,
+});
+if (startup.source === "link") {
+  state = reduceReaderState(state, { type: "position/set", position: startup.position }, chapters);
+} else if (location.hash && location.hash !== "#main" && !initialPosition) {
+  notify("That verse link isn't valid. Your last reading position has been opened.");
+} else if (startup.source === "resume") {
+  state = reduceReaderState(state, { type: "position/set", position: startup.position }, chapters);
+  history.replaceState(null, "", `#${startup.position.chapter}:${startup.position.verse}`);
+}
 
 function applyPreferences() {
   document.documentElement.dataset.theme = state.theme;
@@ -576,8 +589,10 @@ function renderProgressSummary() {
   $("friday-kahf-page-card").hidden = !readingData.settings.kahfFridayEnabled;
   $("kahf-week-summary").textContent = kahfWeekProgress(readingData).text;
   $("kahf-progress").textContent = `Friday · ${kahfWeekProgress(readingData).text}`;
-  $("plan-page").hidden = !readingData.settings.weeklyPlanEnabled;
-  document.querySelector('[data-page="plan"]').hidden = !readingData.settings.weeklyPlanEnabled;
+  const planEnabled = readingData.settings.weeklyPlanEnabled;
+  $("plan-page").hidden = !planEnabled;
+  document.querySelector('[data-page="plan"]').hidden = !planEnabled;
+  if (!planEnabled && activePage === "plan") showPage("reader");
 }
 
 function anchorWasUsedToday(anchor, anchors, readingData) {
@@ -876,6 +891,7 @@ function completeCurrentRuku(ruku, mode, { continueToNext = false } = {}) {
   $("completion-title").textContent = `${chapters[ruku.chapter - 1].name} · ruku ${ruku.localNumber} complete`;
   $("completion-progress").textContent = `Overall: ${state.readingData.completedRukuIds.length} / ${rukus.length} rukus (${percent}%) · Today: ${today.completed} / ${today.target}${today.reached ? " · Target reached" : ""}${today.bonus ? ` · +${today.bonus} bonus` : ""}${today.mode === "light" && today.reached ? " · Light day done. That counts." : ""}`;
   $("next-ruku").disabled = !rukus[ruku.id];
+  $("reflection-input").value = "";
   $("ruku-completion").hidden = false;
   $("reading-content").hidden = true;
   $("ayah-navigation").hidden = true;
@@ -884,11 +900,32 @@ function completeCurrentRuku(ruku, mode, { continueToNext = false } = {}) {
   $("ruku-completion").scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
+function upsertReflection(text, ruku = completedRuku) {
+  const trimmed = text.trim();
+  if (!trimmed || !ruku) return false;
+  const id = `ruku-${ruku.id}`;
+  updateReadingData(readingData => {
+    const existing = readingData.notes.find(note => note.id === id);
+    const note = { id, rukuId: ruku.id, text: trimmed, createdAt: existing?.createdAt ?? Date.now() };
+    return { ...readingData, notes: [...readingData.notes.filter(item => item.id !== id), note] };
+  }, { renderPages: false });
+  if (activePage === "notes") renderNotes();
+  return true;
+}
+
+function clearReflection(ruku = completedRuku) {
+  if (!ruku) return;
+  const id = `ruku-${ruku.id}`;
+  if (!state.readingData.notes.some(note => note.id === id)) return;
+  updateReadingData(readingData => ({
+    ...readingData,
+    notes: readingData.notes.filter(note => note.id !== id),
+  }), { renderPages: false });
+  if (activePage === "notes") renderNotes();
+}
+
 function savePendingReflection() {
-  const text = $("reflection-input").value.trim();
-  if (!text || !completedRuku) return;
-  const note = { id: `note-${Date.now()}`, rukuId: completedRuku.id, text, createdAt: Date.now() };
-  updateReadingData(readingData => ({ ...readingData, notes: [...readingData.notes, note] }));
+  if (!upsertReflection($("reflection-input").value)) return;
   $("reflection-input").value = "";
   notify("Reflection saved.");
 }
@@ -936,6 +973,7 @@ function renderSettings() {
   $("kahf-friday-setting").checked = settings.kahfFridayEnabled;
   $("weekly-plan-setting").checked = settings.weeklyPlanEnabled;
   $("focus-mode-setting").checked = settings.focusMode;
+  $("resume-setting").checked = settings.resumeAtNextUnread;
   $("reminders-setting").checked = settings.remindersEnabled;
   $("listen-echo-setting").checked = settings.listenEchoEnabled;
   const reminderTime = 28 * 24 * 60 * 60 * 1000;
@@ -1034,6 +1072,7 @@ function initializeSettingsControls() {
     updateSetting("focusMode", $("focus-mode-setting").checked);
     applyPreferences();
   });
+  $("resume-setting").addEventListener("change", () => updateSetting("resumeAtNextUnread", $("resume-setting").checked));
   $("reminders-setting").addEventListener("change", async () => {
     if (!$("reminders-setting").checked) {
       updateSetting("remindersEnabled", false);
@@ -1392,6 +1431,17 @@ function initializeFeatureInteractions() {
   });
   $("notes-search").addEventListener("input", renderNotes);
   $("what-if-target").addEventListener("input", renderFinishEstimate);
+  let reflectionTimer;
+  $("reflection-input").addEventListener("input", () => {
+    clearTimeout(reflectionTimer);
+    reflectionTimer = setTimeout(() => upsertReflection($("reflection-input").value), 600);
+  });
+  $("reflection-input").addEventListener("blur", () => {
+    clearTimeout(reflectionTimer);
+    const text = $("reflection-input").value.trim();
+    if (text) upsertReflection(text);
+    else clearReflection();
+  });
   $("next-ruku").addEventListener("click", () => {
     savePendingReflection();
     const next = completedRuku && rukus[completedRuku.id];

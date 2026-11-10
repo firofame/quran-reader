@@ -7,6 +7,7 @@ import {
   createDefaultReadingData,
   findRuku,
   getDayKey,
+  getResumePosition,
   getRukuIndex,
   getSectionRukus,
   getTodayStats,
@@ -14,6 +15,7 @@ import {
   normalizeReadingData,
   recordRukuCompletion,
   recordVerseVisit,
+  resolveStartupPosition,
 } from "../reading-data.js";
 
 const context = vm.createContext({});
@@ -107,13 +109,14 @@ test("reading data migration keeps valid saved fields and drops invalid records"
     notes: [{ id: "b", rukuId: 1, text: "Reflection", createdAt: 1 }],
     settings: { dailyTarget: 50, dayBoundaryHour: 22, anchors: [{ id: "fajr", name: "After Fajr", time: "05:10" }] },
   }, chapters);
-  assert.equal(migrated.version, 3);
+  assert.equal(migrated.version, 4);
   assert.deepEqual(migrated.completedRukuIds, [1]);
   assert.deepEqual(migrated.bookmarks, []);
   assert.equal(migrated.notes[0].text, "Reflection");
   assert.equal(migrated.settings.dailyTarget, 10);
   assert.equal(migrated.settings.dayBoundaryHour, 22);
   assert.equal(migrated.settings.anchors[0].name, "After Fajr");
+  assert.equal(migrated.settings.resumeAtNextUnread, true);
 });
 
 test("version 2 activity migrates without dropping overall verse progress", () => {
@@ -131,10 +134,55 @@ test("version 2 activity migrates without dropping overall verse progress", () =
       },
     },
   }, chapters);
-  assert.equal(migrated.version, 3);
+  assert.equal(migrated.version, 4);
   assert.deepEqual(migrated.verseReadKeys, ["1:1", "1:2"]);
   assert.equal(migrated.activityByDay["2026-11-10"].rukuCompletions, 1);
   assert.equal(Object.hasOwn(migrated.activityByDay["2026-11-10"], "verseKeys"), false);
+});
+
+test("resume opens the next unread verse and never rewinds to an unread stop", () => {
+  let reading = createDefaultReadingData();
+  reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, "deep", new Date(2026, 10, 10, 8));
+  reading = recordVerseVisit(reading, { chapter: 1, verse: 2 }, "deep", new Date(2026, 10, 10, 8, 1));
+
+  assert.deepEqual(getResumePosition({ chapter: 1, verse: 2 }, reading, chapters, rukus), { chapter: 1, verse: 3 });
+  assert.deepEqual(getResumePosition({ chapter: 1, verse: 1 }, reading, chapters, rukus), { chapter: 1, verse: 3 });
+  assert.deepEqual(getResumePosition({ chapter: 2, verse: 1 }, reading, chapters, rukus), { chapter: 2, verse: 1 });
+
+  const finished = recordRukuCompletion(reading, rukus[0], "deep", new Date(2026, 10, 10, 8, 2));
+  assert.deepEqual(getResumePosition({ chapter: 1, verse: 7 }, finished, chapters, rukus), { chapter: 2, verse: 1 });
+});
+
+test("resume stays inside the ruku when later verses are still unread", () => {
+  let reading = createDefaultReadingData();
+  reading = recordVerseVisit(reading, { chapter: 2, verse: 142 }, "deep", new Date(2026, 10, 10, 8));
+  const resumed = getResumePosition({ chapter: 2, verse: 142 }, reading, chapters, rukus);
+  assert.deepEqual(resumed, { chapter: 2, verse: 143 });
+  assert.equal(findRuku(resumed, rukus).id, findRuku({ chapter: 2, verse: 142 }, rukus).id);
+});
+
+test("startup follows an explicit link, resumes past a read verse and honours the setting", () => {
+  let reading = createDefaultReadingData();
+  reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, "deep", new Date(2026, 10, 10, 8));
+  const saved = { chapter: 1, verse: 1 };
+
+  const linked = resolveStartupPosition({ hashPosition: { chapter: 2, verse: 5 }, savedPosition: saved, readingData: reading, chapters, rukus });
+  assert.deepEqual(linked, { position: { chapter: 2, verse: 5 }, source: "link" });
+
+  const ownUrl = resolveStartupPosition({ hashPosition: saved, savedPosition: saved, readingData: reading, chapters, rukus });
+  assert.deepEqual(ownUrl, { position: { chapter: 1, verse: 2 }, source: "resume" });
+
+  const unread = resolveStartupPosition({ hashPosition: { chapter: 1, verse: 9 }, savedPosition: { chapter: 1, verse: 9 }, readingData: reading, chapters, rukus });
+  assert.deepEqual(unread, { position: { chapter: 1, verse: 9 }, source: "saved" });
+
+  const optedOut = resolveStartupPosition({
+    hashPosition: saved,
+    savedPosition: saved,
+    readingData: { ...reading, settings: { ...reading.settings, resumeAtNextUnread: false } },
+    chapters,
+    rukus,
+  });
+  assert.deepEqual(optedOut, { position: saved, source: "saved" });
 });
 
 test("bundled Tanzil Uthmani Arabic text parses as 6,236 unchanged verse rows", async () => {

@@ -1,0 +1,13 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"types": ["@cloudflare/vitest-plugin/types", "node"],
+		/*
+		 * The reader modules in `public/` are plain browser JavaScript without a
+		 * build step, so their inferred types are intentionally loose.
+		 */
+		"noImplicitAny": false
+	},
+	"include": ["./**/*.ts", "../worker-configuration.d.ts", "../src/env.d.ts"],
+	"exclude": []
+}

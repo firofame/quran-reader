@@ -2,6 +2,8 @@
 
 A Cloudflare Worker paired with a SQLite-backed Durable Object provides strongly consistent, real-time synchronization of Quran reading progress across devices. The reader app is configured to use `https://quran.firofame.workers.dev`; readers do not need to deploy the Worker or enter its URL.
 
+The same Worker also serves the reader itself from `public/` as Workers Static Assets, so the site and the sync API share one hostname and one deployment.
+
 ---
 
 ## Architecture Overview
@@ -47,24 +49,24 @@ These steps are for the project maintainer. The reader app already points to the
 project's deployed Worker.
 
 The reader site's default address is `DEFAULT_SYNC_ENDPOINT` in
-[`../sync-client.js`](../sync-client.js). If the Worker is moved to a different
-Cloudflare account or hostname, update that constant before publishing the reader.
+[`../public/sync-client.js`](../public/sync-client.js). If the Worker is moved
+to a different Cloudflare account or hostname, update that constant before
+publishing the reader.
 
 ### GitHub Actions
 
-The repository's `.github/workflows/deploy-worker.yml` deploys this Worker with
+The repository's `.github/workflows/deploy.yml` deploys this Worker with
 Wrangler:
 
-- Changes to `worker/` merged into `main` deploy to production after syntax checks
-  and the full test suite. Manual production dispatch is restricted to `main`
-  once this workflow exists on the default branch.
+- Every merge to `main` deploys to production after syntax checks and the full
+  test suite. A manual production run is restricted to `main` as well.
 - Production reuses the existing `quran` Worker. If only `quran-reader-sync`
   exists, it is renamed in place. The workflow never creates a replacement
   Worker and verifies the immutable Worker ID and active Durable Object namespace
   bindings before and after deployment.
-- A same-repository PR targeting `main` can deploy to production without merging
-  through the explicit maintainer opt-in below. Ordinary PR pushes deploy only
-  an isolated preview, even if the production label is still present.
+- The deploy is authorized by the merge itself: the workflow checks that the
+  revision is still the head of `main` and that the actor has repository write
+  access.
 - Same-repository pull requests get an isolated Worker preview. The preview is
   removed when the pull request closes, including its temporary Durable Object
   storage. Fork pull requests do not get a Cloudflare preview.
@@ -91,33 +93,28 @@ prove these production permissions. HTTP authorization failures, name conflicts,
 unexpected API responses, or changed namespace identities stop the job explicitly.
 Do not paste deployment tokens into setup codes, source files, or workflow logs.
 
-### Explicit pre-merge production deployment
+### What the production job does
 
-1. Push the approved changes to the same-repository PR branch and wait for green
-   reader validation and the isolated preview on that exact head commit.
-2. A maintainer with repository **write**, **maintain**, or **admin** access creates
-   and applies the label `deploy-sync-production`. Applying the label is the
-   production authorization; users with only read or triage access cannot deploy.
-3. The production job checks out the exact PR head, checks both the label sender
-   and rerun actor's permissions, and runs all tests before production changes.
-   It rechecks that the PR is open, still targets `main`, retains the label, and
-   has the same head before the in-place update. Production jobs are serialized.
-4. The job verifies edit permissions and preserves the existing Worker, deploys,
-   and checks `/health` for `status: "ok"` and `service: "quran"`. It compares
-   Worker/namespace identity, reads a synthetic private sync canary written before
-   deployment, checks the new API's read/write payload, and confirms a different
-   fresh key has no state. The pre-deployment canary includes an empty legacy
-   bookmarks field for older Workers; normal reader requests do not include it.
-   Canary keys are
-   masked in logs and the runner's private state file is removed on completion.
-   These checks never use an existing reader's pairing key; the synthetic canary
-   leaves only its isolated sample state in the service.
-5. Confirm the deployed revision and verification results in the Actions job
-   summary, then remove the opt-in label. If the PR head changes, wait for green
-   checks and remove/reapply the label to authorize that new revision.
+1. Checks out the exact revision, installs the dependencies, and runs the syntax
+   checks, the type check, and the full test suite before anything is published.
+2. Confirms that the revision is still the head of `main` and that the actor has
+   repository write access. Production jobs are serialized.
+3. Verifies edit permissions and preserves the existing Worker, deploys, and
+   checks `/health` for `status: "ok"` and `service: "quran"`. It compares
+   Worker/namespace identity, reads a synthetic private sync canary written
+   before deployment, checks the new API's read/write payload, and confirms a
+   different fresh key has no state. The pre-deployment canary includes an empty
+   legacy bookmarks field for older Workers; normal reader requests do not
+   include it. Canary keys are masked in logs and the runner's private state
+   file is removed on completion. These checks never use an existing reader's
+   pairing key; the synthetic canary leaves only its isolated sample state in
+   the service.
+4. Reports the deployed revision and the verification results in the Actions job
+   summary.
 
-This deploys the **Worker only**. It neither merges the PR nor publishes the reader
-site; GitHub Pages continues to publish through the normal `main` workflow.
+The same deploy publishes the reader itself, because the Worker serves the
+reader from `public/` as well as the sync API. There is no separate site
+deployment.
 
 The Worker's optional `SYNC_SECRET` is for API authentication and is unrelated
 to deployment; leave it unset for normal per-device pairing. Wrangler's local
@@ -128,10 +125,9 @@ to deployment; leave it unset for normal per-device pairing. Wrangler's local
 - A free [Cloudflare account](https://dash.cloudflare.com/).
 
 ### 2. Login to Cloudflare Wrangler
-From your terminal, navigate to the `worker/` directory and authenticate with Cloudflare:
+From the repository root, authenticate with Cloudflare:
 
 ```bash
-cd worker
 npx wrangler login
 ```
 
@@ -148,11 +144,9 @@ the same sync space and generated per-device keys would not work.
 Deploy the Worker and create the SQLite Durable Object migration:
 
 ```bash
-cd ..
+npm install
 npm run check
 npm test
-cd worker
-npm run check
 npx wrangler deploy
 ```
 
@@ -166,12 +160,19 @@ https://quran.firofame.workers.dev
 ```
 
 ### 5. Local Development (Optional)
-To run and test the Worker locally:
+To run the Worker and the reader locally:
 
 ```bash
-npx wrangler dev
+npm run dev
 ```
-Local URL will typically be `http://localhost:8787`.
+Local URL will typically be `http://localhost:8787`. The Durable Object is
+emulated locally, and the reader assets are served from `public/`.
+
+To run the test suites:
+
+```bash
+npm test
+```
 
 ---
 
@@ -239,3 +240,18 @@ Updates reading progress.
 
 ### `GET /health`
 Health check endpoint returning `{ "status": "ok", "service": "quran" }`.
+
+---
+
+## Source layout
+
+| Path | Purpose |
+| --- | --- |
+| `src/index.ts` | Hono routes for the sync API and the health check. |
+| `src/durable-object.ts` | The SQLite-backed Durable Object that stores a sync space. |
+| `src/sync-state.ts` | Zod schemas and timestamp rules for the sync payloads. |
+| `src/auth.ts` | Pairing-key extraction and Durable Object name hashing. |
+| `public/` | The reader itself, served as Workers Static Assets. |
+| `scripts/deployment.js` | Maintainer helpers used by the deploy workflow. |
+| `test/worker/` | Worker, Durable Object, and sync tests in the Workers runtime. |
+| `test/node/` | Reader module and deployment helper tests in Node. |

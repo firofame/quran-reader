@@ -1,0 +1,57 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "quran",
+	"account_id": "d2c3c656cbf2f4e32a133ab2fa3dcd5a",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-11-10",
+	"compatibility_flags": ["global_fetch_strictly_public"],
+	/**
+	 * The reader is a static site served by Workers Static Assets.
+	 * https://developers.cloudflare.com/workers/static-assets/
+	 */
+	"assets": {
+		// The path to the directory containing the `index.html` file to be served at `/`
+		"directory": "./public",
+		"html_handling": "auto-trailing-slash",
+		"not_found_handling": "none"
+	},
+	/**
+	 * Bindings
+	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
+	 * databases, object storage, AI inference, real-time communication and more.
+	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
+	 */
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "SYNC_DO",
+				"class_name": "SyncDurableObject"
+			}
+		]
+	},
+	/**
+	 * The Durable Object keeps its SQLite-backed storage across deployments.
+	 * The `v1` tag is the migration that created the SQLite class, so existing
+	 * sync spaces are adopted instead of being recreated.
+	 */
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["SyncDurableObject"]
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true
+	/**
+	 * Environment Variables
+	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
+	 * Note: Use secrets to store sensitive data.
+	 */
+	// "vars": {  "SYNC_SECRET": "production_value" }
+}

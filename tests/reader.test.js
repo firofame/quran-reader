@@ -7,6 +7,7 @@ import { reduceReaderState } from "../reader-state.js";
 import { createPreferencesStore, PREFERENCES_KEY } from "../preferences-store.js";
 import { createTranslationRepository } from "../translation-repository.js";
 import { createReaderServer } from "../server.js";
+import { createDefaultReadingData, READER_SCHEMA_VERSION } from "../reading-data.js";
 
 const context = vm.createContext({});
 vm.runInContext(await readFile(new URL("../quran-data.js", import.meta.url), "utf8"), context);
@@ -338,7 +339,10 @@ test("new and removed translation preferences use Saheeh International without l
     fontSize: 25,
     theme: "dark",
   };
-  assert.deepEqual(decodeState(JSON.stringify(saved), chapters), { ...saved, translation: "en.sahih" });
+  const migrated = decodeState(JSON.stringify(saved), chapters);
+  assert.deepEqual({ translation: migrated.translation, position: migrated.position, fontSize: migrated.fontSize, theme: migrated.theme }, { ...saved, translation: "en.sahih" });
+  assert.equal(migrated.schemaVersion, READER_SCHEMA_VERSION);
+  assert.deepEqual(migrated.readingData, createDefaultReadingData());
   for (const translation of Object.keys(TRANSLATIONS)) {
     assert.equal(decodeState(JSON.stringify({ ...saved, translation }), chapters).translation, translation);
   }
@@ -426,7 +430,7 @@ test("static server serves local assets and rejects unlisted paths and methods",
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
   const base = `http://127.0.0.1:${server.address().port}`;
-  for (const path of ["/", "/app.js", "/reader.js", "/reader-state.js", "/preferences-store.js", "/translation-repository.js", "/styles.css", "/quran-data.js", "/favicon.svg", ...Object.values(TRANSLATIONS).map(item => `/${item.file}`)]) {
+  for (const path of ["/", "/app.js", "/reader.js", "/reader-state.js", "/reading-data.js", "/preferences-store.js", "/translation-repository.js", "/styles.css", "/quran-data.js", "/ar.uthmani.txt", "/service-worker.js", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/favicon.svg", ...Object.values(TRANSLATIONS).map(item => `/${item.file}`)]) {
     const response = await fetch(`${base}${path}`);
     assert.equal(response.status, 200, path);
     assert.ok((await response.text()).length > 0, path);

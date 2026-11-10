@@ -32,7 +32,7 @@ jobs:
       - name: Prepare the static site
         run: |
           mkdir -p _site
-          cp index.html styles.css app.js reader.js reader-state.js preferences-store.js translation-repository.js sync-client.js quran-data.js favicon.svg en.sahih.txt ml.abdulhameed.txt _site/
+          cp index.html styles.css app.js reader.js reader-state.js reading-data.js preferences-store.js translation-repository.js sync-client.js quran-data.js ar.uthmani.txt favicon.svg manifest.webmanifest service-worker.js icon-192.png icon-512.png en.sahih.txt ml.abdulhameed.txt _site/
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

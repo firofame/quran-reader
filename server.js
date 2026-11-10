@@ -9,11 +9,17 @@ const files = new Map([
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
   ["/reader.js", ["reader.js", "text/javascript; charset=utf-8"]],
   ["/reader-state.js", ["reader-state.js", "text/javascript; charset=utf-8"]],
+  ["/reading-data.js", ["reading-data.js", "text/javascript; charset=utf-8"]],
   ["/preferences-store.js", ["preferences-store.js", "text/javascript; charset=utf-8"]],
   ["/translation-repository.js", ["translation-repository.js", "text/javascript; charset=utf-8"]],
   ["/sync-client.js", ["sync-client.js", "text/javascript; charset=utf-8"]],
   ["/quran-data.js", ["quran-data.js", "text/javascript; charset=utf-8"]],
+  ["/service-worker.js", ["service-worker.js", "text/javascript; charset=utf-8"]],
+  ["/manifest.webmanifest", ["manifest.webmanifest", "application/manifest+json; charset=utf-8"]],
   ["/favicon.svg", ["favicon.svg", "image/svg+xml"]],
+  ["/icon-192.png", ["icon-192.png", "image/png"]],
+  ["/icon-512.png", ["icon-512.png", "image/png"]],
+  ["/ar.uthmani.txt", ["ar.uthmani.txt", "text/plain; charset=utf-8"]],
   ...["en.sahih", "ml.abdulhameed"].map(id => [`/${id}.txt`, [`${id}.txt`, "text/plain; charset=utf-8"]]),
 ]);
 

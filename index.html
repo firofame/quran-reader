@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f8f7f2">
     <meta name="description" content="A quiet space to read and reflect on Quran translations. Explore 114 chapters in English and Malayalam.">
+    <link rel="manifest" href="manifest.webmanifest">
     <title>The Quran — A space for reflection</title>
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link id="app-icon" rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -42,9 +43,24 @@
           <button id="open-menu" class="icon-button open-menu" aria-label="Open chapters" aria-controls="sidebar" aria-expanded="false" data-icon="menu"></button>
           <span class="topbar-label">A SPACE FOR REFLECTION</span>
         </div>
-        <button id="theme-toggle" class="icon-button theme-toggle" aria-label="Switch to dark theme" data-icon="moon"></button>
+        <nav id="app-navigation" class="app-navigation" aria-label="Reader pages">
+          <button type="button" data-page="reader" aria-current="page">Read</button>
+          <button type="button" data-page="journey">Journey</button>
+          <button type="button" data-page="notes">Notes</button>
+          <button type="button" data-page="weekly">Week</button>
+          <button type="button" data-page="plan">Khatam plan</button>
+          <button type="button" data-page="settings">Settings</button>
+        </nav>
+        <div class="topbar-right">
+          <div id="overall-progress" class="overall-progress" aria-label="Overall reading progress">
+            <span id="overall-progress-label">0 / 556 rukus</span>
+            <progress id="overall-progress-bar" max="556" value="0" aria-label="Rukus completed"></progress>
+          </div>
+          <button id="theme-toggle" class="icon-button theme-toggle" aria-label="Switch to dark theme" data-icon="moon"></button>
+        </div>
       </header>
       <main id="main" tabindex="-1">
+        <div id="reader-page" class="app-page">
         <section class="reader" aria-label="Quran translation">
           <div class="reader-header">
             <div id="chapter-heading" class="chapter-heading"></div>
@@ -77,6 +93,13 @@
                   </label>
                   <span id="search-count" class="search-count" aria-live="polite" hidden></span>
                 </div>
+                <form id="goto-form" class="goto-form">
+                  <label>Surah<select id="goto-surah" aria-label="Go to surah"></select></label>
+                  <label>Ruku<select id="goto-ruku" aria-label="Go to ruku"></select></label>
+                  <label>Verse<select id="goto-verse" aria-label="Go to verse"></select></label>
+                  <button type="submit" class="secondary-button">Go to…</button>
+                </form>
+                <button type="button" class="secondary-button settings-shortcut" data-page="settings">Reading and habit settings</button>
                 <div id="sync-panel" class="sync-panel">
                   <div class="sync-header">
                     <div class="sync-title-group">
@@ -126,22 +149,103 @@
               </div>
             </details>
           </div>
+          <section id="daily-panel" class="daily-panel" aria-label="Today’s reading progress">
+            <div class="daily-panel-main">
+              <div>
+                <span id="today-progress" class="today-progress">Today: 0 / 3</span>
+                <span id="today-mode-label" class="today-mode-label">Full mode</span>
+                <span id="target-reached-label" class="target-reached-label" hidden>Target reached</span>
+              </div>
+              <button id="light-mode-toggle" type="button" class="quiet-toggle" aria-pressed="false">Light mode</button>
+            </div>
+            <div id="anchor-chips" class="anchor-chips" aria-label="Reading anchors"></div>
+            <div id="kahf-card" class="kahf-card" hidden>
+              <span id="kahf-progress">Friday · Al-Kahf 0 / 12 rukus</span>
+              <button id="open-kahf" type="button" class="quiet-link">Continue Al-Kahf</button>
+            </div>
+          </section>
           <div id="ayah-status" class="sr-only" role="status" hidden></div>
           <div id="active-search" class="active-search" hidden>
             <span id="active-search-label"></span>
             <button id="clear-search" type="button">Clear search</button>
           </div>
-          <progress id="ruku-progress" class="ruku-progress" aria-label="Ruku reading progress" max="7" value="1" hidden></progress>
+          <div id="ruku-progress-wrap" class="ruku-progress-wrap" hidden>
+            <span id="ruku-progress-label" class="ruku-progress-label"></span>
+            <progress id="ruku-progress" class="ruku-progress" aria-label="Ruku reading progress" max="7" value="1"></progress>
+          </div>
+          <details id="ruku-summary" class="ruku-summary" hidden>
+            <summary>About this ruku</summary>
+            <div id="ruku-summary-content"></div>
+            <small id="ruku-summary-source"></small>
+          </details>
           <div id="reading-content" aria-busy="true" aria-live="polite"></div>
+          <section id="ruku-completion" class="ruku-completion" aria-live="polite" hidden>
+            <span class="eyebrow">ONE RUKU COMPLETE</span>
+            <h2 id="completion-title">Ruku complete</h2>
+            <p id="completion-progress"></p>
+            <label class="reflection-field">One thing that stood out
+              <textarea id="reflection-input" rows="2" maxlength="1200" placeholder="Optional · skip this whenever you like"></textarea>
+            </label>
+            <div class="completion-actions">
+              <button id="next-ruku" type="button" class="primary-button">Next ruku</button>
+              <button id="done-for-now" type="button" class="secondary-button">Done for now</button>
+            </div>
+          </section>
           <nav id="ayah-navigation" class="chapter-pagination" aria-label="Ayah navigation"></nav>
-          <p id="navigation-hint" class="navigation-hint">Use <kbd>←</kbd> <kbd>→</kbd> to continue.</p>
+          <p id="navigation-hint" class="navigation-hint">Use <kbd>←</kbd> <kbd>→</kbd> to continue. <span id="shortcut-hint">Space next · <kbd>b</kbd> bookmark · <kbd>r</kbd> repeat · <kbd>Esc</kbd> menu</span></p>
         </section>
         <footer class="reader-footer">
           <p>A translation of the meanings of the Quran.</p>
           <p id="attribution"></p>
+          <p id="arabic-attribution" class="metadata-credit" hidden></p>
           <p class="metadata-credit">Chapter metadata © Tanzil, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a>.</p>
         </footer>
+        </div>
+        <section id="journey-page" class="secondary-page" hidden>
+          <header class="page-heading"><span class="eyebrow">THE LONG VIEW</span><h1>Your journey</h1><p>Small portions add up, one sitting at a time.</p></header>
+          <section class="page-card"><h2>Juz</h2><div id="juz-grid" class="juz-grid"></div></section>
+          <section class="page-card"><h2>Manzil</h2><div id="manzil-list" class="manzil-list"></div></section>
+          <section class="page-card"><h2>Your pace</h2><p id="pace-summary"></p><label class="what-if-control">What if I read <input id="what-if-target" type="number" min="1" max="100" value="3"> rukus each day?</label><p id="finish-estimate" class="finish-estimate"></p></section>
+          <section id="friday-kahf-page-card" class="page-card" hidden><h2>This week in Al-Kahf</h2><p id="kahf-week-summary"></p><button id="journey-open-kahf" class="secondary-button" type="button">Open the first unread ruku</button></section>
+        </section>
+        <section id="notes-page" class="secondary-page" hidden>
+          <header class="page-heading"><span class="eyebrow">YOUR OWN WORDS</span><h1>Notes & bookmarks</h1><p>Reflections stay on this device unless you export a backup.</p></header>
+          <label class="notes-search input-wrap"><span data-icon="search"></span><input id="notes-search" type="search" placeholder="Search notes and bookmarks" aria-label="Search notes and bookmarks"></label>
+          <section class="page-card"><h2>Reflections</h2><div id="notes-list" class="saved-items"></div></section>
+          <section class="page-card"><h2>Bookmarks</h2><div id="bookmarks-list" class="saved-items"></div></section>
+        </section>
+        <section id="weekly-page" class="secondary-page" hidden>
+          <header class="page-heading"><span class="eyebrow">A GENTLE CHECK-IN</span><h1>This week</h1><p id="weekly-days-read"></p></header>
+          <section class="page-card"><h2>Last seven days</h2><div id="week-bars" class="week-bars"></div><p id="week-comparison"></p><p id="week-modes" class="muted-copy"></p><p id="week-notes" class="muted-copy"></p><p id="weekly-target-suggestion" class="muted-copy"></p></section>
+          <section class="page-card"><h2>Recent weeks</h2><div id="heatmap" class="heatmap" aria-label="Ruku completions over the last twelve weeks"></div></section>
+          <section class="page-card"><h2>Lifetime totals</h2><div id="lifetime-totals" class="lifetime-totals"></div><p id="lifetime-modes" class="muted-copy"></p></section>
+        </section>
+        <section id="plan-page" class="secondary-page" hidden>
+          <header class="page-heading"><span class="eyebrow">OPTIONAL FLOW READING</span><h1>Weekly khatam plan</h1><p>Plan a faster reading week separately from your deep-reading target.</p></header>
+          <section class="page-card"><label>Start date <input id="plan-start-date" type="date"></label><button id="generate-plan" class="primary-button" type="button">Build a seven-day plan</button><div id="plan-output" class="plan-output"></div></section>
+        </section>
+        <section id="settings-page" class="secondary-page" hidden>
+          <header class="page-heading"><span class="eyebrow">MAKE IT YOURS</span><h1>Settings</h1><p>Choose a pace and a reading setup that feels sustainable.</p></header>
+          <section class="page-card settings-grid">
+            <label>Daily target <span class="setting-control"><input id="daily-target" type="number" min="1" max="10"> rukus</span></label>
+            <label>Day starts at <select id="day-boundary"></select></label>
+            <label>Translation typeface <select id="translation-font"><option value="serif">Serif</option><option value="sans">Sans serif</option></select></label>
+            <label>Arabic typeface <select id="arabic-font"><option value="naskh">Naskh</option><option value="serif">Serif</option><option value="sans">Sans serif</option></select></label>
+            <label>Arabic text size <input id="arabic-size" type="range" min="26" max="54" step="1"></label>
+            <label>Ruku context <select id="ruku-summary-setting"><option value="auto">Show when a sourced summary is available</option><option value="always">Always show available summaries</option><option value="never">Hide summaries</option></select></label>
+            <label class="setting-check"><input id="kahf-friday-setting" type="checkbox"> Suggest Al-Kahf on Fridays</label>
+            <label class="setting-check"><input id="weekly-plan-setting" type="checkbox"> Show the weekly khatam plan</label>
+            <label class="setting-check"><input id="focus-mode-setting" type="checkbox"> Focus mode</label>
+            <label class="setting-check"><input id="resume-setting" type="checkbox"> Open at the next unread verse</label>
+            <label class="setting-check"><input id="reminders-setting" type="checkbox"> Browser reminders at my anchors</label>
+          </section>
+          <section class="page-card"><div class="card-heading-row"><div><h2>Reading anchors</h2><p>Times are manual and follow your device’s local time.</p></div><button id="add-anchor" type="button" class="secondary-button">Add anchor</button></div><div id="anchor-editor" class="anchor-editor"></div><p class="muted-copy">Browser reminders only fire while the browser is running.</p></section>
+          <section class="page-card"><h2>Backup and portability</h2><p>Export includes reading position, progress, settings, notes, bookmarks, and activity.</p><div class="backup-actions"><button id="export-backup" type="button" class="secondary-button">Export backup</button><button id="import-backup" type="button" class="secondary-button">Import backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div><p id="backup-reminder" class="muted-copy"></p></section>
+          <section class="page-card"><h2>Optional recitation reference</h2><p id="audio-source-status">A one-verse recording is available on request. It never plays automatically and stops after the selected verse.</p><p>Source: Mishary Rashid Alafasy, 128 kbps, streamed by <a href="https://alquran.cloud/terms-and-conditions" target="_blank" rel="noreferrer">Al Quran Cloud</a>. Its terms permit streaming for personal and educational use.</p><label class="setting-check"><input id="listen-echo-setting" type="checkbox"> Show “Hear one verse” beside the ayah</label></section>
+        </section>
       </main>
+      <div id="minimal-menu" class="minimal-menu" hidden role="dialog" aria-label="Reading menu"><button type="button" data-page="reader">Return to reading</button><button type="button" data-page="settings">Settings</button><button id="minimal-bookmark" type="button">Bookmark this verse</button><button id="focus-mode-exit" type="button">Exit focus mode</button></div>
+      <audio id="verse-audio" preload="none" hidden></audio>
     </div>
     <noscript><div class="noscript">Please enable JavaScript to load the local translations and use the reader.</div></noscript>
     <script src="quran-data.js"></script>

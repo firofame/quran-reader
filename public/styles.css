@@ -1,9 +1,9 @@
 /* ─── Palette ──────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
-  --page: #f5f4ef;
-  --sidebar: #edece5;
-  --paper: #fdfcf8;
+  --page: #f3f1e9;
+  --sidebar: #eceae2;
+  --paper: #f8f6ef;
   --ink: #1e2e26;
   --text: #3a4240;
   --muted: #8a8e84;
@@ -11,8 +11,9 @@
   --green: #2e6e4e;
   --green-soft: #e6efe8;
   --gold: #b59a5e;
-  --hover: #f0efea;
+  --hover: #eeede6;
   --reading-size: 21px;
+  --reading-serif: Georgia, "Times New Roman", serif;
   --topbar-height: 54px;
   --reader-gutter: 20px;
   --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
@@ -181,7 +182,7 @@ select option { background: var(--paper); color: var(--text); }
 .verse-number { color: var(--gold); font-size: 10px; text-decoration: none; font-variant-numeric: tabular-nums; padding: 0; text-align: left; line-height: 1.8; white-space: nowrap; font-weight: 500; }
 .verse-number:hover { color: var(--green); }
 .verse-body { min-width: 0; }
-.verse-body > p { margin: 0; font-family: var(--serif); font-size: var(--reading-size); line-height: 1.9; letter-spacing: .01em; text-align: start; overflow-wrap: anywhere; }
+.verse-body > p { margin: 0; color: var(--text); font-family: var(--reading-serif); font-size: var(--reading-size); font-weight: 400; line-height: 1.7; letter-spacing: .005em; text-align: start; overflow-wrap: anywhere; }
 .verse-body > p + p { margin-block-start: 28px; }
 .verse-audio-action { display: flex; align-items: center; }
 .verse-audio-action button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; color: var(--muted); }
@@ -194,7 +195,7 @@ select option { background: var(--paper); color: var(--text); }
 .focused .verse-reference { align-self: center; }
 .focused .verse-number { padding: 0; font-size: 11px; color: var(--muted); }
 .focused .verse-body { width: 100%; max-width: 680px; margin-inline: auto; animation: ayah-arrive .2s ease-out; }
-.focused .verse-body > p { font-size: calc(var(--reading-size) + 1px); line-height: 1.85; }
+.focused .verse-body > p { font-size: var(--reading-size); }
 @keyframes ayah-arrive { from { opacity: .6; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
 .ayah-nav-position { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; align-self: center; }
@@ -214,9 +215,6 @@ select option { background: var(--paper); color: var(--text); }
 .surah-progress::-moz-progress-bar { background: var(--green); }
 .ruku-summary { margin: 0 40px; padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.6; }
 .ruku-summary summary { cursor: pointer; color: var(--green); font-weight: 500; }
-
-/* ─── Translation typeface ──────────────────────────────────────── */
-:root[data-translation-font="sans"] .verse-body > p { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
 /* ─── Pagination ───────────────────────────────────────────────── */
 .chapter-pagination { display: flex; flex-shrink: 0; justify-content: space-between; border-top: 1px solid var(--line); margin: 0 40px; padding: 18px 0; gap: 16px; }

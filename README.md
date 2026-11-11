@@ -52,10 +52,9 @@ without a Cloudflare account.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes in Settings. A small
   play/pause icon sits beside each ayah reference for recitation.
-- Read in a centered column no wider than 680px, with start-aligned translation
-  text, normal letter spacing, and 26px between paragraphs. Default English text
-  is 22px with 1.8 line height, or 20px on phones up to 430px wide.
-  Text-size controls still apply.
+- Read in a centered column no wider than 680px, set in Georgia at 21px with
+  1.7 line height, regular weight, and subtle letter spacing. The warm paper tone
+  reduces glare; phones up to 430px use 20px text. Text-size controls still apply.
 - Long translations (500 or more characters) are grouped at locale-aware
   sentence boundaries, aiming for about 300 characters per paragraph. Quoted
   passages and individual sentences can exceed that target rather than being

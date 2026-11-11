@@ -122,18 +122,17 @@ main:focus { outline: none; }
 .reader { display: flex; flex-direction: column; min-height: calc(100svh - var(--topbar-height) - 2 * var(--reader-gutter)); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); }
 .reader-header { position: relative; flex-shrink: 0; border-bottom: 1px solid var(--line); }
 
-/* Reading controls, shown on the Settings page */
-.reading-options { display: flex; flex-direction: column; }
-.reading-toolbar { display: flex; align-items: center; justify-content: flex-start; gap: 16px; }
-.reading-option-label { color: var(--text); font-size: 10px; }
+/* Subtle text-size controls at the foot of the reading area */
+.reader-font-control { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 0 40px; padding: 0 0 8px; color: var(--muted); }
+.reader-font-control .reading-option-label { color: var(--muted); font-size: 9px; }
 select option { background: var(--paper); color: var(--text); }
 
-.font-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.font-controls button { color: var(--muted); font-family: Georgia, serif; font-size: 17px; min-width: 34px; min-height: 34px; padding: 6px 4px; border-radius: 6px; }
-.font-controls button:last-child { font-size: 20px; }
+.font-controls { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.font-controls button { color: var(--muted); font-family: Georgia, serif; font-size: 15px; min-width: 30px; min-height: 30px; padding: 4px; border-radius: 6px; }
+.font-controls button:last-child { font-size: 18px; }
 .font-controls button span { font: 10px -apple-system, BlinkMacSystemFont, sans-serif; margin-left: 1px; vertical-align: top; }
 .font-controls button:hover:not(:disabled) { color: var(--green); background: var(--green-soft); }
-.control-divider { height: 16px; width: 1px; background: var(--line); }
+.control-divider { height: 14px; width: 1px; background: var(--line); }
 
 /* Chapter heading */
 .chapter-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 14px 28px; }
@@ -231,7 +230,7 @@ select option { background: var(--paper); color: var(--text); }
 .reader-footer .metadata-credit { font-size: 8px; opacity: .85; }
 
 /* ─── Reading history ──────────────────────────────────────────── */
-.reading-history-block { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.reading-history-block { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .reading-history-block p { flex: 1 1 220px; margin: 0; }
 
 /* ─── Empty & loading states ───────────────────────────────────── */
@@ -302,7 +301,7 @@ select option { background: var(--paper); color: var(--text); }
   .topbar { padding: 0 24px; }
   main { padding-left: 20px; padding-right: 20px; }
   .notice { left: calc(50% + 125px); }
-  .reading-toolbar { gap: 12px; }
+  .reader-font-control { margin-inline: 24px; }
   #reading-content { padding-left: 24px; padding-right: 24px; }
   .verse { column-gap: 12px; }
   .chapter-pagination { margin-left: 24px; margin-right: 24px; }
@@ -340,7 +339,6 @@ select option { background: var(--paper); color: var(--text); }
 /* ─── Responsive: small phone ──────────────────────────────────── */
 @media (max-width: 430px) {
   .topbar { padding: 0 12px; }
-  .reading-toolbar { gap: 8px; }
   .font-controls { gap: 4px; }
   .font-controls button { padding-left: 2px; padding-right: 2px; }
   .chapter-heading { flex-direction: column; gap: 6px; padding: 14px 16px; }
@@ -353,6 +351,7 @@ select option { background: var(--paper); color: var(--text); }
   .focused .verse { padding: 30px 8px; }
   .focused .verse-body > p { font-size: calc(var(--reading-size) - 1px); }
   .chapter-pagination { margin: 0 16px; gap: 8px; padding: 14px 0; }
+  .reader-font-control { margin-inline: 16px; }
   .pagination-button { gap: 7px; }
   .pagination-button strong { font-size: 15px; }
   .reader-footer { padding: 18px 20px 24px; }

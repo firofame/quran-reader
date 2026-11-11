@@ -10,7 +10,6 @@ import {
 	getResumePosition,
 	getRukuIndex,
 	getTodayStats,
-	getWeeklySummary,
 	normalizeReadingData,
 	READER_SCHEMA_VERSION,
 	recordRukuCompletion,
@@ -80,22 +79,11 @@ describe("reading history", () => {
 		expect(getTodayStats(reading, first).completed).toBe(1);
 	});
 
-	it("counts reading days and current and previous week totals in the weekly summary", () => {
-		let reading = createDefaultReadingData();
-		const rukus = getRukuIndex(data, chapters);
-		reading = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 8));
-		reading = recordRukuCompletion(reading, rukus[1], new Date(2026, 10, 10, 9));
-		const summary = getWeeklySummary(reading, new Date(2026, 10, 10, 12));
-		expect(summary.thisWeekRukus).toBe(2);
-		expect(summary.readDays).toBe(1);
-		expect(summary.previousWeekRukus).toBe(0);
-	});
-
 	it("folds the retired light day, deep, and flow names away when migrating", () => {
 		const migrated = normalizeReadingData(
 			{
 				version: 5,
-				settings: { dailyTarget: 3, dayModes: { "2026-11-10": "light" }, weeklyPlanEnabled: false },
+				settings: { dailyTarget: 3, dayModes: { "2026-11-10": "light" } },
 				sessions: [
 					{ date: "2026-11-10", rukuId: 1, mode: "light", completedAt: 1 },
 					{ date: "2026-11-10", rukuId: 2, mode: "deep", completedAt: 2 },
@@ -114,7 +102,6 @@ describe("reading history", () => {
 		);
 		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.settings.dayModes).toBeUndefined();
-		expect(migrated.settings.weeklyPlanEnabled).toBeUndefined();
 		expect(migrated.sessions.map(session => session.rukuId)).toEqual([1, 2, 3]);
 		expect(migrated.sessions.every(session => !Object.hasOwn(session, "mode"))).toBe(true);
 		expect(Object.hasOwn(migrated.activityByDay["2026-11-10"], "modeCounts")).toBe(false);
@@ -237,7 +224,7 @@ describe("backfill", () => {
 		expect(updated.verseReadKeys).not.toContain("2:243");
 	});
 
-	it("leaves the daily and weekly history untouched", () => {
+	it("leaves day activity and sessions untouched", () => {
 		const reading = createDefaultReadingData();
 		const updated = recordRukusAsRead(reading, 33, rukus);
 

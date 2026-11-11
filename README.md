@@ -11,7 +11,7 @@ translation.
   sajdas.
 - Resume the saved ayah and see overall and daily ruku progress. Reading
   progress, settings, and recent activity stay in this browser by default.
-- Weekly review, manual reading anchors, and optional browser reminders.
+- Daily progress review, manual reading anchors, and optional browser reminders.
 - Optional one-ayah recitation is off by default and only plays after a direct
   click. The reader never starts audio automatically.
 - Installable PWA with an offline cache for the reader and the translation.
@@ -67,7 +67,7 @@ without a Cloudflare account.
   storage. Nothing is sent to a server.
 - If you have already read further on another device, **Mark earlier rukus as
   read** in Settings catches up the overall progress and the lifetime
-  totals on this device. The daily and weekly history is left unchanged,
+  totals on this device. Daily activity is left unchanged,
   because the days are not known.
 - Reopening the app opens the next unread ayah, so a new sitting starts with
   nothing to click. An ayah that has not been read yet is reopened exactly as

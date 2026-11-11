@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getRecentDayKeys, getRukuIndex, getSurahRukuProgress, getTodayStats, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DEFAULT_RUKU_COUNT, findRuku, getDayKey, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -503,7 +503,7 @@ function renderRukuSummary() {
 function showPage(page) {
   activePage = page;
   $("reader-page").hidden = page !== "reader";
-  for (const id of ["weekly", "settings"]) $(`${id}-page`).hidden = page !== id;
+  $("settings-page").hidden = page !== "settings";
   document.querySelectorAll("[data-page]").forEach(button => {
     if (button.closest("#app-navigation")) {
       if (button.dataset.page === page) button.setAttribute("aria-current", "page");
@@ -511,58 +511,13 @@ function showPage(page) {
     }
   });
   $("minimal-menu").hidden = true;
-  if (page === "weekly") renderWeekly();
   if (page === "settings") renderSettings();
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function renderAllPages() {
   renderProgressSummary();
-  if (activePage === "weekly") renderWeekly();
   if (activePage === "settings") renderSettings();
-}
-
-function renderWeekly() {
-  const summary = getWeeklySummary(state.readingData);
-  $("weekly-days-read").textContent = `Days read this week: ${summary.readDays} / 7 · ${summary.thisWeekRukus} rukus completed`;
-  const max = Math.max(1, ...summary.days.map(day => day.activity?.rukuCompletions ?? 0));
-  const bars = $("week-bars");
-  bars.replaceChildren();
-  for (const day of summary.days) {
-    const count = day.activity?.rukuCompletions ?? 0;
-    const row = document.createElement("div");
-    row.className = "week-bar-row";
-    const label = document.createElement("span");
-    label.textContent = formatDateKey(day.date, { weekday: "short" });
-    const track = document.createElement("span");
-    track.className = "week-bar-track";
-    const fill = document.createElement("span");
-    fill.className = "week-bar-fill";
-    fill.style.width = `${count / max * 100}%`;
-    track.append(fill);
-    const value = document.createElement("span");
-    value.textContent = String(count);
-    row.append(label, track, value);
-    bars.append(row);
-  }
-  $("week-comparison").textContent = `This week: ${summary.thisWeekRukus} rukus · Previous week: ${summary.previousWeekRukus} rukus.`;
-  const suggestedTarget = summary.readDays
-    ? Math.max(1, Math.min(10, Math.round(summary.thisWeekRukus / summary.readDays)))
-    : state.readingData.settings.dailyTarget;
-  $("weekly-target-suggestion").textContent = `For next week, you could try ${suggestedTarget} rukus per day, or keep the target that feels right in Settings.`;
-  const days = getRecentDayKeys(new Date(), state.readingData.settings.dayBoundaryHour, 84);
-  const heatmap = $("heatmap");
-  heatmap.replaceChildren();
-  for (const day of days) {
-    const count = state.readingData.activityByDay[day]?.rukuCompletions ?? 0;
-    const dot = document.createElement("span");
-    dot.className = `heatmap-day heat-${Math.min(4, count)}`;
-    dot.title = `${formatDateKey(day)} · ${count} rukus`;
-    dot.setAttribute("aria-label", dot.title);
-    heatmap.append(dot);
-  }
-  const totals = state.readingData.totals;
-  $("lifetime-totals").innerHTML = `<span><strong>${totals.rukuRead}</strong> rukus read</span><span><strong>${totals.verseRead}</strong> verses read</span><span><strong>${totals.readingDays}</strong> reading days</span>`;
 }
 
 function completeCurrentRuku(ruku) {
@@ -830,7 +785,7 @@ function initializeFeatureInteractions() {
     const pending = pendingEarlierRukus();
     if (!currentRuku || pending === 0) return;
     const plural = pending === 1 ? "ruku" : "rukus";
-    if (!confirm(`Mark ${pending} earlier ${plural} as read? The overall progress and the lifetime totals catch up. The daily and weekly history stays unchanged.`)) return;
+    if (!confirm(`Mark ${pending} earlier ${plural} as read? The overall progress and the lifetime totals catch up. Daily activity stays unchanged.`)) return;
     const updated = recordRukusAsRead(state.readingData, currentRuku.id, rukus);
     updateReadingData(() => updated);
     renderHeading();

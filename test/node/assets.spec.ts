@@ -63,7 +63,7 @@ describe("published assets", () => {
 
 	it("keeps the reading controls on the Settings page, not on the reader", async () => {
 		const html = await readPublicFile("index.html");
-		const readerPage = html.slice(html.indexOf('id="reader-page"'), html.indexOf('id="weekly-page"'));
+		const readerPage = html.slice(html.indexOf('id="reader-page"'), html.indexOf('id="settings-page"'));
 		const settingsPage = html.slice(html.indexOf('id="settings-page"'), html.indexOf("</main>"));
 		// The reader screen carries the chapter heading only.
 		expect(readerPage).not.toMatch(/id="font-(up|down)"/);

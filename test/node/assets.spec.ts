@@ -61,17 +61,17 @@ describe("published assets", () => {
 		}
 	});
 
-	it("keeps the reading controls on the Settings page, not on the reader", async () => {
+	it("keeps text-size controls on the reader and reading history in Settings", async () => {
 		const html = await readPublicFile("index.html");
 		const readerPage = html.slice(html.indexOf('id="reader-page"'), html.indexOf('id="settings-page"'));
 		const settingsPage = html.slice(html.indexOf('id="settings-page"'), html.indexOf("</main>"));
-		// The reader screen carries the chapter heading only.
-		expect(readerPage).not.toMatch(/id="font-(up|down)"/);
+		// Text size can be changed while reading the ayah.
+		expect(readerPage).toMatch(/id="font-up"/);
+		expect(readerPage).toMatch(/id="font-down"/);
 		expect(readerPage).not.toMatch(/id="mark-read-(block|btn)"/);
 		expect(readerPage).not.toMatch(/id="reading-controls"/);
-		// Settings keeps the text-size and catch-up controls.
-		expect(settingsPage).toMatch(/id="font-up"/);
-		expect(settingsPage).toMatch(/id="font-down"/);
+		// Settings keeps the reading-history catch-up control.
+		expect(settingsPage).not.toMatch(/id="font-(up|down)"/);
 		expect(settingsPage).toMatch(/id="mark-read-block"/);
 		expect(settingsPage).toMatch(/id="mark-read-btn"/);
 	});

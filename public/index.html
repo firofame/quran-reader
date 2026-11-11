@@ -55,7 +55,7 @@
           <section id="daily-panel" class="daily-panel" aria-label="Reading progress">
             <div class="daily-panel-main">
               <div class="daily-panel-copy">
-                <span id="today-progress" class="today-progress">Today: 0 / 3</span>
+                <span id="today-progress" class="today-progress">Today: <span id="today-completed">0</span> / <input id="daily-target" class="daily-target-input" type="number" min="1" max="10" inputmode="numeric" aria-label="Daily ruku target" title="Edit daily ruku target"><span id="today-bonus" class="today-bonus"></span></span>
                 <span id="target-reached-label" class="target-reached-label" hidden>Target reached</span>
               </div>
               <div id="ruku-progress-wrap" class="ruku-progress-wrap" hidden>
@@ -91,9 +91,6 @@
         </div>
         <section id="settings-page" class="secondary-page" hidden>
           <header class="page-heading"><span class="eyebrow">MAKE IT YOURS</span><h1>Settings</h1><p>Choose a pace and a reading setup that feels sustainable.</p></header>
-          <section class="page-card settings-grid">
-            <label>Daily target <span class="setting-control"><input id="daily-target" type="number" min="1" max="10"> rukus</span></label>
-          </section>
           <section id="reading-history-card" class="page-card" hidden>
             <h2>Reading history</h2>
             <div id="mark-read-block" class="reading-history-block">

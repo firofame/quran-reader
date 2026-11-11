@@ -465,7 +465,9 @@ function renderPagination(ayah) {
 function renderProgressSummary() {
   const readingData = state.readingData;
   const today = getTodayStats(readingData);
-  $("today-progress").textContent = `Today: ${today.completed} / ${today.target}${today.bonus ? ` · +${today.bonus} bonus` : ""}`;
+  $("today-completed").textContent = today.completed;
+  $("daily-target").value = today.target;
+  $("today-bonus").textContent = today.bonus ? ` · +${today.bonus} bonus` : "";
   $("target-reached-label").hidden = !today.reached;
   $("target-reached-label").textContent = today.bonus ? `Target reached · +${today.bonus} bonus` : "Target reached";
   updateDocumentChrome();
@@ -543,7 +545,6 @@ function completeCurrentRuku(ruku) {
 
 function renderSettings() {
   const settings = state.readingData.settings;
-  $("daily-target").value = settings.dailyTarget;
   $("reminders-setting").checked = settings.remindersEnabled;
   renderAnchorEditor();
   renderMarkReadBlock();

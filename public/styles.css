@@ -216,10 +216,6 @@ select option { background: var(--paper); color: var(--text); }
 .verse-actions { display: flex; gap: 16px; margin-top: 14px; }
 .verse-actions button { min-height: 30px; color: var(--muted); font-size: 9px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 
-.flow-reading { padding-top: 0 !important; }
-.flow-reading .verse { grid-template-columns: 36px minmax(0, 1fr); padding-top: 22px; padding-bottom: 22px; }
-.flow-reading .verse-number { color: var(--muted); }
-
 /* ─── Pagination ───────────────────────────────────────────────── */
 .chapter-pagination { display: flex; flex-shrink: 0; justify-content: space-between; border-top: 1px solid var(--line); margin: 0 40px; padding: 18px 0; gap: 16px; }
 .pagination-button { display: flex; flex: 1; min-width: 0; min-height: 44px; align-items: center; gap: 12px; padding: 8px 0; text-align: left; color: var(--green); font-weight: 500; }
@@ -329,14 +325,6 @@ select option { background: var(--paper); color: var(--text); }
 .lifetime-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .lifetime-totals span { color: var(--muted); font-size: 10px; }
 .lifetime-totals strong { display: block; margin-bottom: 4px; color: var(--ink); font: 400 24px var(--serif); }
-
-/* Khatam plan */
-.plan-output { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
-.plan-day { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); transition: border-color .15s; }
-.plan-day:hover { border-color: var(--green); }
-.plan-day h3 { margin: 0 0 7px; color: var(--ink); font: 400 14px var(--serif); }
-.plan-day p { margin: 0 0 8px; color: var(--muted); font-size: 10px; }
-.plan-pace-note { grid-column: 1 / -1; margin: 0 0 5px; }
 
 /* Settings */
 .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 22px; }
@@ -455,7 +443,6 @@ body.focus-mode .minimal-menu[hidden] { display: none; }
   .manzil-row { grid-template-columns: 65px 1fr; }
   .manzil-row progress { grid-column: 1 / -1; }
   .settings-grid { grid-template-columns: 1fr; }
-  .plan-output { grid-template-columns: 1fr; }
   .lifetime-totals { grid-template-columns: 1fr; }
   .anchor-editor-row { grid-template-columns: 1fr 100px 45px; }
 }

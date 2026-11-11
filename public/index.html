@@ -39,7 +39,6 @@
           <button type="button" data-page="journey">Journey</button>
           <button type="button" data-page="notes">Notes</button>
           <button type="button" data-page="weekly">Week</button>
-          <button type="button" data-page="plan">Khatam plan</button>
           <button type="button" data-page="settings">Settings</button>
         </nav>
         <div class="topbar-right">
@@ -84,7 +83,7 @@
             <div id="ruku-summary-content"></div>
             <small id="ruku-summary-source"></small>
           </details>
-          <div id="reading-content" aria-busy="true" aria-live="polite"></div>
+          <div id="reading-content" class="focused" aria-busy="true" aria-live="polite"></div>
           <section id="ruku-completion" class="ruku-completion" aria-live="polite" hidden>
             <span class="eyebrow">ONE RUKU COMPLETE</span>
             <h2 id="completion-title">Ruku complete</h2>
@@ -120,13 +119,9 @@
         </section>
         <section id="weekly-page" class="secondary-page" hidden>
           <header class="page-heading"><span class="eyebrow">A GENTLE CHECK-IN</span><h1>This week</h1><p id="weekly-days-read"></p></header>
-          <section class="page-card"><h2>Last seven days</h2><div id="week-bars" class="week-bars"></div><p id="week-comparison"></p><p id="week-modes" class="muted-copy"></p><p id="week-notes" class="muted-copy"></p><p id="weekly-target-suggestion" class="muted-copy"></p></section>
+          <section class="page-card"><h2>Last seven days</h2><div id="week-bars" class="week-bars"></div><p id="week-comparison"></p><p id="week-notes" class="muted-copy"></p><p id="weekly-target-suggestion" class="muted-copy"></p></section>
           <section class="page-card"><h2>Recent weeks</h2><div id="heatmap" class="heatmap" aria-label="Ruku completions over the last twelve weeks"></div></section>
-          <section class="page-card"><h2>Lifetime totals</h2><div id="lifetime-totals" class="lifetime-totals"></div><p id="lifetime-modes" class="muted-copy"></p></section>
-        </section>
-        <section id="plan-page" class="secondary-page" hidden>
-          <header class="page-heading"><span class="eyebrow">OPTIONAL FLOW READING</span><h1>Weekly khatam plan</h1><p>Plan a faster reading week separately from your deep-reading target.</p></header>
-          <section class="page-card"><label>Start date <input id="plan-start-date" type="date"></label><button id="generate-plan" class="primary-button" type="button">Build a seven-day plan</button><div id="plan-output" class="plan-output"></div></section>
+          <section class="page-card"><h2>Lifetime totals</h2><div id="lifetime-totals" class="lifetime-totals"></div></section>
         </section>
         <section id="settings-page" class="secondary-page" hidden>
           <header class="page-heading"><span class="eyebrow">MAKE IT YOURS</span><h1>Settings</h1><p>Choose a pace and a reading setup that feels sustainable.</p></header>
@@ -136,7 +131,6 @@
             <label>Translation typeface <select id="translation-font"><option value="serif">Serif</option><option value="sans">Sans serif</option></select></label>
             <label>Ruku context <select id="ruku-summary-setting"><option value="auto">Show when a sourced summary is available</option><option value="always">Always show available summaries</option><option value="never">Hide summaries</option></select></label>
             <label class="setting-check"><input id="kahf-friday-setting" type="checkbox"> Suggest Al-Kahf on Fridays</label>
-            <label class="setting-check"><input id="weekly-plan-setting" type="checkbox"> Show the weekly khatam plan</label>
             <label class="setting-check"><input id="focus-mode-setting" type="checkbox"> Focus mode</label>
             <label class="setting-check"><input id="resume-setting" type="checkbox"> Open at the next unread verse</label>
             <label class="setting-check"><input id="reminders-setting" type="checkbox"> Browser reminders at my anchors</label>

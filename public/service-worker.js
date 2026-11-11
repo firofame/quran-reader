@@ -1,4 +1,4 @@
-const CACHE_NAME = "quran-reader-static-v3";
+const CACHE_NAME = "quran-reader-static-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -11,9 +11,7 @@ const ASSETS = [
   "./translation-repository.js",
   "./sync-client.js",
   "./quran-data.js",
-  "./ar.uthmani.txt",
   "./en.sahih.txt",
-  "./ml.abdulhameed.txt",
   "./favicon.svg",
   "./manifest.webmanifest",
   "./icon-192.png",

@@ -1,4 +1,4 @@
-export const READER_SCHEMA_VERSION = 4;
+export const READER_SCHEMA_VERSION = 5;
 export const DEFAULT_RUKU_COUNT = 556;
 
 const MODES = new Set(["deep", "light", "flow"]);
@@ -23,8 +23,6 @@ export function createDefaultReadingData() {
       remindersEnabled: false,
       focusMode: false,
       translationFont: "serif",
-      arabicFont: "naskh",
-      arabicSize: 38,
       rukuSummary: "auto",
       kahfFridayEnabled: true,
       weeklyPlanEnabled: true,
@@ -162,8 +160,6 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
       remindersEnabled: Boolean(settings.remindersEnabled),
       focusMode: Boolean(settings.focusMode),
       translationFont: ["serif", "sans"].includes(settings.translationFont) ? settings.translationFont : defaults.settings.translationFont,
-      arabicFont: ["naskh", "serif", "sans"].includes(settings.arabicFont) ? settings.arabicFont : defaults.settings.arabicFont,
-      arabicSize: boundedInteger(settings.arabicSize, defaults.settings.arabicSize, 26, 54),
       rukuSummary: ["auto", "always", "never"].includes(settings.rukuSummary) ? settings.rukuSummary : defaults.settings.rukuSummary,
       kahfFridayEnabled: settings.kahfFridayEnabled !== false,
       weeklyPlanEnabled: settings.weeklyPlanEnabled !== false,

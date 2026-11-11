@@ -14,6 +14,7 @@ import {
 	getTodayStats,
 	getWeeklySummary,
 	normalizeReadingData,
+	READER_SCHEMA_VERSION,
 	recordRukuCompletion,
 	recordRukusAsRead,
 	recordVerseVisit,
@@ -150,7 +151,7 @@ describe("reading history", () => {
 			},
 			chapters,
 		);
-		expect(migrated.version).toBe(4);
+		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.completedRukuIds).toEqual([1]);
 		expect(migrated.bookmarks).toEqual([]);
 		expect(migrated.notes[0].text).toBe("Reflection");
@@ -178,7 +179,7 @@ describe("reading history", () => {
 			},
 			chapters,
 		);
-		expect(migrated.version).toBe(4);
+		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.verseReadKeys).toEqual(["1:1", "1:2"]);
 		expect(migrated.activityByDay["2026-11-10"].rukuCompletions).toBe(1);
 		expect(Object.hasOwn(migrated.activityByDay["2026-11-10"], "verseKeys")).toBe(false);
@@ -297,13 +298,11 @@ describe("backfill", () => {
 	});
 });
 
-describe("bundled Arabic text", () => {
+describe("bundled English text", () => {
 	it("parses as 6,236 unchanged verse rows", async () => {
-		const source = await readFile(fileURLToPath(new URL("../../public/ar.uthmani.txt", import.meta.url).href), "utf8");
+		const source = await readFile(fileURLToPath(new URL("../../public/en.sahih.txt", import.meta.url).href), "utf8");
 		const parsed = parseTranslation(source, chapters);
 		expect(parsed.flat().length).toBe(6236);
-		expect(parsed[1][0].text).toMatch(/^بِسْمِ/);
-		expect(source).toMatch(/Tanzil Quran Text \(Uthmani, Version 1\.1\)/);
-		expect(source).toMatch(/CHANGING IT IS NOT ALLOWED/);
+		expect(parsed[0][0].text).toMatch(/^In the name of Allah/);
 	});
 });

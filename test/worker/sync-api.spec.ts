@@ -213,6 +213,8 @@ describe("sync Durable Object", () => {
 		expect(older.verse).toBe(255);
 		expect(older.updatedAt).toBe(1000);
 
+		// The server stores the translation identifier it is given, so a device
+		// running an older reader still syncs without losing its position.
 		const newer = await readJson(await 
 			await stub.fetch(
 				new Request("https://internal/sync", {

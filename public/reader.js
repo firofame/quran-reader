@@ -2,11 +2,6 @@ import { READER_SCHEMA_VERSION, normalizeReadingData } from "./reading-data.js";
 
 export const TRANSLATIONS = {
   "en.sahih": { name: "Saheeh International", language: "en", file: "en.sahih.txt" },
-  "ml.abdulhameed": {
-    name: "Cheriyamundam Abdul Hameed & Kunhi Mohammed Parappoor",
-    language: "ml",
-    file: "ml.abdulhameed.txt",
-  },
 };
 
 export function createChapters(rows) {
@@ -14,7 +9,6 @@ export function createChapters(rows) {
     id: index + 1,
     start: row[0],
     verses: row[1],
-    arabic: row[4],
     name: row[5],
     meaning: row[6],
     origin: row[7],
@@ -144,7 +138,7 @@ export function adjacentPosition(position, direction, chapters) {
 }
 
 export function matchesChapter(chapter, query) {
-  const haystack = `${chapter.id} ${chapter.name} ${chapter.meaning} ${chapter.arabic}`;
+  const haystack = `${chapter.id} ${chapter.name} ${chapter.meaning}`;
   return normalizeSearch(haystack).includes(normalizeSearch(query.trim()));
 }
 

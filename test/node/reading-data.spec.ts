@@ -7,7 +7,6 @@ import {
 	createDefaultReadingData,
 	findRuku,
 	getDayKey,
-	getResumePosition,
 	getRukuIndex,
 	getTodayStats,
 	normalizeReadingData,
@@ -112,7 +111,12 @@ describe("reading history", () => {
 			{
 				version: 1,
 				completedRukuIds: [1, 1, 999],
-				settings: { dailyTarget: 50, dayBoundaryHour: 22, anchors: [{ id: "fajr", name: "After Fajr", time: "05:10" }] },
+				settings: {
+					dailyTarget: 50,
+					dayBoundaryHour: 22,
+					resumeAtNextUnread: false,
+					anchors: [{ id: "fajr", name: "After Fajr", time: "05:10" }],
+				},
 			},
 			chapters,
 		);
@@ -121,7 +125,7 @@ describe("reading history", () => {
 		expect(migrated.settings.dailyTarget).toBe(10);
 		expect(migrated.settings.dayBoundaryHour).toBeUndefined();
 		expect(migrated.settings.anchors[0].name).toBe("After Fajr");
-		expect(migrated.settings.resumeAtNextUnread).toBe(true);
+		expect(Object.hasOwn(migrated.settings, "resumeAtNextUnread")).toBe(false);
 	});
 
 	it("migrates version 2 activity without dropping overall verse progress", () => {
@@ -150,62 +154,13 @@ describe("reading history", () => {
 	});
 });
 
-describe("resume position", () => {
-	it("opens the next unread verse and never rewinds to an unread stop", () => {
-		let reading = createDefaultReadingData();
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, new Date(2026, 10, 10, 8));
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 2 }, new Date(2026, 10, 10, 8, 1));
-
-		expect(getResumePosition({ chapter: 1, verse: 2 }, reading, chapters, rukus)).toEqual({ chapter: 1, verse: 3 });
-		expect(getResumePosition({ chapter: 1, verse: 1 }, reading, chapters, rukus)).toEqual({ chapter: 1, verse: 3 });
-		expect(getResumePosition({ chapter: 2, verse: 1 }, reading, chapters, rukus)).toEqual({ chapter: 2, verse: 1 });
-
-		const finished = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 8, 2));
-		expect(getResumePosition({ chapter: 1, verse: 7 }, finished, chapters, rukus)).toEqual({ chapter: 2, verse: 1 });
-	});
-
-	it("stays inside the ruku when later verses are still unread", () => {
-		let reading = createDefaultReadingData();
-		reading = recordVerseVisit(reading, { chapter: 2, verse: 142 }, new Date(2026, 10, 10, 8));
-		const resumed = getResumePosition({ chapter: 2, verse: 142 }, reading, chapters, rukus);
-		expect(resumed).toEqual({ chapter: 2, verse: 143 });
-		expect(findRuku(resumed, rukus).id).toBe(findRuku({ chapter: 2, verse: 142 }, rukus).id);
-	});
-
-	it("follows an explicit link, resumes past a read verse and honours the setting", () => {
-		let reading = createDefaultReadingData();
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, new Date(2026, 10, 10, 8));
+describe("startup position", () => {
+	it("restores the saved verse unless an explicit verse link is present", () => {
 		const saved = { chapter: 1, verse: 1 };
-
-		const linked = resolveStartupPosition({
-			hashPosition: { chapter: 2, verse: 5 },
-			savedPosition: saved,
-			readingData: reading,
-			chapters,
-			rukus,
-		});
-		expect(linked).toEqual({ position: { chapter: 2, verse: 5 }, source: "link" });
-
-		const ownUrl = resolveStartupPosition({ hashPosition: saved, savedPosition: saved, readingData: reading, chapters, rukus });
-		expect(ownUrl).toEqual({ position: { chapter: 1, verse: 2 }, source: "resume" });
-
-		const unread = resolveStartupPosition({
-			hashPosition: { chapter: 1, verse: 9 },
-			savedPosition: { chapter: 1, verse: 9 },
-			readingData: reading,
-			chapters,
-			rukus,
-		});
-		expect(unread).toEqual({ position: { chapter: 1, verse: 9 }, source: "saved" });
-
-		const optedOut = resolveStartupPosition({
-			hashPosition: saved,
-			savedPosition: saved,
-			readingData: { ...reading, settings: { ...reading.settings, resumeAtNextUnread: false } },
-			chapters,
-			rukus,
-		});
-		expect(optedOut).toEqual({ position: saved, source: "saved" });
+		expect(resolveStartupPosition({ hashPosition: null, savedPosition: saved }))
+			.toEqual({ position: saved, source: "saved" });
+		expect(resolveStartupPosition({ hashPosition: { chapter: 2, verse: 5 }, savedPosition: saved }))
+			.toEqual({ position: { chapter: 2, verse: 5 }, source: "link" });
 	});
 });
 

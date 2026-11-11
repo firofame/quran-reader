@@ -366,19 +366,6 @@ export function getSurahRukuProgress(chapterId, readingData, rukus) {
   return { completed, total: surahRukus.length };
 }
 
-export function getRecentPace(readingData, date = new Date(), windowDays = 14) {
-  const days = getRecentDayKeys(date, readingData.settings.dayBoundaryHour, windowDays);
-  const counts = days.map(day => readingData.activityByDay[day]?.rukuCompletions ?? 0);
-  const total = counts.reduce((sum, count) => sum + count, 0);
-  const activeDays = counts.filter(count => count > 0).length;
-  return {
-    total,
-    activeDays,
-    activeDayAverage: activeDays ? total / activeDays : 0,
-    calendarDayAverage: total / windowDays,
-  };
-}
-
 export function getWeekKeys(date = new Date(), boundaryHour = 0) {
   const today = getDayKey(date, boundaryHour);
   const [year, month, day] = today.split("-").map(Number);
@@ -399,21 +386,6 @@ export function getWeeklySummary(readingData, date = new Date()) {
     thisWeekRukus: sumWeek(thisWeek),
     previousWeekRukus: sumWeek(previousWeek),
   };
-}
-
-export function getSectionRukus(type, number, data, chapters, rukus) {
-  const markers = data[type === "juz" ? "Juz" : "Manzil"];
-  if (!Array.isArray(markers) || !markers[number]) return [];
-  const [startChapter, startVerse] = markers[number];
-  const next = markers[number + 1];
-  const start = chapters[startChapter - 1].start + startVerse - 1;
-  const end = next && chapters[next[0] - 1]
-    ? chapters[next[0] - 1].start + next[1] - 2
-    : chapters.at(-1).start + chapters.at(-1).verses - 1;
-  return rukus.filter(ruku => {
-    const global = chapters[ruku.chapter - 1].start + ruku.start.verse - 1;
-    return global >= start && global <= end;
-  });
 }
 
 export function formatDateKey(key, options = { month: "short", day: "numeric" }) {

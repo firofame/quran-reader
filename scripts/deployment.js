@@ -2,7 +2,8 @@ import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import { createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "../public/sync-client.js";
+
+const PRODUCTION_URL = "https://quran.firofame.workers.dev";
 
 async function requestJson(fetch, url, options = {}) {
   const response = await fetch(url, {
@@ -84,44 +85,12 @@ export function createCloudflareApi({ accountId, token, fetch = globalThis.fetch
 }
 
 export async function findWorker(api) {
-  for (const name of ["quran", "quran-reader-sync"]) {
-    const worker = await api(`workers/${name}`, { allowNotFound: true });
-    if (worker) {
-      if (worker.name !== name || typeof worker.id !== "string" || !worker.id) {
-        throw new Error("Cloudflare returned an unexpected Worker identity.");
-      }
-      return worker;
-    }
+  const worker = await api("workers/quran", { allowNotFound: true });
+  if (!worker) throw new Error("The Worker does not exist; refusing to create a replacement.");
+  if (worker.name !== "quran" || typeof worker.id !== "string" || !worker.id) {
+    throw new Error("Cloudflare returned an unexpected Worker identity.");
   }
-  throw new Error("Neither the current nor legacy sync Worker exists; refusing to create a replacement.");
-}
-
-export async function readBindings(api, name) {
-  const { deployments } = await api(`scripts/${name}/deployments`);
-  const versions = deployments?.[0]?.versions?.filter(version => version.percentage > 0);
-  if (!versions?.length) throw new Error("The sync Worker has no active deployment.");
-  let expected;
-  for (const { version_id: versionId } of versions) {
-    if (typeof versionId !== "string" || !versionId) throw new Error("Invalid active Worker version.");
-    const version = await api(`scripts/${name}/versions/${encodeURIComponent(versionId)}`);
-    const bindings = version.resources?.bindings?.filter(binding => binding.type === "durable_object_namespace");
-    if (
-      !bindings?.some(binding => binding.name === "SYNC_DO" && binding.class_name === "SyncDurableObject") ||
-      bindings.some(binding => typeof binding.namespace_id !== "string" || !binding.namespace_id)
-    ) {
-      throw new Error("Cannot verify the sync Worker's Durable Object namespace bindings.");
-    }
-    const signature = bindings.map(binding => ({
-      name: binding.name,
-      className: binding.class_name,
-      namespaceId: binding.namespace_id,
-    })).sort((first, second) => first.name.localeCompare(second.name));
-    if (expected && JSON.stringify(expected) !== JSON.stringify(signature)) {
-      throw new Error("Active Worker versions use conflicting Durable Object namespaces.");
-    }
-    expected = signature;
-  }
-  return expected;
+  return worker;
 }
 
 export async function renameWorker(api, worker) {
@@ -139,33 +108,6 @@ export async function verifyWorker(api, snapshot) {
   if (worker.id !== snapshot.workerId || worker.name !== "quran") {
     throw new Error("Production deployment changed the Worker identity.");
   }
-  const bindings = await readBindings(api, "quran");
-  if (JSON.stringify(bindings) !== JSON.stringify(snapshot.bindings)) {
-    throw new Error("Production deployment changed the Durable Object namespace bindings.");
-  }
-}
-
-async function syncRequest(endpoint, key, data, fetch = globalThis.fetch) {
-  return requestJson(fetch, `${endpoint}/api/sync`, {
-    method: data ? "PUT" : "GET",
-    headers: { Authorization: `Bearer ${key}`, "X-Sync-Key": key, "Content-Type": "application/json" },
-    body: data ? JSON.stringify(data) : undefined,
-  });
-}
-
-function assertCanary(actual, expected) {
-  if (!actual || actual.empty === true) throw new Error("Production sync canary returned no reading state.");
-  for (const field of ["chapter", "verse", "translation", "updatedAt"]) {
-    if (actual[field] !== expected[field]) throw new Error("Production sync canary did not preserve its reading state.");
-  }
-}
-
-export async function seedCanary({ endpoint, key, state, fetch = globalThis.fetch }) {
-  if ((await syncRequest(endpoint, key, undefined, fetch)).empty !== true) {
-    throw new Error("The fresh production canary key unexpectedly has existing state.");
-  }
-  // Older Workers require bookmarks; this canary-only field is ignored by the new API.
-  assertCanary(await syncRequest(endpoint, key, { ...state, bookmarks: [] }, fetch), state);
 }
 
 async function main(command) {
@@ -191,28 +133,19 @@ async function main(command) {
     await appendFile(env.GITHUB_OUTPUT, `name=${worker.name}\n`);
     return;
   }
-  const statePath = resolve(env.RUNNER_TEMP, "sync-production-state.json");
+  const statePath = resolve(env.RUNNER_TEMP, "deployment-state.json");
   if (command === "prepare") {
     await authorize();
     const worker = await findWorker(api);
-    const bindings = await readBindings(api, worker.name);
-    const canaryKey = generateSyncKey();
-    console.log(`::add-mask::${canaryKey}`);
-    const endpoint = DEFAULT_SYNC_ENDPOINT.replace("://quran.", `://${worker.name}.`);
-    const canary = { chapter: 2, verse: 255, translation: "en.sahih", updatedAt: Date.now() };
-    await seedCanary({ endpoint, key: canaryKey, state: canary });
     await writeFile(statePath, JSON.stringify({
       workerId: worker.id,
       renamed: worker.name !== "quran",
-      bindings,
-      canaryKey,
-      canary,
       sha: env.DEPLOY_SHA,
     }), { mode: 0o600 });
     await authorize();
     await renameWorker(api, worker);
-    await verifyWorker(api, { workerId: worker.id, bindings });
-    console.log(worker.name === "quran" ? "Same-name edit permission verified; Worker already migrated." : "Worker renamed in place; identity and namespaces preserved.");
+    await verifyWorker(api, { workerId: worker.id });
+    console.log(worker.name === "quran" ? "Same-name edit permission verified." : "Worker renamed in place; identity preserved.");
     return;
   }
   if (command === "verify") {
@@ -221,7 +154,7 @@ async function main(command) {
     await verifyWorker(api, snapshot);
     let healthy = false;
     for (let attempt = 0; attempt < 12; attempt++) {
-      const health = await requestJson(globalThis.fetch, `${DEFAULT_SYNC_ENDPOINT}/health`);
+      const health = await requestJson(globalThis.fetch, `${PRODUCTION_URL}/health`);
       if (health.status === "ok" && health.service === "quran") {
         healthy = true;
         break;
@@ -229,20 +162,9 @@ async function main(command) {
       if (attempt < 11) await delay(5000);
     }
     if (!healthy) throw new Error("Production health did not report the new quran service.");
-    const setup = parseSyncSetupCode(createSyncSetupCode(DEFAULT_SYNC_ENDPOINT, snapshot.canaryKey));
-    if (!setup) throw new Error("Production canary setup code failed to round-trip.");
-    assertCanary(await syncRequest(setup.endpoint, setup.syncKey), snapshot.canary);
-    const nextState = { ...snapshot.canary, verse: 256, updatedAt: Math.max(Date.now(), snapshot.canary.updatedAt + 1) };
-    assertCanary(await syncRequest(setup.endpoint, setup.syncKey, nextState), nextState);
-    assertCanary(await syncRequest(setup.endpoint, setup.syncKey), nextState);
-    const secondKey = generateSyncKey();
-    console.log(`::add-mask::${secondKey}`);
-    if ((await syncRequest(DEFAULT_SYNC_ENDPOINT, secondKey)).empty !== true) {
-      throw new Error("Production sync keys are not isolated.");
-    }
     await appendFile(env.GITHUB_STEP_SUMMARY,
-      `### Production sync Worker verified\n\n- Revision: \`${snapshot.sha}\`\n- URL: ${DEFAULT_SYNC_ENDPOINT}\n- Migration: ${snapshot.renamed ? "renamed in place" : "already named quran; same-name edit verified"}\n- Worker identity and Durable Object namespaces preserved.\n- Health, pre-deployment canary state, new API read/write, and independent-key isolation passed.\n`);
-    console.log("Production health, preserved reading state, and key isolation verified.");
+      `### Production Worker verified\n\n- Revision: \`${snapshot.sha}\`\n- URL: ${PRODUCTION_URL}\n- Migration: ${snapshot.renamed ? "renamed in place" : "already named quran; same-name edit verified"}\n- Worker identity preserved.\n- Health check passed.\n`);
+    console.log("Production identity and health verified.");
     return;
   }
   throw new Error(`Unknown deployment command: ${command}`);

@@ -5,7 +5,7 @@ export default defineConfig({
 	test: {
 		projects: [
 			{
-				// Worker, Durable Object, and static asset tests run inside the Workers runtime.
+				// Worker and static asset tests run inside the Workers runtime.
 				plugins: [
 					cloudflareTest({ wrangler: { configPath: "./wrangler.jsonc" } }),
 				],

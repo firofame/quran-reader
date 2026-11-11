@@ -2,7 +2,6 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { createSyncClient, createSyncSetupCode, DEFAULT_SYNC_ENDPOINT, generateSyncKey, parseSyncSetupCode } from "./sync-client.js";
 import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getModeTotals, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
@@ -15,8 +14,6 @@ const icons = {
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   left: '<path d="m14 6-6 6 6 6M8 12h12"/>',
   right: '<path d="m10 6 6 6-6 6M16 12H4"/>',
-  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
-  refresh: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/>',
 };
 const $ = id => document.getElementById(id);
 const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || ""}</svg>`;
@@ -28,6 +25,8 @@ const preferences = createPreferencesStore({
   getItem: key => globalThis.localStorage.getItem(key),
   setItem: (key, value) => globalThis.localStorage.setItem(key, value),
 }, chapters);
+// Drop configuration left by the former cross-device sync feature.
+try { globalThis.localStorage.removeItem("quran-reader:sync:v1"); } catch {}
 const translations = createTranslationRepository();
 let state;
 let requestId = 0;
@@ -43,53 +42,6 @@ let activeAudioButton = null;
 let audioRequestId = 0;
 let currentAyah = null;
 const repeatCounts = new Map();
-
-const syncClient = createSyncClient({
-  storage: {
-    getItem: key => {
-      try { return globalThis.localStorage.getItem(key); } catch { return null; }
-    },
-    setItem: (key, value) => {
-      try { globalThis.localStorage.setItem(key, value); } catch {}
-    },
-    removeItem: key => {
-      try { globalThis.localStorage.removeItem(key); } catch {}
-    },
-  },
-  onRemoteUpdate(data) {
-    let stateChanged = false;
-    let positionChanged = false;
-    let translationChanged = false;
-
-    if (data.chapter && data.verse && (data.chapter !== state.position.chapter || data.verse !== state.position.verse)) {
-      if (validPosition({ chapter: data.chapter, verse: data.verse }, chapters)) {
-        state = reduceReaderState(state, { type: "position/set", position: { chapter: data.chapter, verse: data.verse } }, chapters);
-        stateChanged = true;
-        positionChanged = true;
-      }
-    }
-    if (data.translation && data.translation !== state.translation && Object.hasOwn(TRANSLATIONS, data.translation)) {
-      state = reduceReaderState(state, { type: "translation/set", translation: data.translation }, chapters);
-      stateChanged = true;
-      translationChanged = true;
-    }
-
-    if (stateChanged) {
-      persist();
-      applyPreferences();
-      history.replaceState(null, "", `#${state.position.chapter}:${state.position.verse}`);
-      loadReading();
-      if (positionChanged) {
-        notify(`Synced with cloud: opened verse ${state.position.chapter}:${state.position.verse}.`);
-      } else if (translationChanged) {
-        notify("Synced with cloud: translation updated.");
-      }
-    }
-  },
-  onStatusChange(statusInfo) {
-    renderSyncUI(statusInfo);
-  },
-});
 
 function notify(message, persistent = false) {
   if (storageFailed && !persistent) {
@@ -253,7 +205,6 @@ function updateDocumentChrome() {
 function dispatch(action) {
   state = reduceReaderState(state, action, chapters);
   persist();
-  syncClient.queuePush(state);
 }
 
 const initialPosition = parseHash(location.hash, chapters);
@@ -1197,7 +1148,6 @@ function savePosition(position) {
   state = reduceReaderState(state, { type: "position/set", position }, chapters);
   history.replaceState(null, "", `#${position.chapter}:${position.verse}`);
   persist();
-  syncClient.queuePush(state);
   updateDocumentChrome();
 }
 
@@ -1343,7 +1293,6 @@ async function importBackup(file) {
     applyPreferences();
     renderProgressSummary();
     renderSettings();
-    syncClient.queuePush(state);
     loadReading({ scroll: true });
     notify("Backup imported. Your position and local reading data are restored.");
   } catch (error) {
@@ -1591,190 +1540,6 @@ window.addEventListener("pagehide", () => {
 });
 matchMedia("(max-width: 760px)").addEventListener("change", closeMenu);
 
-function renderSyncUI(statusInfo = syncClient.getStatus()) {
-  const badge = $("sync-badge");
-  const quickBtn = $("sync-quick-btn");
-  const disconnectBtn = $("sync-disconnect-btn");
-  const message = $("sync-message");
-  const toggleBtn = $("sync-toggle-panel");
-  const details = $("sync-details");
-  const setupCodeOutput = $("sync-code-output");
-  const newForm = $("sync-new-form");
-  const joinForm = $("sync-join-form");
-  const codePanel = $("sync-code-panel");
-  const config = syncClient.getConfig();
-
-  const configured = syncClient.isConfigured();
-  quickBtn.hidden = !configured;
-  disconnectBtn.hidden = !configured;
-  newForm.hidden = configured;
-  joinForm.hidden = configured;
-  codePanel.hidden = !configured;
-  if (document.activeElement !== setupCodeOutput) {
-    setupCodeOutput.value = configured ? createSyncSetupCode(config.endpoint, config.syncKey) : "";
-  }
-  if (details.hidden) toggleBtn.textContent = configured ? "Setup code" : "Set up";
-
-  badge.className = "sync-badge";
-  switch (statusInfo.status) {
-    case "synced":
-      badge.textContent = "Synced";
-      badge.classList.add("is-synced");
-      break;
-    case "syncing":
-      badge.textContent = "Syncing…";
-      badge.classList.add("is-syncing");
-      break;
-    case "error":
-      badge.textContent = "Error";
-      badge.classList.add("is-error");
-      break;
-    case "offline":
-      badge.textContent = "Offline";
-      badge.classList.add("is-offline");
-      break;
-    default:
-      badge.textContent = configured ? "Idle" : "Off";
-      break;
-  }
-
-  message.className = `sync-message${statusInfo.status === "error" ? " is-error" : ""}`;
-  if (statusInfo.message) {
-    message.textContent = statusInfo.message;
-  } else if (configured) {
-    if (statusInfo.lastSyncedAt) {
-      const date = new Date(statusInfo.lastSyncedAt);
-      const timeStr = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      message.textContent = `Last synced at ${timeStr} · Chapter ${state.position.chapter}:${state.position.verse}`;
-    } else {
-      message.textContent = "Connected. Ready to sync with cloud.";
-    }
-  } else {
-    message.textContent = "Sync is off. Choose Start syncing here or join with a setup code from another device.";
-  }
-}
-
-function initSyncUI() {
-  const toggleBtn = $("sync-toggle-panel");
-  const details = $("sync-details");
-  const quickBtn = $("sync-quick-btn");
-  const newForm = $("sync-new-form");
-  const newButton = $("sync-new-btn");
-  const joinForm = $("sync-join-form");
-  const joinButton = $("sync-join-btn");
-  const setupCodeInput = $("sync-code-input");
-  const setupCodeOutput = $("sync-code-output");
-  const copyCodeButton = $("copy-sync-code");
-  const disconnectBtn = $("sync-disconnect-btn");
-
-  toggleBtn.addEventListener("click", () => {
-    const isHidden = details.hidden;
-    details.hidden = !isHidden;
-    toggleBtn.setAttribute("aria-expanded", String(isHidden));
-    toggleBtn.textContent = isHidden ? "Close" : (syncClient.isConfigured() ? "Setup code" : "Set up");
-    if (isHidden && !syncClient.isConfigured()) newButton.focus();
-  });
-
-  const triggerSync = async () => {
-    quickBtn.disabled = true;
-    try {
-      await syncClient.sync(state);
-    } finally {
-      quickBtn.disabled = false;
-    }
-  };
-
-  quickBtn.addEventListener("click", triggerSync);
-
-  newForm.addEventListener("submit", async event => {
-    event.preventDefault();
-    let syncKey;
-    try {
-      syncKey = generateSyncKey();
-    } catch (error) {
-      $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = error.message || "Could not create a secure setup code.";
-      return;
-    }
-
-    newButton.disabled = true;
-    try {
-      syncClient.updateConfig({ endpoint: DEFAULT_SYNC_ENDPOINT, syncKey, autoSync: true });
-      await triggerSync();
-    } catch (error) {
-      $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = error.message;
-    } finally {
-      newButton.disabled = false;
-    }
-  });
-
-  joinForm.addEventListener("submit", async event => {
-    event.preventDefault();
-    const setup = parseSyncSetupCode(setupCodeInput.value);
-    if (!setup) {
-      $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = "That setup code is not valid. Copy it again from your connected device.";
-      setupCodeInput.focus();
-      return;
-    }
-
-    joinButton.disabled = true;
-    setupCodeInput.value = "";
-    try {
-      syncClient.updateConfig({ ...setup, autoSync: true });
-      await triggerSync();
-    } catch (error) {
-      $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = error.message;
-    } finally {
-      joinButton.disabled = false;
-    }
-  });
-
-  copyCodeButton.addEventListener("click", async () => {
-    const setupCode = setupCodeOutput.value;
-    if (!setupCode) return;
-    if (!navigator.clipboard?.writeText) {
-      $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = "Clipboard access is unavailable. Select and copy the setup code manually.";
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(setupCode);
-      $("sync-message").className = "sync-message";
-      $("sync-message").textContent = "Setup code copied. Paste it on each device you want to sync.";
-    } catch {
-      $("sync-message").className = "sync-message is-error";
-      $("sync-message").textContent = "Could not copy the code. Select and copy it manually.";
-    }
-  });
-
-  disconnectBtn.addEventListener("click", () => {
-    syncClient.clearConfig();
-    setupCodeInput.value = "";
-    renderSyncUI();
-    notify("Cloud sync disconnected. Your progress is saved locally.");
-  });
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && syncClient.isConfigured()) {
-      syncClient.sync(state);
-    }
-  });
-
-  window.addEventListener("online", () => {
-    if (syncClient.isConfigured()) {
-      syncClient.sync(state);
-    }
-  });
-
-  renderSyncUI();
-  if (syncClient.isConfigured()) {
-    syncClient.sync(state);
-  }
-}
-
 if (rukus.length !== DEFAULT_RUKU_COUNT) console.warn(`Expected ${DEFAULT_RUKU_COUNT} Tanzil rukus; found ${rukus.length}.`);
 initializeSettingsControls();
 initializeFeatureInteractions();
@@ -1785,5 +1550,4 @@ persist();
 renderProgressSummary();
 renderAllPages();
 loadReading();
-initSyncUI();
 scheduleAnchorReminder();

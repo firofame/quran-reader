@@ -58,14 +58,10 @@ jobs:
           wranglerVersion: "4.160.0"
           command: deploy
 
-      - name: Verify production identity, health, and sync
+      - name: Verify production identity and health
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/deployment.js verify
-
-      - name: Remove private canary credentials from the runner
-        if: always()
-        run: rm -f "$RUNNER_TEMP/sync-production-state.json"
 
   preview:
     if: >-

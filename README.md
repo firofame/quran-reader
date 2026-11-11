@@ -31,9 +31,8 @@ npm install
 npm run dev
 ```
 
-Wrangler serves the reader and the sync API at `http://localhost:8787`. The
-Worker runs locally without a Cloudflare account, and the Durable Object is
-emulated in a local SQLite database.
+Wrangler serves the reader at `http://localhost:8787`. The Worker runs locally
+without a Cloudflare account.
 
 | Command | What it does |
 | --- | --- |
@@ -42,7 +41,7 @@ emulated in a local SQLite database.
 | `npm run check` | Syntax-checks the reader modules and type-checks the Worker. |
 | `npm run typecheck` | Type-checks `src/` and `test/` with the generated Worker types. |
 | `npm run cf-typegen` | Regenerates `worker-configuration.d.ts` after a config change. |
-| `npm run deploy` | Publishes the Worker, its assets, and the Durable Object. |
+| `npm run deploy` | Publishes the Worker and its assets. |
 
 
 ## Reader Features
@@ -69,8 +68,7 @@ emulated in a local SQLite database.
 - A small progress bar beneath the current ayah count tracks the surah. A brief,
   motion-free fade signals a new ayah; reduced-motion preferences disable it.
 - The exact selected ayah and preferences are saved in this browser's local
-  storage by default. Cross-device synchronization is off until you choose to
-  start or join it; see [Cross-Device Sync](#cross-device-sync).
+  storage. Nothing is sent to a server.
 - If you have already read further on another device, **Mark earlier rukus as
   read** in the Controls panel catches up the overall progress and the lifetime
   totals on this device. The daily and weekly history is left unchanged,
@@ -84,12 +82,10 @@ emulated in a local SQLite database.
   `Escape` for the small reading menu.
 
 Translations are loaded from the supplied local file and retained in memory
-while the page is open. A fresh installation makes no cloud requests. After you
-choose **Start syncing** or **Join sync**, the app sends your reading position
-and selected translation identifier to the Quran Reader sync service;
-translation text remains local. Translation wording is unchanged; paragraph
-breaks are added only for display. Optional sentence-by-sentence Focus Reading
-is not implemented: complete ayahs remain visible.
+while the page is open. The app makes no cloud requests for your reading data.
+Translation wording is unchanged; paragraph breaks are added only for display.
+Optional sentence-by-sentence Focus Reading is not implemented: complete ayahs
+remain visible.
 
 ## Reading data and sources
 
@@ -113,59 +109,25 @@ The first service-worker visit needs a connection to cache the static app and
 text. Once installed and cached, reading works offline. Recitation streaming
 requires a connection.
 
-## Cross-Device Sync
-
-Sync is off by default. Nothing is sent to the sync service until you explicitly
-choose **Start syncing** or **Join sync** in the Cross-device sync panel.
-
-After upgrading from an older version, sync configuration without explicit
-consent, or configuration pointing to a different service, is cleared before
-any sync request. Local reading data remains. Set up sync again and rejoin your
-devices with the new setup code.
-
-1. On your first device, open **Controls** → **Cross-device sync** and choose
-   **Start syncing**. The app creates a private key and connects automatically.
-2. Choose **Copy setup code**.
-3. On each additional device, open **Cross-device sync**, paste the code under
-   **Another device**, and choose **Join sync**.
-
-Setup codes connect only to the project's service at
-`https://quran.firofame.workers.dev`; custom-server codes are not accepted.
-The code is Base64url-encoded, not encrypted. Keep it private: anyone with it can read or change that sync space's
-reading position and translation choice. Reading changes are saved locally first
-and remain available offline. Position and translation updates use bounded
-timestamp-based conflict resolution.
-
-The sync service is hosted by the project, so readers do not need a Cloudflare
-account or a Worker URL. See [`docs/sync-service.md`](docs/sync-service.md) for
-maintainer deployment and service details.
-
 ## Architecture
 
 The project is a single Cloudflare Worker. [`public/`](public) holds the reader
 itself — plain HTML, CSS, and browser JavaScript modules with no build step —
-and is served as Workers Static Assets. [`src/`](src) holds the Worker:
-
-- `src/index.ts` routes requests with Hono. It serves the sync API, answers
-  `/health`, and falls through to the static assets.
-- `src/durable-object.ts` stores each reader's sync space in a SQLite-backed
-  Durable Object.
-- `src/sync-state.ts` validates payloads with Zod, and `src/auth.ts` turns a
-  pairing key into the Durable Object that owns its sync space.
+and is served as Workers Static Assets. [`src/index.ts`](src/index.ts) answers
+`/health` and the JSON fallback for unknown paths.
 
 The reader modules keep their responsibilities: `reader.js` contains pure Quran
 data, parsing, search, and navigation logic; `reader-state.js` owns validated
-state transitions; `preferences-store.js` isolates browser persistence;
-`sync-client.js` manages background cross-device synchronization and conflict
-resolution; and `translation-repository.js` loads, validates, and caches
-translation data. `reading-data.js` validates the versioned local reading
-history and computes progress, pace, and section membership. `app.js` connects
-those modules to the browser UI and interaction behavior.
+state transitions; `preferences-store.js` isolates browser persistence; and
+`translation-repository.js` loads, validates, and caches translation data.
+`reading-data.js` validates the versioned local reading history and computes
+progress, pace, and section membership. `app.js` connects those modules to the
+browser UI and interaction behavior.
 Paragraph grouping uses the browser's standard `Intl.Segmenter` API.
 
 Tests run in two Vitest projects: `test/worker/` runs inside the Workers
-runtime against the real Durable Object, and `test/node/` covers the reader
-modules and the deployment helpers in Node.
+runtime, and `test/node/` covers the reader modules and the deployment helpers
+in Node.
 
 ## Validate
 
@@ -179,16 +141,15 @@ Pull requests targeting `main` run these checks automatically through the
 
 ## Publish
 
-The Worker, its static assets, and the Durable Object are published together
-by [the deploy workflow](.github/workflows/deploy.yml). Merging to `main`
-deploys automatically: the workflow validates the revision, confirms the
-maintainer authorization, checks that the existing Worker and its Durable Object
-namespace are preserved, deploys, and then verifies the production identity,
-health, and sync behaviour.
+The Worker and its static assets are published together by
+[the deploy workflow](.github/workflows/deploy.yml). Merging to `main` deploys
+automatically: the workflow validates the revision, confirms the maintainer
+authorization, checks that the existing Worker identity is preserved, deploys,
+and then verifies the production identity and health.
 
-Production reuses the existing `quran` Worker, so the sync URL in
-`DEFAULT_SYNC_ENDPOINT` and the Durable Object namespaces stay the same, and
-the reader is served from the same host as the sync API.
+Production reuses the existing `quran` Worker, so the reader stays on the same
+hostname. The retired sync Durable Object and its stored data are deleted by the
+`v2` migration the next time the Worker is deployed.
 
 Pull requests get an isolated preview Worker, and the reader is never published
 from a fork.

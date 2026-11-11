@@ -3,9 +3,9 @@
 ## Stack, run, and deployment
 
 - The reader is a dependency-free static web app using browser JavaScript modules, HTML, and CSS. It lives in `public/` and is served by a Cloudflare Worker as Workers Static Assets.
-- One Cloudflare Worker serves the reader and the cross-device sync API. The API is routed with Hono, its payloads are validated with Zod, and its state lives in a SQLite-backed Durable Object.
-- Run locally with `npm run dev` (Wrangler at `http://localhost:8787`); the Durable Object is emulated locally, and no Cloudflare account is needed.
-- GitHub Actions checks every pull request. Merging to `main` deploys the Worker, its assets, and the Durable Object to Cloudflare.
+- One Cloudflare Worker serves the reader as Workers Static Assets. It also answers `/health`; the cross-device sync API and its Durable Object have been removed.
+- Run locally with `npm run dev` (Wrangler at `http://localhost:8787`); no Cloudflare account is needed.
+- GitHub Actions checks every pull request. Merging to `main` deploys the Worker and its assets to Cloudflare.
 
 ## Quran and translation data
 
@@ -26,7 +26,7 @@
 - Every verse navigation saves the exact position. A valid `#chapter:verse` link overrides the saved position on load. Existing position, translation, text size, and theme survive migration; new reading history uses schema version 5.
 - On load the reader opens the next unread verse rather than repeating the last one read, so a new sitting starts with nothing to click. A saved position that has not been read yet is still reopened exactly, and the behaviour can be turned off in Settings.
 - Progress, activity, sessions, daily energy mode, settings, anchors, bookmarks, reflections, and weekly history are local. Export/import moves the complete reader state as one JSON backup.
-- Optional sync sends only reading position and translation to the configured Worker; sync is off until the user chooses to connect.
+- Reading data stays in this browser. The reader sends no reading position or translation to a server.
 - New fields will be added through a versioned migration that keeps the current position and preferences.
 
 ## Screens and navigation
@@ -43,5 +43,5 @@
 
 - Tests use Node's built-in test runner: `npm test`.
 - Syntax validation runs with `npm run check`.
-- Existing coverage includes metadata and verse parsing, navigation, state validation, local storage, synchronization, Worker behavior, deployment, and static asset serving.
+- Existing coverage includes metadata and verse parsing, navigation, state validation, local storage, Worker behavior, deployment, and static asset serving.
 - New reading-data coverage checks the selected 556 Ruku convention, all per-surah counts, Juz and Manzil boundaries, local day boundaries, energy mode, daily and lifetime totals, weekly summaries and their deep, light and flow split, schema migration, the resume and startup position rules, and the bundled English verse count.

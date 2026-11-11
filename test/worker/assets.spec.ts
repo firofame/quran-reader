@@ -7,10 +7,11 @@ async function readJson<T = any>(response: Response): Promise<T> {
 }
 
 describe("routing", () => {
-	it("answers the sync API without serving it as a static asset", async () => {
-		const response = await SELF.fetch(new Request("https://quran.example.com/api/sync"));
-		expect(response.status).toBe(401);
+	it("answers the health check", async () => {
+		const response = await SELF.fetch(new Request("https://quran.example.com/health"));
+		expect(response.status).toBe(200);
 		expect(response.headers.get("content-type")).toMatch(/application\/json/);
+		expect(await readJson(response)).toEqual({ status: "ok", service: "quran" });
 	});
 
 	it("returns a JSON error for unknown paths", async () => {

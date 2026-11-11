@@ -14,7 +14,6 @@ const READER_FILES = [
 	"reading-data.js",
 	"preferences-store.js",
 	"translation-repository.js",
-	"sync-client.js",
 	"quran-data.js",
 	"service-worker.js",
 	"manifest.webmanifest",

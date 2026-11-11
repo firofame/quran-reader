@@ -94,52 +94,6 @@
                   <button id="mark-read-btn" type="button" class="secondary-button">Mark earlier rukus as read</button>
                   <p class="muted-copy">For when you have already read further on another device. It catches up the overall progress and the lifetime totals. The daily and weekly history stays as it is, because the days are not known.</p>
                 </div>
-                <div id="sync-panel" class="sync-panel">
-                  <div class="sync-header">
-                    <div class="sync-title-group" title="Cross-device sync">
-                      <span data-icon="cloud"></span>
-                      <span>Sync</span>
-                      <span id="sync-badge" class="sync-badge">Off</span>
-                    </div>
-                    <div class="sync-header-actions">
-                      <button id="sync-quick-btn" type="button" class="secondary-button sync-quick-btn" title="Sync reading progress now" hidden><span data-icon="refresh"></span>Sync now</button>
-                      <button id="sync-toggle-panel" type="button" class="sync-toggle-btn" aria-expanded="false" aria-controls="sync-details">Set up</button>
-                    </div>
-                  </div>
-                  <div id="sync-details" class="sync-details" hidden>
-                    <p class="sync-description">Keep your reading position and translation in sync. Nothing is sent until you choose an option below. Start on one device, then join the others with one private setup code.</p>
-                    <form id="sync-new-form" class="sync-setup-section" autocomplete="off">
-                      <h3>First device</h3>
-                      <p class="sync-section-description">Start syncing here. A private setup code will be created for your other devices.</p>
-                      <div class="sync-actions">
-                        <button id="sync-new-btn" type="submit" class="primary-button sync-primary-btn">Start syncing</button>
-                      </div>
-                    </form>
-                    <div id="sync-code-panel" class="sync-setup-section" hidden>
-                      <h3>Your setup code</h3>
-                      <label class="sync-field">
-                        <span class="sync-field-label">Copy this code to your other devices</span>
-                        <textarea id="sync-code-output" rows="3" readonly spellcheck="false" aria-label="Private sync setup code"></textarea>
-                      </label>
-                      <div class="sync-actions">
-                        <button id="copy-sync-code" type="button" class="secondary-button">Copy setup code</button>
-                        <button id="sync-disconnect-btn" type="button" class="disconnect-button" hidden>Disconnect</button>
-                      </div>
-                      <p class="sync-code-warning">Keep the code private. Anyone with it can access your synced reading position and translation.</p>
-                    </div>
-                    <form id="sync-join-form" class="sync-setup-section" autocomplete="off">
-                      <h3>Another device</h3>
-                      <label class="sync-field">
-                        <span class="sync-field-label">Setup code</span>
-                        <textarea id="sync-code-input" rows="3" placeholder="Paste the code from your first device" autocomplete="off" spellcheck="false"></textarea>
-                      </label>
-                      <div class="sync-actions">
-                        <button id="sync-join-btn" type="submit" class="primary-button sync-primary-btn">Join sync</button>
-                      </div>
-                    </form>
-                    <div id="sync-message" class="sync-message" role="status" aria-live="polite"></div>
-                  </div>
-                </div>
               </div>
             </details>
           </div>

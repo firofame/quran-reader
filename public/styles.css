@@ -144,8 +144,10 @@ select option { background: var(--paper); color: var(--text); }
 .control-divider { height: 16px; width: 1px; background: var(--line); }
 
 /* Chapter heading */
-.chapter-heading { padding: 14px 28px; }
+.chapter-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 14px 28px; }
 .chapter-heading > div { min-width: 0; }
+.chapter-heading-title { flex: 1 1 auto; }
+.chapter-heading-meta { flex: 0 1 auto; text-align: right; }
 .chapter-heading h1 { color: var(--ink); font-family: var(--serif); font-size: 26px; line-height: 1.25; letter-spacing: -.5px; font-weight: 400; margin: 0 0 4px; overflow-wrap: anywhere; }
 .chapter-heading p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 
@@ -440,8 +442,9 @@ body.focus-mode .minimal-menu[hidden] { display: none; }
   .reading-toolbar { gap: 8px; }
   .font-controls { gap: 4px; }
   .font-controls button { padding-left: 2px; padding-right: 2px; }
-  .chapter-heading { padding: 14px 16px; }
+  .chapter-heading { flex-direction: column; gap: 6px; padding: 14px 16px; }
   .chapter-heading h1 { font-size: 22px; }
+  .chapter-heading-meta { text-align: left; }
   #reading-content { padding: 0 16px; }
   .verse { grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 24px 0; }
   .verse-number { font-size: 9px; padding-top: 10px; }

@@ -270,7 +270,7 @@ function renderHeading() {
   const currentRuku = findRuku(state.position, rukus);
   const surahProgress = getSurahRukuProgress(chapter.id, state.readingData, rukus);
   const localRuku = currentRuku?.localNumber ?? 0;
-  $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed<span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div>`;
+  $("chapter-heading").innerHTML = `<div class="chapter-heading-title"><h1>${chapter.id}. ${chapter.name}</h1></div><div class="chapter-heading-meta"><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed<span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div>`;
   renderReadingMetadata(currentAyah);
   const translation = TRANSLATIONS[state.translation];
   const attribution = $("attribution");

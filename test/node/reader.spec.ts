@@ -7,12 +7,12 @@ import {
 	adjacentPosition,
 	createChapters,
 	decodeState,
+	findAyah,
 	getRukuProgress,
 	getVerseMetadata,
 	matchesChapter,
 	parseHash,
 	parseTranslation,
-	selectAyah,
 	splitTranslationParagraphs,
 	validPosition,
 } from "../../public/reader.js";
@@ -170,23 +170,17 @@ describe("parsing", () => {
 });
 
 describe("navigation", () => {
-	it("selects exactly one ayah and navigates search matches", () => {
+	it("selects exactly one ayah by its verse number", () => {
 		const verses = [
 			{ chapter: 1, verse: 1, text: "Mercy and guidance" },
 			{ chapter: 1, verse: 2, text: "Praise" },
 			{ chapter: 1, verse: 3, text: "The Merciful" },
 		];
-		expect(selectAyah(verses, 2).ayah).toBe(verses[1]);
-		const results = selectAyah(verses, 2, "merc");
-		expect(results.ayah).toBe(verses[0]);
-		expect(results.index).toBe(0);
-		expect(results.matches.length).toBe(2);
-		const next = selectAyah(verses, 3, "MERC");
-		expect(next.ayah).toBe(verses[2]);
-		expect(next.index).toBe(1);
-		expect(selectAyah(verses, 2, "1:2").ayah).toBe(verses[1]);
-		expect(selectAyah(verses, 1, "missing").ayah).toBeNull();
-		expect(selectAyah(verses, 1, "missing").matches.length).toBe(0);
+		expect(findAyah(verses, 1)).toBe(verses[0]);
+		expect(findAyah(verses, 2)).toBe(verses[1]);
+		expect(findAyah(verses, 3)).toBe(verses[2]);
+		expect(findAyah(verses, 9)).toBe(verses[0]);
+		expect(findAyah([], 1)).toBeNull();
 	});
 
 	it("crosses chapter boundaries without skipping any of the 6,236 ayahs", () => {
@@ -253,37 +247,24 @@ describe("navigation", () => {
 		}
 	});
 
-	it("moves between search matches and disables at the ends", () => {
+	it("moves between consecutive ayahs and stops at the chapter edges", () => {
 		const verses = [
 			{ chapter: 2, verse: 1, text: "Alif, Lam, Meem." },
 			{ chapter: 2, verse: 2, text: "This is the Book about which there is no doubt, guidance for the conscious of Allah." },
 			{ chapter: 2, verse: 3, text: "Who believe in the unseen..." },
-			{ chapter: 2, verse: 4, text: "And who believe in what has been revealed to you..." },
-			{ chapter: 2, verse: 5, text: "Those are upon guidance from their Lord..." },
 		];
-		// Search for "guidance" matches verses 2 and 5 (indices 0 and 1)
-		const search1 = selectAyah(verses, 2, "guidance");
-		expect(search1.matches.length).toBe(2);
-		expect(search1.index).toBe(0);
-		expect(search1.ayah.verse).toBe(2);
+		const first = findAyah(verses, 2);
+		expect(first.verse).toBe(2);
 
-		// At first match, previous match is undefined (button disabled: "No more matches")
-		const prevMatch = search1.matches[search1.index - 1];
-		expect(prevMatch).toBeUndefined();
+		// The previous ayah is the one before it.
+		expect(verses[verses.indexOf(first) - 1].verse).toBe(1);
 
-		// Next match is verse 5
-		const nextMatch = search1.matches[search1.index + 1];
-		expect(nextMatch).toEqual(verses[4]);
+		// The next ayah is the one after it.
+		const next = findAyah(verses, first.verse + 1);
+		expect(next.verse).toBe(3);
 
-		// Navigating to verse 5
-		const search2 = selectAyah(verses, nextMatch.verse, "guidance");
-		expect(search2.index).toBe(1);
-		expect(search2.ayah.verse).toBe(5);
-
-		// At last match, next match is undefined (button disabled: "No more matches")
-		expect(search2.matches[search2.index + 1]).toBeUndefined();
-		// Previous match is verse 2
-		expect(search2.matches[search2.index - 1]).toEqual(verses[1]);
+		// Past the last ayah of the chapter there is nothing left to open.
+		expect(findAyah(verses, 4).verse).toBe(1);
 	});
 });
 

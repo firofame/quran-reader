@@ -52,8 +52,6 @@ without a Cloudflare account.
   filling at its last ayah and resetting when you enter another ruku.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
-- Search the entire current chapter and move through matching ayahs one at a
-  time.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes.
 - Read in a centered column no wider than 680px, with start-aligned translation
@@ -117,7 +115,7 @@ and is served as Workers Static Assets. [`src/index.ts`](src/index.ts) answers
 `/health` and the JSON fallback for unknown paths.
 
 The reader modules keep their responsibilities: `reader.js` contains pure Quran
-data, parsing, search, and navigation logic; `reader-state.js` owns validated
+data, parsing, and navigation logic; `reader-state.js` owns validated
 state transitions; `preferences-store.js` isolates browser persistence; and
 `translation-repository.js` loads, validates, and caches translation data.
 `reading-data.js` validates the versioned local reading history and computes

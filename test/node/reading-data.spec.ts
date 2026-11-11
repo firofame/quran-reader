@@ -119,23 +119,6 @@ describe("reading history", () => {
 		expect(summary.previousWeekRukus).toBe(0);
 	});
 
-	it("counts notes written in the weekly summary", () => {
-		let reading = createDefaultReadingData();
-		const rukus = getRukuIndex(data, chapters);
-		reading = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 8));
-		reading = recordRukuCompletion(reading, rukus[1], new Date(2026, 10, 10, 9));
-		reading = {
-			...reading,
-			notes: [
-				{ id: "n1", rukuId: 1, text: "This week", createdAt: new Date(2026, 10, 10, 11).getTime() },
-				{ id: "n2", rukuId: 2, text: "Last week", createdAt: new Date(2026, 10, 3, 11).getTime() },
-			] as any[],
-		} as any;
-		const summary = getWeeklySummary(reading, new Date(2026, 10, 10, 12));
-		expect(summary.notes).toBe(1);
-		expect(summary.thisWeekRukus).toBe(2);
-	});
-
 	it("folds the retired light day, deep, and flow names away when migrating", () => {
 		const migrated = normalizeReadingData(
 			{
@@ -170,14 +153,12 @@ describe("reading history", () => {
 			{
 				version: 1,
 				completedRukuIds: [1, 1, 999],
-				notes: [{ id: "b", rukuId: 1, text: "Reflection", createdAt: 1 }],
 				settings: { dailyTarget: 50, dayBoundaryHour: 22, anchors: [{ id: "fajr", name: "After Fajr", time: "05:10" }] },
 			},
 			chapters,
 		);
 		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.completedRukuIds).toEqual([1]);
-		expect(migrated.notes[0].text).toBe("Reflection");
 		expect(migrated.settings.dailyTarget).toBe(10);
 		expect(migrated.settings.dayBoundaryHour).toBe(22);
 		expect(migrated.settings.anchors[0].name).toBe("After Fajr");

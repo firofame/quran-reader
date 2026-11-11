@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getRecentDayKeys, getRukuIndex, getSurahRukuProgress, getTodayStats, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -504,7 +504,7 @@ function renderRukuSummary() {
 function showPage(page) {
   activePage = page;
   $("reader-page").hidden = page !== "reader";
-  for (const id of ["journey", "weekly", "settings"]) $(`${id}-page`).hidden = page !== id;
+  for (const id of ["weekly", "settings"]) $(`${id}-page`).hidden = page !== id;
   document.querySelectorAll("[data-page]").forEach(button => {
     if (button.closest("#app-navigation")) {
       if (button.dataset.page === page) button.setAttribute("aria-current", "page");
@@ -512,7 +512,6 @@ function showPage(page) {
     }
   });
   $("minimal-menu").hidden = true;
-  if (page === "journey") renderJourney();
   if (page === "weekly") renderWeekly();
   if (page === "settings") renderSettings();
   window.scrollTo({ top: 0, behavior: "instant" });
@@ -520,67 +519,8 @@ function showPage(page) {
 
 function renderAllPages() {
   renderProgressSummary();
-  if (activePage === "journey") renderJourney();
   if (activePage === "weekly") renderWeekly();
   if (activePage === "settings") renderSettings();
-}
-
-function renderJourney() {
-  const completed = new Set(state.readingData.completedRukuIds);
-  const juzGrid = $("juz-grid");
-  juzGrid.replaceChildren();
-  for (let number = 1; number <= 30; number++) {
-    const section = getSectionRukus("juz", number, globalThis.QuranData, chapters, rukus);
-    const read = section.filter(ruku => completed.has(ruku.id)).length;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "juz-cell";
-    button.dataset.section = `juz:${number}`;
-    button.innerHTML = `<span>Juz ${number}</span><span>${section.length ? Math.round(read / section.length * 100) : 0}%</span>`;
-    button.title = `${read} of ${section.length} rukus completed`;
-    juzGrid.append(button);
-  }
-  const manzilList = $("manzil-list");
-  manzilList.replaceChildren();
-  for (let number = 1; number <= 7; number++) {
-    const section = getSectionRukus("manzil", number, globalThis.QuranData, chapters, rukus);
-    const read = section.filter(ruku => completed.has(ruku.id)).length;
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "manzil-row";
-    row.dataset.section = `manzil:${number}`;
-    row.innerHTML = `<span>Manzil ${number}</span><span>${read} / ${section.length} rukus</span><progress max="${section.length || 1}" value="${read}"></progress>`;
-    manzilList.append(row);
-  }
-  const pace = getRecentPace(state.readingData);
-  const completedOverall = state.readingData.completedRukuIds.length;
-  $("pace-summary").textContent = pace.activeDays
-    ? `Last 14 days: ${pace.activeDayAverage.toFixed(1)} rukus per active day across ${pace.activeDays} reading ${pace.activeDays === 1 ? "day" : "days"}.`
-    : completedOverall > 0
-      ? `No ruku was finished in the last 14 days, but ${completedOverall} ${completedOverall === 1 ? "ruku is" : "rukus are"} recorded overall.`
-      : "There are no completed rukus in the last 14 days yet. Estimates will appear after a ruku is finished.";
-  if (!$("what-if-target").dataset.initialized) {
-    $("what-if-target").value = String(pace.activeDays ? Math.max(1, Math.round(pace.activeDayAverage)) : state.readingData.settings.dailyTarget);
-    $("what-if-target").dataset.initialized = "true";
-  }
-  renderFinishEstimate();
-}
-
-function renderFinishEstimate() {
-  const paceInput = Number($("what-if-target").value);
-  const dailyPace = Number.isFinite(paceInput) && paceInput > 0 ? Math.min(100, paceInput) : state.readingData.settings.dailyTarget;
-  const completed = new Set(state.readingData.completedRukuIds);
-  const remaining = rukus.filter(ruku => !completed.has(ruku.id));
-  const baqarahRemaining = rukus.filter(ruku => ruku.chapter === 2 && !completed.has(ruku.id)).length;
-  const today = new Date();
-  const dateAfter = days => {
-    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
-    date.setDate(date.getDate() + Math.max(0, days));
-    return date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
-  };
-  const baqarahDate = dateAfter(Math.ceil(baqarahRemaining / dailyPace));
-  const quranDate = dateAfter(Math.ceil(remaining.length / dailyPace));
-  $("finish-estimate").textContent = `At ${dailyPace} rukus a day, Al-Baqarah is estimated for ${baqarahDate} and the full Quran for ${quranDate}.`;
 }
 
 function renderWeekly() {
@@ -777,7 +717,6 @@ function initializeSettingsControls() {
     renderAnchorEditor();
     scheduleAnchorReminder();
   });
-  $("what-if-target").addEventListener("input", renderFinishEstimate);
 }
 
 function scheduleAnchorReminder() {
@@ -887,22 +826,10 @@ function navigate(chapter, verse = 1, { record = false } = {}) {
   loadReading({ scroll: true });
 }
 
-function openSection(type, number) {
-  const section = getSectionRukus(type, number, globalThis.QuranData, chapters, rukus);
-  const firstUnread = section.find(ruku => !state.readingData.completedRukuIds.includes(ruku.id));
-  const target = firstUnread || section[0];
-  if (target) navigate(target.start.chapter, target.start.verse);
-}
-
 function initializeFeatureInteractions() {
   document.addEventListener("click", event => {
     const pageButton = event.target.closest("[data-page]");
     if (pageButton) showPage(pageButton.dataset.page);
-    const sectionButton = event.target.closest("[data-section]");
-    if (sectionButton) {
-      const [type, number] = sectionButton.dataset.section.split(":");
-      openSection(type, Number(number));
-    }
     const jump = event.target.closest("[data-jump]");
     if (jump) {
       const [chapter, verse] = jump.dataset.jump.split(":").map(Number);
@@ -915,7 +842,6 @@ function initializeFeatureInteractions() {
     }
   });
 
-  $("what-if-target").addEventListener("input", renderFinishEstimate);
   $("next-ruku").addEventListener("click", () => {
     const next = completedRuku && rukus[completedRuku.id];
     $("ruku-completion").hidden = true;

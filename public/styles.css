@@ -278,21 +278,7 @@ select option { background: var(--paper); color: var(--text); }
 .page-card { margin: 0 0 16px; padding: 22px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); box-shadow: var(--shadow-card); }
 .page-card h2 { margin: 0 0 16px; color: var(--ink); font: 400 20px/1.35 var(--serif); }
 
-/* Juz grid */
-.juz-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
-.juz-cell { display: flex; flex-direction: column; justify-content: space-between; min-height: 66px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); text-align: left; color: var(--muted); font-size: 9px; transition: border-color .15s, background .15s; }
-.juz-cell span:last-child { color: var(--green); font-weight: 600; }
-.juz-cell:hover, .manzil-row:hover { border-color: var(--green); background: var(--green-soft); }
-
-/* Manzil list */
-.manzil-list { display: flex; flex-direction: column; gap: 7px; }
-.manzil-row { display: grid; grid-template-columns: 90px 1fr 80px; align-items: center; gap: 12px; min-height: 42px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text); font-size: 10px; text-align: left; transition: border-color .15s, background .15s; }
-.manzil-row progress { width: 100%; height: 4px; accent-color: var(--green); }
-
-/* Pace */
-.what-if-control { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 11px; }
-.what-if-control input, .settings-grid input[type="number"] { width: 66px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); }
-.finish-estimate { color: var(--green) !important; font-weight: 500; }
+.settings-grid input[type="number"] { width: 66px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); }
 
 /* Week bars */
 .week-bars { display: flex; flex-direction: column; gap: 10px; }
@@ -411,9 +397,6 @@ select option { background: var(--paper); color: var(--text); }
   .daily-panel-copy { gap: 4px 10px; }
   .target-reached-label { flex-basis: 100%; }
   .ruku-progress-label { font-size: 8px; }
-  .juz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .manzil-row { grid-template-columns: 65px 1fr; }
-  .manzil-row progress { grid-column: 1 / -1; }
   .settings-grid { grid-template-columns: 1fr; }
   .lifetime-totals { grid-template-columns: 1fr; }
   .anchor-editor-row { grid-template-columns: 1fr 100px 45px; }

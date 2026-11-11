@@ -9,7 +9,6 @@ import {
 	getDayKey,
 	getResumePosition,
 	getRukuIndex,
-	getSectionRukus,
 	getTodayStats,
 	getWeeklySummary,
 	normalizeReadingData,
@@ -39,33 +38,6 @@ describe("Tanzil metadata", () => {
 		expect(rukus.at(-1).end).toEqual({ chapter: 114, verse: 6 });
 	});
 
-	it("assigns every ruku start to exactly one juz and one manzil", () => {
-		for (const [type, count] of [
-			["juz", 30],
-			["manzil", 7],
-		] as [string, number][]) {
-			const assignments: number[] = [];
-			for (let number = 1; number <= count; number++) {
-				assignments.push(...getSectionRukus(type, number, data, chapters, rukus).map((ruku: any) => ruku.id));
-			}
-			expect(assignments.length, type).toBe(556);
-			expect(new Set(assignments).size, type).toBe(556);
-		}
-		expect(Array.from(data.Juz).slice(1, 31).map((row: any) => [row[0], row[1]])).toEqual([
-			[1, 1], [2, 142], [2, 253], [3, 93], [4, 24], [4, 148], [5, 82], [6, 111], [7, 88], [8, 41],
-			[9, 93], [11, 6], [12, 53], [15, 1], [17, 1], [18, 75], [21, 1], [23, 1], [25, 21], [27, 56],
-			[29, 46], [33, 31], [36, 28], [39, 32], [41, 47], [46, 1], [51, 31], [58, 1], [67, 1], [78, 1],
-		]);
-		expect(Array.from(data.Manzil).slice(1, 8).map((row: any) => [row[0], row[1]])).toEqual([
-			[1, 1],
-			[5, 1],
-			[10, 1],
-			[17, 1],
-			[26, 1],
-			[37, 1],
-			[50, 1],
-		]);
-	});
 });
 
 describe("reading history", () => {

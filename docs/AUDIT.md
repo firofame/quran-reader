@@ -36,7 +36,7 @@
 - Current metadata includes page, ruku, manzil, hizb, juz, and sajda. A small ring in the daily panel tracks the current ayah within its ruku.
 - The reader also has a Settings view for reading preferences and anchors.
 - Browser reminders request notification permission only when enabled and only schedule while the page is open. The app is an installable PWA; the service worker caches its local reading assets for offline use.
-- One-verse recitation is available from the play icon beside each ayah. It streams Alafasy 128 kbps from Al Quran Cloud after a direct user action, then reads the English translation with browser speech synthesis. See the provider's current [terms](https://alquran.cloud/terms-and-conditions).
+- One-verse recitation is available from the play icon beside each ayah. It streams Alafasy 128 kbps from Al Quran Cloud after a direct user action, then reads the English translation with browser speech synthesis, preferring Aaron (Enhanced), en-US. See the provider's current [terms](https://alquran.cloud/terms-and-conditions).
 - Word-by-word meanings remain unpopulated because no sufficiently suitable and attributable source was selected. The app does not generate religious content.
 
 ## Tests

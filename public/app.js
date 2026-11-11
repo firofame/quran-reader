@@ -14,6 +14,7 @@ const icons = {
   left: '<path d="m14 6-6 6 6 6M8 12h12"/>',
   right: '<path d="m10 6 6 6-6 6M16 12H4"/>',
 };
+const PREFERRED_TTS_VOICE = { name: "Aaron (Enhanced)", language: "en-US" };
 const $ = id => document.getElementById(id);
 const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || ""}</svg>`;
 document.querySelectorAll("[data-icon]").forEach(element => { element.innerHTML = icon(element.dataset.icon); });
@@ -160,6 +161,11 @@ function playVerseTranslation(position, request) {
 
   const utterance = new Utterance(ayah.text);
   utterance.lang = translation.language;
+  const preferredVoice = (synth.getVoices?.() ?? []).find(voice =>
+    voice.name === PREFERRED_TTS_VOICE.name &&
+    voice.lang.replace(/_/g, "-").toLowerCase() === PREFERRED_TTS_VOICE.language.toLowerCase()
+  );
+  if (preferredVoice) utterance.voice = preferredVoice;
   utterance.rate = 0.6;
   utterance.onend = () => finishVersePlayback(request);
   utterance.onerror = event => {

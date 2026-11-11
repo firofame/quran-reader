@@ -1,7 +1,7 @@
 import { READER_SCHEMA_VERSION, normalizeReadingData } from "./reading-data.js";
 
 export const TRANSLATIONS = {
-  "en.sahih": { name: "Saheeh International", language: "en", file: "en.sahih.txt" },
+  "en.sahih": { name: "Saheeh International", language: "en-US", file: "en.sahih.txt" },
 };
 
 export function createChapters(rows) {

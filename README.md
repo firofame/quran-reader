@@ -53,7 +53,7 @@ without a Cloudflare account.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes in Settings. A small
   play/pause icon beside each ayah reference plays the Arabic recitation, then
-  reads the English translation using the device's available speech voice.
+  reads the English translation using Aaron (Enhanced), en-US, when available.
 - Read in a centered column no wider than 680px, set in Georgia at 21px with
   1.7 line height, regular weight, and subtle letter spacing. The warm paper tone
   reduces glare; phones up to 430px use 20px text. Text-size controls still apply.
@@ -90,8 +90,9 @@ visible.
 - Translation: English Saheeh International. The file and its attribution are
   supplied by the project and are not modified.
 - Recitation: Mishary Rashid Alafasy at 128 kbps, streamed from Al Quran Cloud.
-  English translation speech uses the browser's built-in speech synthesis, so
-  the available voice and quality depend on the device.
+  English translation speech uses the browser's built-in speech synthesis and
+  prefers Aaron (Enhanced), en-US. If that voice is unavailable, the browser
+  uses its default English voice. The quality depends on the device.
   Its [terms](https://alquran.cloud/terms-and-conditions) permit streaming for
   personal and educational use. The sequence ends after that ayah's translation.
 

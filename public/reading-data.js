@@ -1,4 +1,4 @@
-export const READER_SCHEMA_VERSION = 7;
+export const READER_SCHEMA_VERSION = 8;
 export const DEFAULT_RUKU_COUNT = 556;
 
 /**
@@ -17,7 +17,6 @@ export function createDefaultReadingData() {
     totals: { rukuRead: 0, verseRead: 0, readingDays: 0 },
     activityByDay: {},
     sessions: [],
-    notes: [],
     settings: {
       dailyTarget: 3,
       dayBoundaryHour: 0,
@@ -98,12 +97,6 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
       if (clean) activityByDay[date] = clean;
     }
   }
-  const notes = (Array.isArray(raw.notes) ? raw.notes : []).flatMap(note => {
-    if (!isObject(note) || !Number.isSafeInteger(note.rukuId) || note.rukuId < 1 || note.rukuId > rukuCount) return [];
-    const text = typeof note.text === "string" ? note.text.trim().slice(0, 1200) : "";
-    if (!text) return [];
-    return [{ id: typeof note.id === "string" ? note.id.slice(0, 80) : `${note.rukuId}-${note.createdAt || 0}`, rukuId: note.rukuId, text, createdAt: Number.isSafeInteger(note.createdAt) ? note.createdAt : 0 }];
-  }).slice(-1000);
   const sessions = (Array.isArray(raw.sessions) ? raw.sessions : []).flatMap(session => {
     if (!isObject(session) || !Number.isSafeInteger(session.rukuId) || session.rukuId < 1 || session.rukuId > rukuCount) return [];
     if (!validDateKey(session.date)) return [];
@@ -126,7 +119,6 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
     },
     activityByDay,
     sessions,
-    notes,
     settings: {
       dailyTarget: boundedInteger(settings.dailyTarget, defaults.settings.dailyTarget, 1, 10),
       dayBoundaryHour: boundedInteger(settings.dayBoundaryHour, 0, 0, 23),
@@ -407,16 +399,11 @@ export function getWeeklySummary(readingData, date = new Date()) {
   const previousWeek = thisWeek.map(day => shiftDayKey(day, -7));
   const sumWeek = days => days.reduce((total, day) => total + (readingData.activityByDay[day]?.rukuCompletions ?? 0), 0);
   const readDays = thisWeek.filter(day => readingData.activityByDay[day]?.active).length;
-  const weekSet = new Set(thisWeek);
-  const notes = readingData.notes.filter(note => Number.isSafeInteger(note.createdAt)
-    && note.createdAt > 0
-    && weekSet.has(getDayKey(new Date(note.createdAt), readingData.settings.dayBoundaryHour))).length;
   return {
     days: thisWeek.map(day => ({ date: day, activity: readingData.activityByDay[day] ?? null })),
     readDays,
     thisWeekRukus: sumWeek(thisWeek),
     previousWeekRukus: sumWeek(previousWeek),
-    notes,
   };
 }
 

@@ -9,11 +9,10 @@ translation.
 - Complete Tanzil chapter and ayah metadata is baked in: verses, revelation
   order, revelation place, rukus, pages, manzils, hizb quarters, juzs, and
   sajdas.
-- Resume the saved ayah, see overall and daily ruku progress, and finish with an
-  optional reflection. Reading progress, notes, settings, and recent activity
-  stay in this browser by default.
+- Resume the saved ayah and see overall and daily ruku progress. Reading
+  progress, settings, and recent activity stay in this browser by default.
 - Journey, weekly review, Friday Al-Kahf progress, manual reading anchors, and
-  optional browser reminders. The weekly review counts the reflections written.
+  optional browser reminders.
 - Optional one-ayah recitation is off by default and only plays after a direct
   click. The reader never starts audio automatically.
 - Installable PWA with an offline cache for the reader and the translation.

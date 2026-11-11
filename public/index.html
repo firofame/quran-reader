@@ -37,7 +37,6 @@
         <nav id="app-navigation" class="app-navigation" aria-label="Reader pages">
           <button type="button" data-page="reader" aria-current="page">Read</button>
           <button type="button" data-page="journey">Journey</button>
-          <button type="button" data-page="notes">Notes</button>
           <button type="button" data-page="weekly">Week</button>
           <button type="button" data-page="settings">Settings</button>
         </nav>
@@ -88,9 +87,6 @@
             <span class="eyebrow">ONE RUKU COMPLETE</span>
             <h2 id="completion-title">Ruku complete</h2>
             <p id="completion-progress"></p>
-            <label class="reflection-field">One thing that stood out
-              <textarea id="reflection-input" rows="2" maxlength="1200" placeholder="Optional · skip this whenever you like"></textarea>
-            </label>
             <div class="completion-actions">
               <button id="next-ruku" type="button" class="primary-button">Next ruku</button>
               <button id="done-for-now" type="button" class="secondary-button">Done for now</button>
@@ -112,14 +108,9 @@
           <section class="page-card"><h2>Your pace</h2><p id="pace-summary"></p><label class="what-if-control">What if I read <input id="what-if-target" type="number" min="1" max="100" value="3"> rukus each day?</label><p id="finish-estimate" class="finish-estimate"></p></section>
           <section id="friday-kahf-page-card" class="page-card" hidden><h2>This week in Al-Kahf</h2><p id="kahf-week-summary"></p><button id="journey-open-kahf" class="secondary-button" type="button">Open the first unread ruku</button></section>
         </section>
-        <section id="notes-page" class="secondary-page" hidden>
-          <header class="page-heading"><span class="eyebrow">YOUR OWN WORDS</span><h1>Notes</h1><p>Reflections stay on this device unless you export a backup.</p></header>
-          <label class="notes-search input-wrap"><span data-icon="search"></span><input id="notes-search" type="search" placeholder="Search notes" aria-label="Search notes"></label>
-          <section class="page-card"><h2>Reflections</h2><div id="notes-list" class="saved-items"></div></section>
-        </section>
         <section id="weekly-page" class="secondary-page" hidden>
           <header class="page-heading"><span class="eyebrow">A GENTLE CHECK-IN</span><h1>This week</h1><p id="weekly-days-read"></p></header>
-          <section class="page-card"><h2>Last seven days</h2><div id="week-bars" class="week-bars"></div><p id="week-comparison"></p><p id="week-notes" class="muted-copy"></p><p id="weekly-target-suggestion" class="muted-copy"></p></section>
+          <section class="page-card"><h2>Last seven days</h2><div id="week-bars" class="week-bars"></div><p id="week-comparison"></p><p id="weekly-target-suggestion" class="muted-copy"></p></section>
           <section class="page-card"><h2>Recent weeks</h2><div id="heatmap" class="heatmap" aria-label="Ruku completions over the last twelve weeks"></div></section>
           <section class="page-card"><h2>Lifetime totals</h2><div id="lifetime-totals" class="lifetime-totals"></div></section>
         </section>
@@ -153,7 +144,7 @@
             </div>
           </section>
           <section class="page-card"><div class="card-heading-row"><div><h2>Reading anchors</h2><p>Times are manual and follow your device’s local time.</p></div><button id="add-anchor" type="button" class="secondary-button">Add anchor</button></div><div id="anchor-editor" class="anchor-editor"></div><p class="muted-copy">Browser reminders only fire while the browser is running.</p></section>
-          <section class="page-card"><h2>Backup and portability</h2><p>Export includes reading position, progress, settings, notes, and activity.</p><div class="backup-actions"><button id="export-backup" type="button" class="secondary-button">Export backup</button><button id="import-backup" type="button" class="secondary-button">Import backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div><p id="backup-reminder" class="muted-copy"></p></section>
+          <section class="page-card"><h2>Backup and portability</h2><p>Export includes reading position, progress, settings, and activity.</p><div class="backup-actions"><button id="export-backup" type="button" class="secondary-button">Export backup</button><button id="import-backup" type="button" class="secondary-button">Import backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div><p id="backup-reminder" class="muted-copy"></p></section>
           <section class="page-card"><h2>Optional recitation reference</h2><p id="audio-source-status">A one-verse recording is available on request. It never plays automatically and stops after the selected verse.</p><p>Source: Mishary Rashid Alafasy, 128 kbps, streamed by <a href="https://alquran.cloud/terms-and-conditions" target="_blank" rel="noreferrer">Al Quran Cloud</a>. Its terms permit streaming for personal and educational use.</p><label class="setting-check"><input id="listen-echo-setting" type="checkbox"> Show “Hear one verse” beside the ayah</label></section>
         </section>
       </main>

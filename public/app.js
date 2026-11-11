@@ -35,7 +35,6 @@ let loading = false;
 let activePage = "reader";
 let completedRuku = null;
 let reminderTimer;
-let reflectionTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
 let currentAyah = null;
@@ -523,7 +522,7 @@ function renderRukuSummary() {
 function showPage(page) {
   activePage = page;
   $("reader-page").hidden = page !== "reader";
-  for (const id of ["journey", "notes", "weekly", "settings"]) $(`${id}-page`).hidden = page !== id;
+  for (const id of ["journey", "weekly", "settings"]) $(`${id}-page`).hidden = page !== id;
   document.querySelectorAll("[data-page]").forEach(button => {
     if (button.closest("#app-navigation")) {
       if (button.dataset.page === page) button.setAttribute("aria-current", "page");
@@ -532,7 +531,6 @@ function showPage(page) {
   });
   $("minimal-menu").hidden = true;
   if (page === "journey") renderJourney();
-  if (page === "notes") renderNotes();
   if (page === "weekly") renderWeekly();
   if (page === "settings") renderSettings();
   window.scrollTo({ top: 0, behavior: "instant" });
@@ -541,7 +539,6 @@ function showPage(page) {
 function renderAllPages() {
   renderProgressSummary();
   if (activePage === "journey") renderJourney();
-  if (activePage === "notes") renderNotes();
   if (activePage === "weekly") renderWeekly();
   if (activePage === "settings") renderSettings();
 }
@@ -605,38 +602,6 @@ function renderFinishEstimate() {
   $("finish-estimate").textContent = `At ${dailyPace} rukus a day, Al-Baqarah is estimated for ${baqarahDate} and the full Quran for ${quranDate}.`;
 }
 
-function renderNotes() {
-  const query = $("notes-search").value.trim().toLocaleLowerCase();
-  const notes = state.readingData.notes.filter(note => {
-    const ruku = rukus[note.rukuId - 1];
-    return `${note.text} ${chapters[ruku.chapter - 1].name} ruku ${ruku.localNumber}`.toLocaleLowerCase().includes(query);
-  });
-  const noteList = $("notes-list");
-  noteList.replaceChildren();
-  if (!notes.length) {
-    noteList.textContent = query ? "No notes match this search." : "Your optional reflections will appear here.";
-  }
-  for (const note of [...notes].reverse()) {
-    const ruku = rukus[note.rukuId - 1];
-    const item = document.createElement("article");
-    item.className = "saved-item";
-    const jump = document.createElement("button");
-    jump.type = "button";
-    jump.className = "saved-item-link";
-    jump.dataset.jump = `${ruku.start.chapter}:${ruku.start.verse}`;
-    jump.textContent = `${chapters[ruku.chapter - 1].name} · ruku ${ruku.localNumber}`;
-    const text = document.createElement("p");
-    text.textContent = note.text;
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "quiet-link";
-    remove.dataset.deleteNote = note.id;
-    remove.textContent = "Delete note";
-    item.append(jump, text, remove);
-    noteList.append(item);
-  }
-}
-
 function renderWeekly() {
   const summary = getWeeklySummary(state.readingData);
   $("weekly-days-read").textContent = `Days read this week: ${summary.readDays} / 7 · ${summary.thisWeekRukus} rukus completed`;
@@ -661,7 +626,6 @@ function renderWeekly() {
     bars.append(row);
   }
   $("week-comparison").textContent = `This week: ${summary.thisWeekRukus} rukus · Previous week: ${summary.previousWeekRukus} rukus.`;
-  $("week-notes").textContent = `Notes written this week: ${summary.notes}.`;
   const suggestedTarget = summary.readDays
     ? Math.max(1, Math.min(10, Math.round(summary.thisWeekRukus / summary.readDays)))
     : state.readingData.settings.dailyTarget;
@@ -694,50 +658,12 @@ function completeCurrentRuku(ruku) {
   $("completion-title").textContent = `${chapters[ruku.chapter - 1].name} · ruku ${ruku.localNumber} complete`;
   $("completion-progress").textContent = `Overall: ${state.readingData.completedRukuIds.length} / ${rukus.length} rukus (${percent}%) · Today: ${today.completed} / ${today.target}${today.reached ? " · Target reached" : ""}${today.bonus ? ` · +${today.bonus} bonus` : ""}`;
   $("next-ruku").disabled = !rukus[ruku.id];
-  $("reflection-input").value = "";
   $("ruku-completion").hidden = false;
   $("reading-content").hidden = true;
   $("ayah-navigation").hidden = true;
   $("navigation-hint").hidden = true;
   $("ruku-progress-wrap").hidden = true;
   $("ruku-completion").scrollIntoView({ block: "center", behavior: "smooth" });
-}
-
-function upsertReflection(text, ruku = completedRuku) {
-  const trimmed = text.trim();
-  if (!trimmed || !ruku) return false;
-  const id = `ruku-${ruku.id}`;
-  updateReadingData(readingData => {
-    const existing = readingData.notes.find(note => note.id === id);
-    const note = { id, rukuId: ruku.id, text: trimmed, createdAt: existing?.createdAt ?? Date.now() };
-    return { ...readingData, notes: [...readingData.notes.filter(item => item.id !== id), note] };
-  }, { renderPages: false });
-  if (activePage === "notes") renderNotes();
-  return true;
-}
-
-function clearReflection(ruku = completedRuku) {
-  if (!ruku) return;
-  const id = `ruku-${ruku.id}`;
-  if (!state.readingData.notes.some(note => note.id === id)) return;
-  updateReadingData(readingData => ({
-    ...readingData,
-    notes: readingData.notes.filter(note => note.id !== id),
-  }), { renderPages: false });
-  if (activePage === "notes") renderNotes();
-}
-
-function savePendingReflection() {
-  if (!upsertReflection($("reflection-input").value)) return;
-  $("reflection-input").value = "";
-  notify("Reflection saved.");
-}
-
-function flushPendingReflection() {
-  if (!reflectionTimer) return;
-  clearTimeout(reflectionTimer);
-  reflectionTimer = null;
-  upsertReflection($("reflection-input").value);
 }
 
 function renderSettings() {
@@ -1035,7 +961,7 @@ async function importBackup(file) {
     const payload = JSON.parse(await file.text());
     const incoming = payload?.format === "quran-reader-backup" ? payload.readerState : payload;
     if (!incoming || typeof incoming !== "object" || !validPosition(incoming.position, chapters)) throw new Error("This file is not a valid reader backup.");
-    if (!confirm("Importing this backup will replace your current reading data, settings, notes, and progress. Continue?")) return;
+    if (!confirm("Importing this backup will replace your current reading data, settings, and progress. Continue?")) return;
     state = decodeState(JSON.stringify(incoming), chapters);
     persist();
     applyPreferences();
@@ -1069,35 +995,17 @@ function initializeFeatureInteractions() {
       const [chapter, verse] = listen.dataset.listenVerse.split(":").map(Number);
       playVerseAudio({ chapter, verse }, listen);
     }
-    const deleteNote = event.target.closest("[data-delete-note]");
-    if (deleteNote) updateReadingData(readingData => ({ ...readingData, notes: readingData.notes.filter(note => note.id !== deleteNote.dataset.deleteNote) }));
   });
 
   $("open-kahf").addEventListener("click", openKahf);
   $("journey-open-kahf").addEventListener("click", openKahf);
-  $("notes-search").addEventListener("input", renderNotes);
   $("what-if-target").addEventListener("input", renderFinishEstimate);
-  $("reflection-input").addEventListener("input", () => {
-    clearTimeout(reflectionTimer);
-    reflectionTimer = setTimeout(() => {
-      reflectionTimer = null;
-      upsertReflection($("reflection-input").value);
-    }, 600);
-  });
-  $("reflection-input").addEventListener("blur", () => {
-    clearTimeout(reflectionTimer);
-    const text = $("reflection-input").value.trim();
-    if (text) upsertReflection(text);
-    else clearReflection();
-  });
   $("next-ruku").addEventListener("click", () => {
-    savePendingReflection();
     const next = completedRuku && rukus[completedRuku.id];
     $("ruku-completion").hidden = true;
     if (next) navigate(next.start.chapter, next.start.verse);
   });
   $("done-for-now").addEventListener("click", () => {
-    savePendingReflection();
     $("ruku-completion").hidden = true;
     $("reading-content").hidden = false;
     completedRuku = null;
@@ -1127,7 +1035,6 @@ function initializeFeatureInteractions() {
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") scheduleAnchorReminder();
-    else flushPendingReflection();
   });
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" })
@@ -1216,7 +1123,6 @@ window.addEventListener("hashchange", () => {
   else notify("That verse link isn't valid. Choose a chapter or verse to continue.");
 });
 window.addEventListener("pagehide", () => {
-  flushPendingReflection();
   persist();
 });
 matchMedia("(max-width: 760px)").addEventListener("change", closeMenu);

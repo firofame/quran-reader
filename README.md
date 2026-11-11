@@ -12,10 +12,8 @@ translation.
 - Resume the saved ayah, see overall and daily ruku progress, and finish with an
   optional reflection. Reading progress, notes, settings, and recent activity
   stay in this browser by default.
-- Journey, weekly review, Friday Al-Kahf progress, manual reading anchors,
-  optional browser reminders, and a separate seven-day Flow plan. The weekly
-  review separates full reading and flow reading, and counts the reflections
-  written.
+- Journey, weekly review, Friday Al-Kahf progress, manual reading anchors, and
+  optional browser reminders. The weekly review counts the reflections written.
 - Optional one-ayah recitation is off by default and only plays after a direct
   click. The reader never starts audio automatically.
 - Installable PWA with an offline cache for the reader and the translation.

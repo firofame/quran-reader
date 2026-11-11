@@ -7,7 +7,6 @@ import {
 	createDefaultReadingData,
 	findRuku,
 	getDayKey,
-	getModeTotals,
 	getResumePosition,
 	getRukuIndex,
 	getSectionRukus,
@@ -79,7 +78,7 @@ describe("reading history", () => {
 		let reading = createDefaultReadingData();
 		reading = { ...reading, settings: { ...reading.settings, dailyTarget: 3 } };
 		const rukus = getRukuIndex(data, chapters);
-		reading = recordRukuCompletion(reading, rukus[0], "full", new Date(2026, 10, 10, 5));
+		reading = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 5));
 		const stats = getTodayStats(reading, new Date(2026, 10, 10, 5));
 		expect({ target: stats.target, completed: stats.completed, reached: stats.reached }).toEqual({
 			target: 3,
@@ -99,8 +98,8 @@ describe("reading history", () => {
 		expect(reading.activityByDay["2026-11-10"].active).toBe(true);
 
 		const ruku = findRuku({ chapter: 1, verse: 1 }, rukus);
-		reading = recordRukuCompletion(reading, ruku, "full", new Date(2026, 10, 10, 8, 3));
-		reading = recordRukuCompletion(reading, ruku, "flow", new Date(2026, 10, 10, 9));
+		reading = recordRukuCompletion(reading, ruku, new Date(2026, 10, 10, 8, 3));
+		reading = recordRukuCompletion(reading, ruku, new Date(2026, 10, 10, 9));
 		expect(reading.completedRukuIds).toEqual([1]);
 		expect(reading.totals.rukuRead).toBe(2);
 		expect(reading.activityByDay["2026-11-10"].rukuIds.length).toBe(1);
@@ -112,20 +111,19 @@ describe("reading history", () => {
 	it("counts reading days and current and previous week totals in the weekly summary", () => {
 		let reading = createDefaultReadingData();
 		const rukus = getRukuIndex(data, chapters);
-		reading = recordRukuCompletion(reading, rukus[0], "full", new Date(2026, 10, 10, 8));
-		reading = recordRukuCompletion(reading, rukus[1], "full", new Date(2026, 10, 10, 9));
+		reading = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 8));
+		reading = recordRukuCompletion(reading, rukus[1], new Date(2026, 10, 10, 9));
 		const summary = getWeeklySummary(reading, new Date(2026, 10, 10, 12));
 		expect(summary.thisWeekRukus).toBe(2);
 		expect(summary.readDays).toBe(1);
 		expect(summary.previousWeekRukus).toBe(0);
 	});
 
-	it("separates full and flow reading in the weekly summary and counts notes written", () => {
+	it("counts notes written in the weekly summary", () => {
 		let reading = createDefaultReadingData();
 		const rukus = getRukuIndex(data, chapters);
-		reading = recordRukuCompletion(reading, rukus[0], "full", new Date(2026, 10, 10, 8));
-		reading = recordRukuCompletion(reading, rukus[1], "full", new Date(2026, 10, 10, 9));
-		reading = recordRukuCompletion(reading, rukus[2], "flow", new Date(2026, 10, 10, 10));
+		reading = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 8));
+		reading = recordRukuCompletion(reading, rukus[1], new Date(2026, 10, 10, 9));
 		reading = {
 			...reading,
 			notes: [
@@ -134,16 +132,15 @@ describe("reading history", () => {
 			] as any[],
 		} as any;
 		const summary = getWeeklySummary(reading, new Date(2026, 10, 10, 12));
-		expect(summary.modes).toEqual({ full: 2, flow: 1 });
 		expect(summary.notes).toBe(1);
-		expect(getModeTotals(reading)).toEqual({ full: 2, flow: 1 });
+		expect(summary.thisWeekRukus).toBe(2);
 	});
 
-	it("folds the retired light day and deep name into full reading when migrating", () => {
+	it("folds the retired light day, deep, and flow names away when migrating", () => {
 		const migrated = normalizeReadingData(
 			{
 				version: 5,
-				settings: { dailyTarget: 3, dayModes: { "2026-11-10": "light" } },
+				settings: { dailyTarget: 3, dayModes: { "2026-11-10": "light" }, weeklyPlanEnabled: false },
 				sessions: [
 					{ date: "2026-11-10", rukuId: 1, mode: "light", completedAt: 1 },
 					{ date: "2026-11-10", rukuId: 2, mode: "deep", completedAt: 2 },
@@ -162,9 +159,10 @@ describe("reading history", () => {
 		);
 		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.settings.dayModes).toBeUndefined();
-		expect(migrated.sessions.map(session => session.mode)).toEqual(["full", "full", "flow"]);
-		expect(migrated.activityByDay["2026-11-10"].modeCounts).toEqual({ full: 2, flow: 1 });
-		expect(getModeTotals(migrated)).toEqual({ full: 2, flow: 1 });
+		expect(migrated.settings.weeklyPlanEnabled).toBeUndefined();
+		expect(migrated.sessions.map(session => session.rukuId)).toEqual([1, 2, 3]);
+		expect(migrated.sessions.every(session => !Object.hasOwn(session, "mode"))).toBe(true);
+		expect(Object.hasOwn(migrated.activityByDay["2026-11-10"], "modeCounts")).toBe(false);
 	});
 
 	it("keeps valid saved fields and drops invalid records when migrating", () => {
@@ -208,6 +206,7 @@ describe("reading history", () => {
 		expect(migrated.verseReadKeys).toEqual(["1:1", "1:2"]);
 		expect(migrated.activityByDay["2026-11-10"].rukuCompletions).toBe(1);
 		expect(Object.hasOwn(migrated.activityByDay["2026-11-10"], "verseKeys")).toBe(false);
+		expect(Object.hasOwn(migrated.activityByDay["2026-11-10"], "modeCounts")).toBe(false);
 	});
 });
 
@@ -221,7 +220,7 @@ describe("resume position", () => {
 		expect(getResumePosition({ chapter: 1, verse: 1 }, reading, chapters, rukus)).toEqual({ chapter: 1, verse: 3 });
 		expect(getResumePosition({ chapter: 2, verse: 1 }, reading, chapters, rukus)).toEqual({ chapter: 2, verse: 1 });
 
-		const finished = recordRukuCompletion(reading, rukus[0], "full", new Date(2026, 10, 10, 8, 2));
+		const finished = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 8, 2));
 		expect(getResumePosition({ chapter: 1, verse: 7 }, finished, chapters, rukus)).toEqual({ chapter: 2, verse: 1 });
 	});
 

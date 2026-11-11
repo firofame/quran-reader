@@ -14,7 +14,6 @@ const icons = {
   left: '<path d="m14 6-6 6 6 6M8 12h12"/>',
   right: '<path d="m10 6 6 6-6 6M16 12H4"/>',
 };
-const PREFERRED_TTS_VOICE = { name: "Aaron (Enhanced)", language: "en-US" };
 const $ = id => document.getElementById(id);
 const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || ""}</svg>`;
 document.querySelectorAll("[data-icon]").forEach(element => { element.innerHTML = icon(element.dataset.icon); });
@@ -37,7 +36,6 @@ let activePage = "reader";
 let reminderTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
-let activePlaybackPhase = null;
 let currentAyah = null;
 
 function notify(message, persistent = false) {
@@ -105,8 +103,8 @@ function renderMarkReadBlock() {
 function setAudioButtonState(button, status) {
   const [chapter, verse] = button.dataset.listenVerse.split(":");
   const labels = {
-    play: `Play recitation and translation for verse ${chapter}:${verse}`,
-    pause: `Pause audio for verse ${chapter}:${verse}`,
+    play: `Play recitation for verse ${chapter}:${verse}`,
+    pause: `Pause recitation for verse ${chapter}:${verse}`,
     loading: `Loading recitation for verse ${chapter}:${verse}`,
   };
   const iconPath = status === "pause"
@@ -120,8 +118,6 @@ function setAudioButtonState(button, status) {
 
 function stopVerseAudio() {
   audioRequestId++;
-  activePlaybackPhase = null;
-  globalThis.speechSynthesis?.cancel();
   const audio = $("verse-audio");
   if (!audio) return;
   audio.pause();
@@ -137,54 +133,6 @@ function finishVersePlayback(request) {
   if (request !== audioRequestId) return;
   if (activeAudioButton?.isConnected) setAudioButtonState(activeAudioButton, "play");
   activeAudioButton = null;
-  activePlaybackPhase = null;
-}
-
-function playVerseTranslation(position, request) {
-  if (request !== audioRequestId) return;
-  const synth = globalThis.speechSynthesis;
-  const Utterance = globalThis.SpeechSynthesisUtterance;
-  if (!synth || typeof Utterance !== "function") {
-    finishVersePlayback(request);
-    notify("English translation speech is not available in this browser.");
-    return;
-  }
-
-  const translation = TRANSLATIONS[state.translation];
-  const data = translations.getLoaded(state.translation);
-  const ayah = data?.[position.chapter - 1] && findAyah(data[position.chapter - 1], position.verse);
-  if (!ayah) {
-    finishVersePlayback(request);
-    notify("The English translation could not be loaded for speech.");
-    return;
-  }
-
-  const utterance = new Utterance(ayah.text);
-  utterance.lang = translation.language;
-  const preferredVoice = (synth.getVoices?.() ?? []).find(voice =>
-    voice.name === PREFERRED_TTS_VOICE.name &&
-    voice.lang.replace(/_/g, "-").toLowerCase() === PREFERRED_TTS_VOICE.language.toLowerCase()
-  );
-  if (preferredVoice) utterance.voice = preferredVoice;
-  utterance.rate = 0.6;
-  utterance.onend = () => finishVersePlayback(request);
-  utterance.onerror = event => {
-    if (request !== audioRequestId) return;
-    console.warn("Unable to speak the selected translation:", event.error);
-    finishVersePlayback(request);
-    notify("English translation speech could not be played. Check your device’s speech voices.");
-  };
-
-  activePlaybackPhase = "translation";
-  if (activeAudioButton?.isConnected) setAudioButtonState(activeAudioButton, "pause");
-  try {
-    synth.cancel();
-    synth.speak(utterance);
-  } catch (error) {
-    console.warn("Unable to start translation speech:", error);
-    finishVersePlayback(request);
-    notify("English translation speech could not be played. Check your device’s speech voices.");
-  }
 }
 
 function playVerseAudio(position, button) {
@@ -197,13 +145,12 @@ function playVerseAudio(position, button) {
   stopVerseAudio();
   const request = ++audioRequestId;
   activeAudioButton = button;
-  activePlaybackPhase = "recitation";
   setAudioButtonState(button, "loading");
   audio.src = source;
   audio.currentTime = 0;
   audio.onended = () => {
     if (request !== audioRequestId) return;
-    playVerseTranslation(position, request);
+    finishVersePlayback(request);
   };
   audio.onerror = () => {
     if (request !== audioRequestId) return;
@@ -226,18 +173,6 @@ function toggleVerseAudio(position, button) {
   const audio = $("verse-audio");
   if (activeAudioButton !== button) {
     playVerseAudio(position, button);
-    return;
-  }
-  if (activePlaybackPhase === "translation") {
-    const synth = globalThis.speechSynthesis;
-    if (!synth) return;
-    if (synth.paused) {
-      synth.resume();
-      setAudioButtonState(button, "pause");
-    } else {
-      synth.pause();
-      setAudioButtonState(button, "play");
-    }
     return;
   }
   if (!audio.paused) {

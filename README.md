@@ -12,9 +12,8 @@ translation.
 - Resume the saved ayah and see overall and daily ruku progress. Reading
   progress, settings, and recent activity stay in this browser by default.
 - Daily progress review, manual reading anchors, and optional browser reminders.
-- One-ayah recitation is available from the play icon beside each ayah. After
-  the Arabic recitation, the browser reads that ayah's English translation. The
-  sequence starts only after a direct click.
+- One-ayah Arabic recitation is available from the play icon beside each ayah.
+  Playback starts only after a direct click.
 - Installable PWA with an offline cache for the reader and the translation.
 
 ---
@@ -52,8 +51,7 @@ without a Cloudflare account.
   to move through the Quran. Navigation continues across chapter boundaries.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes in Settings. A small
-  play/pause icon beside each ayah reference plays the Arabic recitation, then
-  reads the English translation using Aaron (Enhanced), en-US, when available.
+  play/pause icon beside each ayah reference plays its Arabic recitation.
 - Read in a centered column no wider than 680px, set in Georgia at 21px with
   1.7 line height, regular weight, and subtle letter spacing. The warm paper tone
   reduces glare; phones up to 430px use 20px text. Text-size controls still apply.
@@ -90,11 +88,8 @@ visible.
 - Translation: English Saheeh International. The file and its attribution are
   supplied by the project and are not modified.
 - Recitation: Mishary Rashid Alafasy at 128 kbps, streamed from Al Quran Cloud.
-  English translation speech uses the browser's built-in speech synthesis and
-  prefers Aaron (Enhanced), en-US. If that voice is unavailable, the browser
-  uses its default English voice. The quality depends on the device.
   Its [terms](https://alquran.cloud/terms-and-conditions) permit streaming for
-  personal and educational use. The sequence ends after that ayah's translation.
+  personal and educational use. Playback ends after that ayah's recitation.
 
 The app does not bundle word-by-word meanings because no suitable, clearly
 attributable source under terms that fit this offline-first reader has been

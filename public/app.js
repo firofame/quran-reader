@@ -659,17 +659,6 @@ function renderSettings() {
   $("resume-setting").checked = settings.resumeAtNextUnread;
   $("reminders-setting").checked = settings.remindersEnabled;
   $("listen-echo-setting").checked = settings.listenEchoEnabled;
-  const reminderTime = 28 * 24 * 60 * 60 * 1000;
-  const progressDays = Object.keys(state.readingData.activityByDay).sort();
-  const reminderThreshold = new Date();
-  reminderThreshold.setDate(reminderThreshold.getDate() - 28);
-  const oldProgressExists = progressDays[0] && progressDays[0] <= getDayKey(reminderThreshold, settings.dayBoundaryHour);
-  const backupDue = settings.lastBackupExportedAt
-    ? Date.now() - settings.lastBackupExportedAt >= reminderTime
-    : Boolean(oldProgressExists);
-  $("backup-reminder").textContent = state.readingData.totals.rukuRead && backupDue
-    ? "It has been a while since the last backup. Export a copy whenever it suits you."
-    : "Your backup is a single JSON file you can keep somewhere safe.";
   renderAnchorEditor();
   renderMarkReadBlock();
 }
@@ -912,45 +901,6 @@ function openSection(type, number) {
   if (target) navigate(target.start.chapter, target.start.verse);
 }
 
-function exportBackup() {
-  updateSetting("lastBackupExportedAt", Date.now());
-  const backup = {
-    format: "quran-reader-backup",
-    version: 1,
-    exportedAt: Date.now(),
-    readerState: state,
-  };
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `quran-reader-backup-${getDayKey(new Date())}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-  renderSettings();
-  notify("Backup exported.");
-}
-
-async function importBackup(file) {
-  try {
-    const payload = JSON.parse(await file.text());
-    const incoming = payload?.format === "quran-reader-backup" ? payload.readerState : payload;
-    if (!incoming || typeof incoming !== "object" || !validPosition(incoming.position, chapters)) throw new Error("This file is not a valid reader backup.");
-    if (!confirm("Importing this backup will replace your current reading data, settings, and progress. Continue?")) return;
-    state = decodeState(JSON.stringify(incoming), chapters);
-    persist();
-    applyPreferences();
-    renderProgressSummary();
-    renderSettings();
-    loadReading({ scroll: true });
-    notify("Backup imported. Your position and local reading data are restored.");
-  } catch (error) {
-    notify(error.message || "Could not read that backup file.");
-  } finally {
-    $("backup-file-input").value = "";
-  }
-}
-
 function initializeFeatureInteractions() {
   document.addEventListener("click", event => {
     const pageButton = event.target.closest("[data-page]");
@@ -999,12 +949,6 @@ function initializeFeatureInteractions() {
     updateSetting("focusMode", false);
     applyPreferences();
     $("minimal-menu").hidden = true;
-  });
-  $("export-backup").addEventListener("click", exportBackup);
-  $("import-backup").addEventListener("click", () => $("backup-file-input").click());
-  $("backup-file-input").addEventListener("change", () => {
-    const file = $("backup-file-input").files?.[0];
-    if (file) importBackup(file);
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") scheduleAnchorReminder();

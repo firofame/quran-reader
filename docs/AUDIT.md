@@ -25,7 +25,7 @@
 - The existing shape is `{ translation, position: { chapter, verse }, fontSize, theme }`.
 - Every verse navigation saves the exact position. A valid `#chapter:verse` link overrides the saved position on load. Existing position, translation, text size, and theme survive migration; new reading history uses schema version 8.
 - On load the reader opens the next unread verse rather than repeating the last one read, so a new sitting starts with nothing to click. A saved position that has not been read yet is still reopened exactly, and the behaviour can be turned off in Settings.
-- Progress, activity, sessions, settings, anchors, and weekly history are local. Export/import moves the complete reader state as one JSON backup.
+- Progress, activity, sessions, settings, anchors, and weekly history are stored locally in this browser.
 - Reading data stays in this browser. The reader sends no reading position or translation to a server.
 - New fields will be added through a versioned migration that keeps the current position and preferences.
 

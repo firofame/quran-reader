@@ -229,14 +229,12 @@ function applyPreferences() {
   document.documentElement.dataset.theme = state.theme;
   document.documentElement.style.setProperty("--reading-size", `${state.fontSize}px`);
   document.documentElement.dataset.translationFont = state.readingData.settings.translationFont;
-  document.body.classList.toggle("focus-mode", state.readingData.settings.focusMode);
   $("theme-toggle").innerHTML = icon(state.theme === "dark" ? "sun" : "moon");
   $("theme-toggle").setAttribute("aria-label", `Switch to ${state.theme === "dark" ? "light" : "dark"} theme`);
   $("font-down").disabled = state.fontSize <= 17;
   $("font-up").disabled = state.fontSize >= 29;
   document.querySelector('meta[name="theme-color"]').content = state.theme === "dark" ? "#191e1b" : "#f8f7f2";
   $("shortcut-hint").hidden = state.readingData.settings.shortcutsSeen;
-  $("focus-mode-exit").hidden = !state.readingData.settings.focusMode;
   updateDocumentChrome();
 }
 
@@ -655,7 +653,6 @@ function renderSettings() {
   $("day-boundary").value = String(settings.dayBoundaryHour);
   $("translation-font").value = settings.translationFont;
   $("ruku-summary-setting").value = settings.rukuSummary;
-  $("focus-mode-setting").checked = settings.focusMode;
   $("resume-setting").checked = settings.resumeAtNextUnread;
   $("reminders-setting").checked = settings.remindersEnabled;
   $("listen-echo-setting").checked = settings.listenEchoEnabled;
@@ -729,10 +726,6 @@ function initializeSettingsControls() {
     updateSetting("listenEchoEnabled", $("listen-echo-setting").checked);
     if (!$("listen-echo-setting").checked) stopVerseAudio();
     renderVerses();
-  });
-  $("focus-mode-setting").addEventListener("change", () => {
-    updateSetting("focusMode", $("focus-mode-setting").checked);
-    applyPreferences();
   });
   $("resume-setting").addEventListener("change", () => updateSetting("resumeAtNextUnread", $("resume-setting").checked));
   $("reminders-setting").addEventListener("change", async () => {
@@ -944,11 +937,6 @@ function initializeFeatureInteractions() {
     updateReadingData(() => updated);
     renderHeading();
     notify(`Marked ${pending} earlier ${plural} as read.`);
-  });
-  $("focus-mode-exit").addEventListener("click", () => {
-    updateSetting("focusMode", false);
-    applyPreferences();
-    $("minimal-menu").hidden = true;
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") scheduleAnchorReminder();

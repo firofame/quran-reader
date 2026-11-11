@@ -48,7 +48,7 @@ without a Cloudflare account.
 - The daily panel shows today's target next to a small gold ring that tracks your
   position within the current ruku, filling at its last ayah and resetting when
   you enter another ruku.
-- Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
+- Read one ayah at a time, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes. Both live in
@@ -80,8 +80,8 @@ without a Cloudflare account.
 Translations are loaded from the supplied local file and retained in memory
 while the page is open. The app makes no cloud requests for your reading data.
 Translation wording is unchanged; paragraph breaks are added only for display.
-Optional sentence-by-sentence Focus Reading is not implemented: complete ayahs
-remain visible.
+Optional sentence-by-sentence reading is not implemented: complete ayahs remain
+visible.
 
 ## Reading data and sources
 

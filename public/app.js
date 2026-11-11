@@ -208,13 +208,17 @@ function dispatch(action) {
 }
 
 const initialPosition = parseHash(location.hash, chapters);
-const startup = resolveStartupPosition({
-  hashPosition: initialPosition,
-  savedPosition: state.position,
-  readingData: state.readingData,
-  chapters,
-  rukus,
-});
+const navigation = globalThis.performance?.getEntriesByType?.("navigation")?.[0];
+// A browser reload should keep the visible ayah, even when it is already marked read.
+const startup = navigation?.type === "reload" && initialPosition
+  ? { position: initialPosition, source: "link" }
+  : resolveStartupPosition({
+      hashPosition: initialPosition,
+      savedPosition: state.position,
+      readingData: state.readingData,
+      chapters,
+      rukus,
+    });
 if (startup.source === "link") {
   state = reduceReaderState(state, { type: "position/set", position: startup.position }, chapters);
 } else if (location.hash && location.hash !== "#main" && !initialPosition) {

@@ -31,12 +31,12 @@
 
 ## Screens and navigation
 
-- One reading screen shows one complete translated ayah at a time. Chapter navigation is in the left drawer, and the reading screen carries no controls of its own: text size and the catch-up action live in Settings. There is no translation picker, because Saheeh International is the only translation.
+- One reading screen shows one complete translated ayah at a time. Chapter navigation is in the left drawer, with a small play/pause control beside each ayah reference. Text size and the catch-up action live in Settings. There is no translation picker, because Saheeh International is the only translation.
 - Previous/Continue buttons and left/right arrows navigate ayahs, including across chapter boundaries. Direct verse links use `#chapter:verse`. The last ayah of a ruku turns the next action into "Finish ruku". Space and `Escape` cover the rest of the reading shortcuts.
 - Current metadata includes page, ruku, manzil, hizb, juz, and sajda. A small ring in the daily panel tracks the current ayah within its ruku.
 - The reader also has a Settings view for reading preferences and anchors.
 - Browser reminders request notification permission only when enabled and only schedule while the page is open. The app is an installable PWA; the service worker caches its local reading assets for offline use.
-- One-verse recitation is optional and off by default. It streams Alafasy 128 kbps from Al Quran Cloud after a direct user action. See the provider's current [terms](https://alquran.cloud/terms-and-conditions).
+- One-verse recitation is available from the play icon beside each ayah. It streams Alafasy 128 kbps from Al Quran Cloud only after a direct user action and stops after the selected ayah. See the provider's current [terms](https://alquran.cloud/terms-and-conditions).
 - Ruku summaries and word-by-word meanings remain unpopulated because no sufficiently suitable and attributable source was selected. The app does not generate religious content.
 
 ## Tests

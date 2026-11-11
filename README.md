@@ -12,8 +12,8 @@ translation.
 - Resume the saved ayah and see overall and daily ruku progress. Reading
   progress, settings, and recent activity stay in this browser by default.
 - Daily progress review, manual reading anchors, and optional browser reminders.
-- Optional one-ayah recitation is off by default and only plays after a direct
-  click. The reader never starts audio automatically.
+- One-ayah recitation is available from the play icon beside each ayah and only
+  starts after a direct click. The reader never starts audio automatically.
 - Installable PWA with an offline cache for the reader and the translation.
 
 ---
@@ -50,8 +50,8 @@ without a Cloudflare account.
 - Read one ayah at a time, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
-- Adjust text size and switch between light and dark themes. Both live in
-  Settings, so the reading screen stays free of controls.
+- Adjust text size and switch between light and dark themes in Settings. A small
+  play/pause icon sits beside each ayah reference for recitation.
 - Read in a centered column no wider than 680px, with start-aligned translation
   text, normal letter spacing, and 26px between paragraphs. Default English text
   is 22px with 1.8 line height, or 20px on phones up to 430px wide.
@@ -90,10 +90,9 @@ visible.
   convention referenced in the improvement brief.
 - Translation: English Saheeh International. The file and its attribution are
   supplied by the project and are not modified.
-- Optional recitation: Mishary Rashid Alafasy at 128 kbps, streamed from Al
-  Quran Cloud. Its [terms](https://alquran.cloud/terms-and-conditions) permit
-  streaming for personal and educational use. The recitation button is hidden
-  until enabled in Settings.
+- Recitation: Mishary Rashid Alafasy at 128 kbps, streamed from Al Quran Cloud.
+  Its [terms](https://alquran.cloud/terms-and-conditions) permit streaming for
+  personal and educational use. Playback stops after the selected ayah.
 
 The app does not bundle word-by-word meanings or ruku themes: available sources
 did not provide a suitable, clearly attributable dataset under terms that fit

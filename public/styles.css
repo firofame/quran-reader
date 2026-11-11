@@ -224,7 +224,6 @@ select option { background: var(--paper); color: var(--text); }
 
 .verse-actions { display: flex; gap: 16px; margin-top: 14px; }
 .verse-actions button { min-height: 30px; color: var(--muted); font-size: 9px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
-.verse-actions button[aria-pressed="true"] { color: var(--green); }
 
 .flow-reading { padding-top: 0 !important; }
 .flow-reading .verse { grid-template-columns: 36px minmax(0, 1fr); padding-top: 22px; padding-bottom: 22px; }
@@ -320,7 +319,6 @@ select option { background: var(--paper); color: var(--text); }
 .saved-item:first-child { border-top: 0; }
 .saved-item-link { width: fit-content; color: var(--green); font-size: 10px; font-weight: 600; text-align: left; }
 .saved-item p { margin: 0; white-space: pre-wrap; color: var(--text); font-size: 11px; line-height: 1.7; }
-.saved-item-actions { display: flex; gap: 14px; }
 
 /* Week bars */
 .week-bars { display: flex; flex-direction: column; gap: 10px; }

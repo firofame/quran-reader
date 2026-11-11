@@ -213,8 +213,6 @@ select option { background: var(--paper); color: var(--text); }
 .surah-progress::-webkit-progress-bar { background: var(--line); border-radius: 1px; }
 .surah-progress::-webkit-progress-value { background: var(--green); transition: width .2s ease-out; border-radius: 1px; }
 .surah-progress::-moz-progress-bar { background: var(--green); }
-.ruku-summary { margin: 0 40px; padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.6; }
-.ruku-summary summary { cursor: pointer; color: var(--green); font-weight: 500; }
 
 /* ─── Pagination ───────────────────────────────────────────────── */
 .chapter-pagination { display: flex; flex-shrink: 0; justify-content: space-between; border-top: 1px solid var(--line); margin: 0 40px; padding: 18px 0; gap: 16px; }
@@ -310,7 +308,6 @@ select option { background: var(--paper); color: var(--text); }
   .chapter-pagination { margin-left: 24px; margin-right: 24px; }
   .app-navigation button { padding: 0 6px; font-size: 10px; }
   .overall-progress { width: 120px; }
-  .ruku-summary { margin: 0 24px; }
 }
 
 /* ─── Responsive: mobile ───────────────────────────────────────── */
@@ -334,7 +331,6 @@ select option { background: var(--paper); color: var(--text); }
   .app-navigation button { flex: 0 0 auto; min-height: 30px; padding: 0 8px; }
   .overall-progress { width: 118px; }
   .daily-panel { padding: 8px 16px; }
-  .ruku-summary { margin: 0 18px; }
 }
 
 @media (any-pointer: coarse) {

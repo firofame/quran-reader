@@ -93,10 +93,9 @@ visible.
   Its [terms](https://alquran.cloud/terms-and-conditions) permit streaming for
   personal and educational use. Playback stops after the selected ayah.
 
-The app does not bundle word-by-word meanings or ruku themes: available sources
-did not provide a suitable, clearly attributable dataset under terms that fit
-this offline-first reader. No religious summaries are generated. This leaves
-the context card empty unless a suitable sourced collection is added later.
+The app does not bundle word-by-word meanings because no suitable, clearly
+attributable source under terms that fit this offline-first reader has been
+selected. The app does not generate religious content.
 
 The first service-worker visit needs a connection to cache the static app and
 text. Once installed and cached, reading works offline. Recitation streaming

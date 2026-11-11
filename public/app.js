@@ -260,12 +260,11 @@ if (startup.source === "link") {
 function applyPreferences() {
   document.documentElement.dataset.theme = state.theme;
   document.documentElement.style.setProperty("--reading-size", `${state.fontSize}px`);
-  document.documentElement.dataset.translationFont = state.readingData.settings.translationFont;
   $("theme-toggle").innerHTML = icon(state.theme === "dark" ? "sun" : "moon");
   $("theme-toggle").setAttribute("aria-label", `Switch to ${state.theme === "dark" ? "light" : "dark"} theme`);
   $("font-down").disabled = state.fontSize <= 17;
   $("font-up").disabled = state.fontSize >= 29;
-  document.querySelector('meta[name="theme-color"]').content = state.theme === "dark" ? "#191e1b" : "#f8f7f2";
+  document.querySelector('meta[name="theme-color"]').content = state.theme === "dark" ? "#191e1b" : "#f8f6ef";
   $("shortcut-hint").hidden = state.readingData.settings.shortcutsSeen;
   updateDocumentChrome();
 }
@@ -562,7 +561,6 @@ function completeCurrentRuku(ruku) {
 function renderSettings() {
   const settings = state.readingData.settings;
   $("daily-target").value = settings.dailyTarget;
-  $("translation-font").value = settings.translationFont;
   $("ruku-summary-setting").value = settings.rukuSummary;
   $("resume-setting").checked = settings.resumeAtNextUnread;
   $("reminders-setting").checked = settings.remindersEnabled;
@@ -618,10 +616,6 @@ function initializeSettingsControls() {
     const value = Math.max(1, Math.min(10, Number($("daily-target").value) || 3));
     updateSetting("dailyTarget", value);
     $("daily-target").value = value;
-  });
-  $("translation-font").addEventListener("change", () => {
-    updateSetting("translationFont", $("translation-font").value);
-    applyPreferences();
   });
   $("ruku-summary-setting").addEventListener("change", () => updateSetting("rukuSummary", $("ruku-summary-setting").value));
   $("resume-setting").addEventListener("change", () => updateSetting("resumeAtNextUnread", $("resume-setting").checked));

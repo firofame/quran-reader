@@ -160,7 +160,7 @@ function playVerseTranslation(position, request) {
 
   const utterance = new Utterance(ayah.text);
   utterance.lang = translation.language;
-  utterance.rate = 0.9;
+  utterance.rate = 0.6;
   utterance.onend = () => finishVersePlayback(request);
   utterance.onerror = event => {
     if (request !== audioRequestId) return;

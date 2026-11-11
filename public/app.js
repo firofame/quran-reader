@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, splitTranslationParagraphs, selectAyah, adjacentPosition, matchesChapter, decodeState, validPosition } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, splitTranslationParagraphs, findAyah, adjacentPosition, matchesChapter, decodeState, validPosition } from "./reader.js";
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
@@ -271,10 +271,7 @@ function renderHeading() {
   const jumpOptions = Array.from({ length: chapter.verses }, (_, index) => new Option(index + 1, index + 1));
   $("verse-jump").replaceChildren(...jumpOptions);
   $("verse-jump").value = state.position.verse;
-  $("jump-control").hidden = Boolean($("verse-search").value.trim());
   populateGotoControls();
-  $("verse-search").placeholder = "Search in this chapter…";
-  $("verse-search").setAttribute("aria-label", "Search verses in this chapter");
   const translation = TRANSLATIONS[state.translation];
   const attribution = $("attribution");
   attribution.replaceChildren(document.createTextNode(`${translation.name} · `));
@@ -289,30 +286,29 @@ function renderHeading() {
 function renderVerses() {
   const data = translations.getLoaded(state.translation);
   if (!data) return;
-  const query = $("verse-search").value.trim();
   const verses = data[state.position.chapter - 1];
-  const selection = selectAyah(verses, state.position.verse, query);
+  const ayah = findAyah(verses, state.position.verse);
   const currentRuku = findRuku(state.position, rukus);
   const filtered = flowMode && currentRuku
     ? versesInRuku(data, currentRuku)
-    : selection.ayah ? [selection.ayah] : [];
+    : ayah ? [ayah] : [];
   const chapter = chapters[state.position.chapter - 1];
-  currentAyah = selection.ayah;
+  currentAyah = ayah;
   renderReadingMetadata(currentAyah);
-  if (selection.ayah) {
+  if (ayah) {
     $("verse-jump").value = state.position.verse;
   }
   $("reading-content").classList.toggle("focused", !flowMode);
   $("reading-content").classList.toggle("flow-reading", flowMode);
   document.body.classList.toggle("flow-mode", flowMode);
   $("reading-content").setAttribute("aria-live", "polite");
-  $("ayah-status").hidden = !selection.ayah;
+  $("ayah-status").hidden = !ayah;
   $("ayah-status").textContent = flowMode
     ? `RUKU ${currentRuku?.id} OF ${rukus.length}`
     : `AYAH ${state.position.verse} OF ${chapter.verses}`;
-  $("ruku-progress-wrap").hidden = !selection.ayah;
-  if (selection.ayah && currentRuku) {
-    const progress = getRukuProgress(selection.ayah, globalThis.QuranData, chapters);
+  $("ruku-progress-wrap").hidden = !ayah;
+  if (ayah && currentRuku) {
+    const progress = getRukuProgress(ayah, globalThis.QuranData, chapters);
     const value = flowMode ? progress.max : progress.value;
     $("ruku-progress").max = progress.max;
     $("ruku-progress").value = value;
@@ -327,22 +323,15 @@ function renderVerses() {
   if (!filtered.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.innerHTML = `${icon("search")}<h3>No verses found</h3><p>Try a different word or clear your search.</p>`;
+    empty.innerHTML = `<h3>No verses found</h3><p>This part of the chapter could not be loaded.</p>`;
     fragment.append(empty);
   }
   for (const verse of filtered) fragment.append(createVerse(verse, !flowMode));
   $("reading-content").replaceChildren(fragment);
   $("reading-content").setAttribute("aria-busy", "false");
-  $("search-count").hidden = !query;
-  $("search-count").textContent = selection.ayah
-    ? `${selection.index + 1} of ${selection.matches.length} matches`
-    : `${selection.matches.length} ${selection.matches.length === 1 ? "verse" : "verses"}`;
-  $("active-search").hidden = !query;
-  $("active-search-label").textContent = query ? `Search: “${query}” · ${$("search-count").textContent}` : "";
-  $("jump-control").hidden = Boolean(query);
   updateDocumentChrome();
   if (currentRuku) renderRukuSummary(currentRuku);
-  renderPagination(selection);
+  renderPagination(ayah);
 }
 
 function versesInRuku(data, ruku) {
@@ -457,11 +446,10 @@ function createVerse(verse, showActions = true) {
   return article;
 }
 
-function renderPagination(selection) {
+function renderPagination(ayah) {
   const nav = $("ayah-navigation");
   const focusedDirection = document.activeElement?.getAttribute("data-direction");
-  const searching = Boolean($("verse-search").value.trim());
-  nav.hidden = !selection.ayah;
+  nav.hidden = !ayah;
   $("navigation-hint").hidden = nav.hidden;
   nav.replaceChildren();
   if (nav.hidden) return;
@@ -469,8 +457,6 @@ function renderPagination(selection) {
   for (const direction of [-1, 1]) {
     const target = flowMode
       ? rukus[(currentRuku?.id ?? 1) - 1 + direction]?.start
-      : searching
-      ? selection.matches[selection.index + direction]
       : adjacentPosition(state.position, direction, chapters);
     const button = document.createElement("button");
     button.className = direction === -1 ? "pagination-button previous" : "pagination-button next";
@@ -481,7 +467,7 @@ function renderPagination(selection) {
       ? flowMode ? (direction === -1 ? "Previous ruku" : "Next ruku")
         : direction === 1 && currentRuku && isRukuEnd(state.position, currentRuku) ? "Finish ruku"
           : target.chapter !== state.position.chapter ? chapters[target.chapter - 1].name : direction === -1 ? "Back" : "Continue"
-      : searching ? "No more matches" : direction === -1 ? "The beginning" : "The final ayah";
+      : direction === -1 ? "The beginning" : "The final ayah";
     button.innerHTML = `${icon(direction === -1 ? "left" : "right")}<strong>${title}</strong>`;
     nav.append(button);
     if (direction === -1) {
@@ -489,10 +475,8 @@ function renderPagination(selection) {
       position.className = "ayah-nav-position";
       position.textContent = flowMode
         ? `Ruku ${currentRuku?.id ?? 0} / ${rukus.length} · Flow`
-        : searching
-        ? `${selection.index + 1} / ${selection.matches.length}`
         : `${state.position.verse} / ${chapters[state.position.chapter - 1].verses}`;
-      if (!searching && !flowMode) {
+      if (!flowMode) {
         const progress = document.createElement("progress");
         progress.className = "surah-progress";
         progress.max = chapters[state.position.chapter - 1].verses;
@@ -903,7 +887,6 @@ function beginFlow(rukuId) {
   if (!ruku) return;
   flowMode = true;
   completedRuku = null;
-  $("verse-search").value = "";
   showPage("reader");
   savePosition(ruku.start);
   recordCurrentVerse("flow");
@@ -1118,7 +1101,6 @@ async function loadReading({ scroll = false } = {}) {
   renderHeading();
   $("ayah-navigation").hidden = true;
   $("ayah-status").hidden = true;
-  $("active-search").hidden = true;
   $("navigation-hint").hidden = true;
   $("ruku-progress-wrap").hidden = true;
   $("ruku-completion").hidden = true;
@@ -1131,7 +1113,6 @@ async function loadReading({ scroll = false } = {}) {
     const data = await translations.load(translationId, chapters);
     if (request !== requestId) return;
     loading = false;
-    synchronizeSearchPosition(data);
     renderVerses();
   } catch (error) {
     if (request !== requestId) return;
@@ -1151,15 +1132,6 @@ function savePosition(position) {
   updateDocumentChrome();
 }
 
-function synchronizeSearchPosition(data) {
-  const query = $("verse-search").value.trim();
-  if (!query) return;
-  const selection = selectAyah(data[state.position.chapter - 1], state.position.verse, query);
-  if (selection.ayah && selection.ayah.verse !== state.position.verse) {
-    savePosition({ chapter: state.position.chapter, verse: selection.ayah.verse });
-  }
-}
-
 function showAyah(position) {
   if (position.chapter !== state.position.chapter) {
     navigate(position.chapter, position.verse, { record: true });
@@ -1173,14 +1145,7 @@ function showAyah(position) {
 
 function ayahTarget(direction) {
   if (loading) return null;
-  const data = translations.getLoaded(state.translation);
-  if (!data) return null;
-  const query = $("verse-search").value.trim();
-  const selection = selectAyah(data[state.position.chapter - 1], state.position.verse, query);
-  if (!selection.ayah) return null;
-  return query
-    ? selection.matches[selection.index + direction]
-    : adjacentPosition(state.position, direction, chapters);
+  return adjacentPosition(state.position, direction, chapters);
 }
 
 function moveAyah(direction) {
@@ -1196,11 +1161,6 @@ function moveAyah(direction) {
     return;
   }
   if (direction === 1 && currentRuku && isRukuEnd(state.position, currentRuku)) {
-    if ($("verse-search").value.trim()) {
-      const target = ayahTarget(direction);
-      if (target) showAyah(target);
-      return;
-    }
     recordCurrentVerse();
     completeCurrentRuku(currentRuku, getTodayStats(state.readingData).mode);
     return;
@@ -1224,7 +1184,6 @@ function navigate(chapter, verse = 1, { record = false } = {}) {
   completedRuku = null;
   savePosition({ chapter, verse });
   if (record) recordCurrentVerse();
-  $("verse-search").value = "";
   $("reading-controls").open = false;
   closeMenu();
   loadReading({ scroll: true });
@@ -1438,17 +1397,6 @@ $("ayah-navigation").addEventListener("click", event => {
   if (button) moveAyah(Number(button.dataset.direction));
 });
 $("chapter-search").addEventListener("input", renderChapters);
-$("verse-search").addEventListener("input", () => {
-  if (loading) return;
-  const data = translations.getLoaded(state.translation);
-  if (data) synchronizeSearchPosition(data);
-  renderVerses();
-});
-$("clear-search").addEventListener("click", () => {
-  $("verse-search").value = "";
-  if (!loading) renderVerses();
-  $("reading-controls").querySelector("summary").focus({ preventScroll: true });
-});
 $("verse-jump").addEventListener("change", () => {
   $("reading-controls").open = false;
   showAyah({ chapter: state.position.chapter, verse: Number($("verse-jump").value) });

@@ -163,17 +163,10 @@ select option { background: var(--paper); color: var(--text); }
 .sajda-indicator { display: inline-flex; align-items: baseline; gap: 4px; color: var(--green); white-space: nowrap; }
 .sajda-symbol { color: var(--gold); font: 14px/1 "Geeza Pro", "Traditional Arabic", serif; }
 
-/* Verse toolbar / search */
+/* Verse toolbar */
 .verse-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 40px; padding: 4px 24px; border-top: 1px solid var(--line); gap: 10px 14px; }
-.verse-search { height: 34px; width: 240px; max-width: 100%; flex: 1; border-radius: 6px; }
-.verse-search input { font-size: 11px; }
-.verse-search svg { width: 14px; height: 14px; }
 .jump-control { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; white-space: nowrap; }
 .jump-control select { border: 0; min-height: 34px; padding: 5px 3px; font-size: 10px; color: var(--text); background: transparent; cursor: pointer; }
-.search-count { font-size: 10px; color: var(--muted); }
-.active-search { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 28px; background: var(--hover); font-size: 11px; line-height: 1.6; }
-.active-search > span { min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
-.active-search button { flex-shrink: 0; min-height: 36px; color: var(--green); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 
 /* ─── Buttons ──────────────────────────────────────────────────── */
 .primary-button { background: var(--green); color: #fff; border-radius: var(--radius-sm); padding: 11px 20px; margin-top: 10px; font-size: 12px; font-weight: 500; letter-spacing: .01em; box-shadow: 0 1px 3px rgba(46,110,78,.2); transition: background .15s, box-shadow .15s, transform .1s; }
@@ -395,7 +388,7 @@ select option { background: var(--paper); color: var(--text); }
 .minimal-menu button:hover { background: var(--green-soft); color: var(--green); }
 
 /* ─── Focus mode ───────────────────────────────────────────────── */
-body.focus-mode .sidebar, body.focus-mode .topbar, body.focus-mode .reader-header, body.focus-mode .daily-panel, body.focus-mode .active-search, body.focus-mode .chapter-pagination, body.focus-mode .navigation-hint, body.focus-mode .reader-footer { display: none; }
+body.focus-mode .sidebar, body.focus-mode .topbar, body.focus-mode .reader-header, body.focus-mode .daily-panel, body.focus-mode .chapter-pagination, body.focus-mode .navigation-hint, body.focus-mode .reader-footer { display: none; }
 body.focus-mode main { max-width: none; padding: 0; }
 body.focus-mode .reader { min-height: 100svh; border: 0; border-radius: 0; box-shadow: none; }
 body.focus-mode #reading-content { min-height: 100svh; padding: 25px; }
@@ -464,10 +457,7 @@ body.focus-mode .minimal-menu[hidden] { display: none; }
   .chapter-heading h1 { font-size: 22px; }
   .reading-controls summary { right: 12px; padding: 0 8px; }
   .verse-toolbar { padding: 0 16px; }
-  .verse-search { gap: 6px; }
-  .verse-search input { font-size: 10px; }
   .jump-control { font-size: 9px; }
-  .active-search { padding: 6px 14px; }
   #reading-content { padding: 0 16px; }
   .verse { grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 24px 0; }
   .verse-number { font-size: 9px; padding-top: 10px; }

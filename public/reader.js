@@ -117,12 +117,8 @@ export function normalizeSearch(text) {
   return text.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase().replace(/['’\-]/g, "");
 }
 
-export function selectAyah(verses, verseNumber, query = "") {
-  const search = normalizeSearch(query.trim());
-  const matches = verses.filter(verse =>
-    normalizeSearch(verse.text).includes(search) || `${verse.chapter}:${verse.verse}`.includes(search));
-  const index = Math.max(0, matches.findIndex(verse => verse.verse === verseNumber));
-  return { ayah: matches[index] ?? null, index, matches };
+export function findAyah(verses, verseNumber) {
+  return verses.find(verse => verse.verse === verseNumber) ?? verses[0] ?? null;
 }
 
 export function adjacentPosition(position, direction, chapters) {

@@ -1,5 +1,6 @@
 export const READER_SCHEMA_VERSION = 8;
 export const DEFAULT_RUKU_COUNT = 556;
+export const DAY_BOUNDARY_HOUR = 0;
 
 /**
  * Sessions recorded under the retired light day, deep, and flow names still
@@ -19,7 +20,6 @@ export function createDefaultReadingData() {
     sessions: [],
     settings: {
       dailyTarget: 3,
-      dayBoundaryHour: 0,
       anchors: [],
       remindersEnabled: false,
       translationFont: "serif",
@@ -117,7 +117,6 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
     sessions,
     settings: {
       dailyTarget: boundedInteger(settings.dailyTarget, defaults.settings.dailyTarget, 1, 10),
-      dayBoundaryHour: boundedInteger(settings.dayBoundaryHour, 0, 0, 23),
       anchors,
       remindersEnabled: Boolean(settings.remindersEnabled),
       translationFont: ["serif", "sans"].includes(settings.translationFont) ? settings.translationFont : defaults.settings.translationFont,
@@ -128,14 +127,14 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
   };
 }
 
-export function getDayKey(date = new Date(), boundaryHour = 0) {
-  const adjusted = new Date(date.getTime() - Math.max(0, Math.min(23, boundaryHour)) * 60 * 60 * 1000);
+export function getDayKey(date = new Date()) {
+  const adjusted = new Date(date.getTime() - DAY_BOUNDARY_HOUR * 60 * 60 * 1000);
   return `${adjusted.getFullYear()}-${String(adjusted.getMonth() + 1).padStart(2, "0")}-${String(adjusted.getDate()).padStart(2, "0")}`;
 }
 
 export function getTodayStats(readingData, date = new Date()) {
   const { settings } = readingData;
-  const key = getDayKey(date, settings.dayBoundaryHour);
+  const key = getDayKey(date);
   const activity = readingData.activityByDay[key];
   const target = settings.dailyTarget;
   const completed = activity?.rukuIds.length ?? 0;
@@ -144,8 +143,7 @@ export function getTodayStats(readingData, date = new Date()) {
 
 export function recordVerseVisit(readingData, position, date = new Date()) {
   const key = `${position.chapter}:${position.verse}`;
-  const boundaryHour = readingData.settings.dayBoundaryHour;
-  const day = getDayKey(date, boundaryHour);
+  const day = getDayKey(date);
   const wasRead = readingData.verseReadKeys.includes(key);
   const prior = readingData.activityByDay[day] ?? {
     active: false, rukuIds: [], rukuCompletions: 0,
@@ -220,7 +218,7 @@ export function recordRukusAsRead(readingData, currentRukuId, rukus) {
 }
 
 export function recordRukuCompletion(readingData, ruku, date = new Date()) {
-  const day = getDayKey(date, readingData.settings.dayBoundaryHour);
+  const day = getDayKey(date);
   const prior = readingData.activityByDay[day] ?? {
     active: false, rukuIds: [], rukuCompletions: 0,
     sessionStarts: [], lastReadAt: 0,

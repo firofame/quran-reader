@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DEFAULT_RUKU_COUNT, findRuku, getDayKey, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DAY_BOUNDARY_HOUR, DEFAULT_RUKU_COUNT, findRuku, getDayKey, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -504,8 +504,8 @@ function renderProgressSummary() {
 
 function anchorWasUsedToday(anchor, anchors, readingData) {
   const now = new Date();
-  const boundary = readingData.settings.dayBoundaryHour;
-  const today = getDayKey(now, boundary);
+  const boundary = DAY_BOUNDARY_HOUR;
+  const today = getDayKey(now);
   const current = anchors.findIndex(item => item.id === anchor.id);
   if (current < 0 || !anchors.length) return false;
   const next = anchors[(current + 1) % anchors.length];
@@ -562,7 +562,6 @@ function completeCurrentRuku(ruku) {
 function renderSettings() {
   const settings = state.readingData.settings;
   $("daily-target").value = settings.dailyTarget;
-  $("day-boundary").value = String(settings.dayBoundaryHour);
   $("translation-font").value = settings.translationFont;
   $("ruku-summary-setting").value = settings.rukuSummary;
   $("resume-setting").checked = settings.resumeAtNextUnread;
@@ -615,19 +614,11 @@ function updateSetting(name, value, renderPages = false) {
 }
 
 function initializeSettingsControls() {
-  const boundary = $("day-boundary");
-  boundary.replaceChildren(new Option("Midnight", 0));
-  for (let hour = 1; hour < 24; hour++) {
-    const label = new Date(2020, 0, 1, hour).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-    boundary.add(new Option(label, hour));
-  }
-
   $("daily-target").addEventListener("change", () => {
     const value = Math.max(1, Math.min(10, Number($("daily-target").value) || 3));
     updateSetting("dailyTarget", value);
     $("daily-target").value = value;
   });
-  boundary.addEventListener("change", () => updateSetting("dayBoundaryHour", Number(boundary.value)));
   $("translation-font").addEventListener("change", () => {
     updateSetting("translationFont", $("translation-font").value);
     applyPreferences();

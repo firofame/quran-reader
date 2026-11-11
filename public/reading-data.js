@@ -1,4 +1,4 @@
-export const READER_SCHEMA_VERSION = 6;
+export const READER_SCHEMA_VERSION = 7;
 export const DEFAULT_RUKU_COUNT = 556;
 
 const MODES = new Set(["full", "flow"]);
@@ -26,7 +26,6 @@ export function createDefaultReadingData() {
     activityByDay: {},
     sessions: [],
     notes: [],
-    bookmarks: [],
     settings: {
       dailyTarget: 3,
       dayBoundaryHour: 0,
@@ -121,19 +120,6 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
     if (!text) return [];
     return [{ id: typeof note.id === "string" ? note.id.slice(0, 80) : `${note.rukuId}-${note.createdAt || 0}`, rukuId: note.rukuId, text, createdAt: Number.isSafeInteger(note.createdAt) ? note.createdAt : 0 }];
   }).slice(-1000);
-  const bookmarks = (Array.isArray(raw.bookmarks) ? raw.bookmarks : []).flatMap(bookmark => {
-    if (!isObject(bookmark)) return [];
-    const chapter = bookmark.chapter;
-    const verse = bookmark.verse;
-    if (!chapters[chapter - 1] || !Number.isSafeInteger(verse) || verse < 1 || verse > chapters[chapter - 1].verses) return [];
-    return [{
-      id: typeof bookmark.id === "string" ? bookmark.id.slice(0, 80) : `${chapter}:${verse}`,
-      chapter,
-      verse,
-      note: typeof bookmark.note === "string" ? bookmark.note.trim().slice(0, 500) : "",
-      createdAt: Number.isSafeInteger(bookmark.createdAt) ? bookmark.createdAt : 0,
-    }];
-  }).slice(-2000);
   const sessions = (Array.isArray(raw.sessions) ? raw.sessions : []).flatMap(session => {
     if (!isObject(session) || !Number.isSafeInteger(session.rukuId) || session.rukuId < 1 || session.rukuId > rukuCount) return [];
     if (!validDateKey(session.date)) return [];
@@ -159,7 +145,6 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
     activityByDay,
     sessions,
     notes,
-    bookmarks,
     settings: {
       dailyTarget: boundedInteger(settings.dailyTarget, defaults.settings.dailyTarget, 1, 10),
       dayBoundaryHour: boundedInteger(settings.dayBoundaryHour, 0, 0, 23),

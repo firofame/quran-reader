@@ -172,7 +172,6 @@ describe("reading history", () => {
 			{
 				version: 1,
 				completedRukuIds: [1, 1, 999],
-				bookmarks: [{ id: "a", chapter: 1, verse: 99 }],
 				notes: [{ id: "b", rukuId: 1, text: "Reflection", createdAt: 1 }],
 				settings: { dailyTarget: 50, dayBoundaryHour: 22, anchors: [{ id: "fajr", name: "After Fajr", time: "05:10" }] },
 			},
@@ -180,7 +179,6 @@ describe("reading history", () => {
 		);
 		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.completedRukuIds).toEqual([1]);
-		expect(migrated.bookmarks).toEqual([]);
 		expect(migrated.notes[0].text).toBe("Reflection");
 		expect(migrated.settings.dailyTarget).toBe(10);
 		expect(migrated.settings.dayBoundaryHour).toBe(22);

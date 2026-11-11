@@ -10,8 +10,8 @@ translation.
   order, revelation place, rukus, pages, manzils, hizb quarters, juzs, and
   sajdas.
 - Resume the saved ayah, see overall and daily ruku progress, and finish with an
-  optional reflection. Reading progress, bookmarks, notes, settings, and recent
-  activity stay in this browser by default.
+  optional reflection. Reading progress, notes, settings, and recent activity
+  stay in this browser by default.
 - Journey, weekly review, Friday Al-Kahf progress, manual reading anchors,
   optional browser reminders, and a separate seven-day Flow plan. The weekly
   review separates full reading and flow reading, and counts the reflections
@@ -78,8 +78,7 @@ without a Cloudflare account.
   it was, and an explicit ayah link still wins. This can be turned off in
   Settings.
 - Press `/` to find a chapter, `Space` or `→` for the next ayah, `←` for the
-  previous one, `b` to bookmark the current ayah, `r` to read it again, and
-  `Escape` for the small reading menu.
+  previous one, and `Escape` for the small reading menu.
 
 Translations are loaded from the supplied local file and retained in memory
 while the page is open. The app makes no cloud requests for your reading data.

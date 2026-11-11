@@ -40,7 +40,6 @@ let reflectionTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
 let currentAyah = null;
-const repeatCounts = new Map();
 
 function notify(message, persistent = false) {
   if (storageFailed && !persistent) {
@@ -417,29 +416,15 @@ function createVerse(verse, showActions = true) {
     textContainer.append(text);
   }
   article.append(number, textContainer);
-  if (showActions) {
+  if (showActions && state.readingData.settings.listenEchoEnabled) {
     const actions = document.createElement("div");
     actions.className = "verse-actions";
-    const isBookmarked = state.readingData.bookmarks.some(item => item.chapter === verse.chapter && item.verse === verse.verse);
-    const bookmark = document.createElement("button");
-    bookmark.type = "button";
-    bookmark.dataset.bookmark = `${verse.chapter}:${verse.verse}`;
-    bookmark.textContent = isBookmarked ? "Bookmarked" : "Bookmark";
-    bookmark.setAttribute("aria-pressed", String(isBookmarked));
-    const repeat = document.createElement("button");
-    repeat.type = "button";
-    repeat.dataset.repeat = `${verse.chapter}:${verse.verse}`;
-    const repeats = repeatCounts.get(`${verse.chapter}:${verse.verse}`) || 0;
-    repeat.textContent = repeats ? `Read again · ${repeats}x` : "Read again";
-    actions.append(bookmark, repeat);
-    if (state.readingData.settings.listenEchoEnabled) {
-      const listen = document.createElement("button");
-      listen.type = "button";
-      listen.dataset.listenVerse = `${verse.chapter}:${verse.verse}`;
-      listen.textContent = "Hear one verse";
-      listen.setAttribute("aria-label", `Hear verse ${verse.chapter}:${verse.verse} once, then read it aloud`);
-      actions.append(listen);
-    }
+    const listen = document.createElement("button");
+    listen.type = "button";
+    listen.dataset.listenVerse = `${verse.chapter}:${verse.verse}`;
+    listen.textContent = "Hear one verse";
+    listen.setAttribute("aria-label", `Hear verse ${verse.chapter}:${verse.verse} once, then read it aloud`);
+    actions.append(listen);
     textContainer.append(actions);
   }
   return article;
@@ -686,36 +671,6 @@ function renderNotes() {
     item.append(jump, text, remove);
     noteList.append(item);
   }
-  const bookmarks = state.readingData.bookmarks.filter(item => `${chapters[item.chapter - 1].name} ${item.chapter}:${item.verse} ${item.note}`.toLocaleLowerCase().includes(query));
-  const bookmarkList = $("bookmarks-list");
-  bookmarkList.replaceChildren();
-  if (!bookmarks.length) bookmarkList.textContent = query ? "No bookmarks match this search." : "Saved verses will appear here.";
-  for (const bookmark of bookmarks) {
-    const item = document.createElement("article");
-    item.className = "saved-item";
-    const jump = document.createElement("button");
-    jump.type = "button";
-    jump.className = "saved-item-link";
-    jump.dataset.jump = `${bookmark.chapter}:${bookmark.verse}`;
-    jump.textContent = `${chapters[bookmark.chapter - 1].name} ${bookmark.chapter}:${bookmark.verse}`;
-    const note = document.createElement("p");
-    note.textContent = bookmark.note || "No note";
-    const actions = document.createElement("div");
-    actions.className = "saved-item-actions";
-    const edit = document.createElement("button");
-    edit.type = "button";
-    edit.className = "quiet-link";
-    edit.dataset.editBookmark = bookmark.id;
-    edit.textContent = "Add or edit note";
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "quiet-link";
-    remove.dataset.deleteBookmark = bookmark.id;
-    remove.textContent = "Remove bookmark";
-    actions.append(edit, remove);
-    item.append(jump, note, actions);
-    bookmarkList.append(item);
-  }
 }
 
 function renderWeekly() {
@@ -887,26 +842,6 @@ function beginFlow(rukuId) {
   savePosition(ruku.start);
   recordCurrentVerse();
   loadReading({ scroll: true });
-}
-
-function toggleBookmark(position) {
-  const id = `${position.chapter}:${position.verse}`;
-  const existing = state.readingData.bookmarks.find(item => item.chapter === position.chapter && item.verse === position.verse);
-  updateReadingData(readingData => ({
-    ...readingData,
-    bookmarks: existing
-      ? readingData.bookmarks.filter(item => item.id !== existing.id)
-      : [...readingData.bookmarks, { id, chapter: position.chapter, verse: position.verse, note: "", createdAt: Date.now() }],
-  }));
-  notify(existing ? "Bookmark removed." : "Verse bookmarked.");
-  if (!$("reading-content").hidden) renderVerses();
-}
-
-function repeatVerse(position) {
-  const key = `${position.chapter}:${position.verse}`;
-  repeatCounts.set(key, (repeatCounts.get(key) || 0) + 1);
-  renderVerses();
-  notify(`Read verse ${key} again. ${repeatCounts.get(key)}x this visit.`);
 }
 
 function renderSettings() {
@@ -1222,7 +1157,7 @@ async function importBackup(file) {
     const payload = JSON.parse(await file.text());
     const incoming = payload?.format === "quran-reader-backup" ? payload.readerState : payload;
     if (!incoming || typeof incoming !== "object" || !validPosition(incoming.position, chapters)) throw new Error("This file is not a valid reader backup.");
-    if (!confirm("Importing this backup will replace your current reading data, settings, notes, bookmarks, and progress. Continue?")) return;
+    if (!confirm("Importing this backup will replace your current reading data, settings, notes, and progress. Continue?")) return;
     state = decodeState(JSON.stringify(incoming), chapters);
     persist();
     applyPreferences();
@@ -1253,16 +1188,6 @@ function initializeFeatureInteractions() {
       const [chapter, verse] = jump.dataset.jump.split(":").map(Number);
       navigate(chapter, verse);
     }
-    const bookmark = event.target.closest("[data-bookmark]");
-    if (bookmark) {
-      const [chapter, verse] = bookmark.dataset.bookmark.split(":").map(Number);
-      toggleBookmark({ chapter, verse });
-    }
-    const repeat = event.target.closest("[data-repeat]");
-    if (repeat) {
-      const [chapter, verse] = repeat.dataset.repeat.split(":").map(Number);
-      repeatVerse({ chapter, verse });
-    }
     const listen = event.target.closest("[data-listen-verse]");
     if (listen) {
       const [chapter, verse] = listen.dataset.listenVerse.split(":").map(Number);
@@ -1270,14 +1195,6 @@ function initializeFeatureInteractions() {
     }
     const deleteNote = event.target.closest("[data-delete-note]");
     if (deleteNote) updateReadingData(readingData => ({ ...readingData, notes: readingData.notes.filter(note => note.id !== deleteNote.dataset.deleteNote) }));
-    const deleteBookmark = event.target.closest("[data-delete-bookmark]");
-    if (deleteBookmark) updateReadingData(readingData => ({ ...readingData, bookmarks: readingData.bookmarks.filter(item => item.id !== deleteBookmark.dataset.deleteBookmark) }));
-    const editBookmark = event.target.closest("[data-edit-bookmark]");
-    if (editBookmark) {
-      const item = state.readingData.bookmarks.find(bookmark => bookmark.id === editBookmark.dataset.editBookmark);
-      const note = prompt("Optional note for this bookmarked verse", item?.note ?? "");
-      if (note !== null && item) updateReadingData(readingData => ({ ...readingData, bookmarks: readingData.bookmarks.map(bookmark => bookmark.id === item.id ? { ...bookmark, note: note.trim().slice(0, 500) } : bookmark) }));
-    }
   });
 
   $("open-kahf").addEventListener("click", openKahf);
@@ -1310,7 +1227,6 @@ function initializeFeatureInteractions() {
     completedRuku = null;
     renderVerses();
   });
-  $("minimal-bookmark").addEventListener("click", () => toggleBookmark(state.position));
   $("mark-read-btn").addEventListener("click", () => {
     const currentRuku = findRuku(state.position, rukus);
     const pending = pendingEarlierRukus();
@@ -1390,16 +1306,6 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     markShortcutsSeen();
     moveAyah(1);
-  }
-  if (activePage === "reader" && !typing && !sidebarOpen && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLocaleLowerCase() === "b") {
-    event.preventDefault();
-    markShortcutsSeen();
-    toggleBookmark(state.position);
-  }
-  if (activePage === "reader" && !typing && !sidebarOpen && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLocaleLowerCase() === "r") {
-    event.preventDefault();
-    markShortcutsSeen();
-    repeatVerse(state.position);
   }
   if (event.key === "Escape") {
     if (sidebarOpen) { closeMenu(); $("open-menu").focus(); return; }

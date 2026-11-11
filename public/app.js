@@ -80,9 +80,9 @@ function updateReadingData(update, { renderPages = true } = {}) {
   else renderProgressSummary();
 }
 
-function recordCurrentVerse(mode = getTodayStats(state.readingData).mode) {
+function recordCurrentVerse() {
   const currentRuku = findRuku(state.position, rukus);
-  updateReadingData(readingData => recordVerseVisit(readingData, state.position, mode, new Date()), { renderPages: false });
+  updateReadingData(readingData => recordVerseVisit(readingData, state.position, new Date()), { renderPages: false });
   if (currentRuku) renderRukuSummary(currentRuku);
 }
 
@@ -494,9 +494,6 @@ function renderProgressSummary() {
   const readingData = state.readingData;
   const today = getTodayStats(readingData);
   $("today-progress").textContent = `Today: ${today.completed} / ${today.target}${today.bonus ? ` · +${today.bonus} bonus` : ""}`;
-  $("today-mode-label").textContent = today.mode === "light" ? "Light day · that counts" : "Full mode";
-  $("light-mode-toggle").setAttribute("aria-pressed", String(today.mode === "light"));
-  $("light-mode-toggle").textContent = today.mode === "light" ? "Switch to full mode" : "Light mode";
   $("target-reached-label").hidden = !today.reached;
   $("target-reached-label").textContent = today.bonus ? `Target reached · +${today.bonus} bonus` : "Target reached";
   updateDocumentChrome();
@@ -743,7 +740,7 @@ function renderWeekly() {
     bars.append(row);
   }
   $("week-comparison").textContent = `This week: ${summary.thisWeekRukus} rukus · Previous week: ${summary.previousWeekRukus} rukus.`;
-  $("week-modes").textContent = `Deep reading: ${summary.modes.deep} · Light days: ${summary.modes.light} · Flow reading: ${summary.modes.flow}.`;
+  $("week-modes").textContent = `Full reading: ${summary.modes.full} · Flow reading: ${summary.modes.flow}.`;
   $("week-notes").textContent = `Notes written this week: ${summary.notes}.`;
   const suggestedTarget = summary.readDays
     ? Math.max(1, Math.min(10, Math.round(summary.thisWeekRukus / summary.readDays)))
@@ -763,7 +760,7 @@ function renderWeekly() {
   const totals = state.readingData.totals;
   $("lifetime-totals").innerHTML = `<span><strong>${totals.rukuRead}</strong> rukus read</span><span><strong>${totals.verseRead}</strong> verses read</span><span><strong>${totals.readingDays}</strong> reading days</span>`;
   const modes = getModeTotals(state.readingData);
-  $("lifetime-modes").textContent = `Deep reading: ${modes.deep} · Light days: ${modes.light} · Flow reading: ${modes.flow}.`;
+  $("lifetime-modes").textContent = `Full reading: ${modes.full} · Flow reading: ${modes.flow}.`;
 }
 
 function renderPlan() {
@@ -802,7 +799,7 @@ function renderPlan() {
   const largestDay = dayTotals.indexOf(Math.max(...dayTotals)) + 1;
   const note = document.createElement("p");
   note.className = "muted-copy plan-pace-note";
-  note.textContent = `This plan averages ${average.toFixed(0)} rukus a day across the remaining portions. Manzil ${largestDay} has the largest portion at ${Math.max(...dayTotals)} rukus. Your usual deep-reading pace is about 3 to 6 rukus per day.`;
+  note.textContent = `This plan averages ${average.toFixed(0)} rukus a day across the remaining portions. Manzil ${largestDay} has the largest portion at ${Math.max(...dayTotals)} rukus. Your usual reading pace is about 3 to 6 rukus per day.`;
   output.prepend(note);
 }
 
@@ -816,7 +813,7 @@ function completeCurrentRuku(ruku, mode, { continueToNext = false } = {}) {
     if (next) {
       flowMode = true;
       savePosition(next.start);
-      recordCurrentVerse("flow");
+      recordCurrentVerse();
       loadReading({ scroll: false });
     } else {
       flowMode = false;
@@ -831,7 +828,7 @@ function completeCurrentRuku(ruku, mode, { continueToNext = false } = {}) {
     ? Math.round(completedCount / rukus.length * 100)
     : Number((completedCount / rukus.length * 100).toFixed(1));
   $("completion-title").textContent = `${chapters[ruku.chapter - 1].name} · ruku ${ruku.localNumber} complete`;
-  $("completion-progress").textContent = `Overall: ${state.readingData.completedRukuIds.length} / ${rukus.length} rukus (${percent}%) · Today: ${today.completed} / ${today.target}${today.reached ? " · Target reached" : ""}${today.bonus ? ` · +${today.bonus} bonus` : ""}${today.mode === "light" && today.reached ? " · Light day done. That counts." : ""}`;
+  $("completion-progress").textContent = `Overall: ${state.readingData.completedRukuIds.length} / ${rukus.length} rukus (${percent}%) · Today: ${today.completed} / ${today.target}${today.reached ? " · Target reached" : ""}${today.bonus ? ` · +${today.bonus} bonus` : ""}`;
   $("next-ruku").disabled = !rukus[ruku.id];
   $("reflection-input").value = "";
   $("ruku-completion").hidden = false;
@@ -886,7 +883,7 @@ function beginFlow(rukuId) {
   completedRuku = null;
   showPage("reader");
   savePosition(ruku.start);
-  recordCurrentVerse("flow");
+  recordCurrentVerse();
   loadReading({ scroll: true });
 }
 
@@ -1153,14 +1150,14 @@ function moveAyah(direction) {
     if (direction > 0) completeCurrentRuku(currentRuku, "flow", { continueToNext: true });
     else if (targetRuku) {
       savePosition(targetRuku.start);
-      recordCurrentVerse("flow");
+      recordCurrentVerse();
       renderVerses();
     }
     return;
   }
   if (direction === 1 && currentRuku && isRukuEnd(state.position, currentRuku)) {
     recordCurrentVerse();
-    completeCurrentRuku(currentRuku, getTodayStats(state.readingData).mode);
+    completeCurrentRuku(currentRuku, "full");
     return;
   }
   const target = ayahTarget(direction);
@@ -1281,12 +1278,6 @@ function initializeFeatureInteractions() {
     }
   });
 
-  $("light-mode-toggle").addEventListener("click", () => {
-    const key = getDayKey(new Date(), state.readingData.settings.dayBoundaryHour);
-    const current = state.readingData.settings.dayModes[key] || "deep";
-    const dayModes = { ...state.readingData.settings.dayModes, [key]: current === "light" ? "deep" : "light" };
-    updateSetting("dayModes", dayModes);
-  });
   $("open-kahf").addEventListener("click", openKahf);
   $("journey-open-kahf").addEventListener("click", openKahf);
   $("notes-search").addEventListener("input", renderNotes);

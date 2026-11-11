@@ -1,9 +1,21 @@
-export const READER_SCHEMA_VERSION = 5;
+export const READER_SCHEMA_VERSION = 6;
 export const DEFAULT_RUKU_COUNT = 556;
 
-const MODES = new Set(["deep", "light", "flow"]);
+const MODES = new Set(["full", "flow"]);
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const VERSE_KEY = /^(\d{1,3}):(\d{1,3})$/;
+
+/**
+ * Maps a stored or incoming mode onto the modes the reader keeps.
+ *
+ * The retired light day and the earlier `deep` name both fold into `full`,
+ * so saved history keeps counting as regular reading.
+ */
+function normalizeMode(mode) {
+  if (MODES.has(mode)) return mode;
+  if (mode === "deep" || mode === "light") return "full";
+  return null;
+}
 
 export function createDefaultReadingData() {
   return {
@@ -18,7 +30,6 @@ export function createDefaultReadingData() {
     settings: {
       dailyTarget: 3,
       dayBoundaryHour: 0,
-      dayModes: {},
       anchors: [],
       remindersEnabled: false,
       focusMode: false,
@@ -65,13 +76,15 @@ function validVerseKey(value, chapters) {
 
 function cleanActivity(row, chapters, rukuCount) {
   if (!isObject(row)) return null;
+  const full = boundedInteger(row.modeCounts?.full, 0, 0, 1000000)
+    + boundedInteger(row.modeCounts?.deep, 0, 0, 1000000)
+    + boundedInteger(row.modeCounts?.light, 0, 0, 1000000);
   return {
     active: Boolean(row.active),
     rukuIds: uniqueIntegers(row.rukuIds, rukuCount),
     rukuCompletions: boundedInteger(row.rukuCompletions, 0, 0, 1000000),
     modeCounts: {
-      deep: boundedInteger(row.modeCounts?.deep, 0, 0, 1000000),
-      light: boundedInteger(row.modeCounts?.light, 0, 0, 1000000),
+      full: Math.min(1000000, full),
       flow: boundedInteger(row.modeCounts?.flow, 0, 0, 1000000),
     },
     sessionStarts: (Array.isArray(row.sessionStarts) ? row.sessionStarts : [])
@@ -93,13 +106,6 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
   const defaults = createDefaultReadingData();
   if (!isObject(raw)) return defaults;
   const settings = isObject(raw.settings) ? raw.settings : {};
-  const dayModes = {};
-  if (isObject(settings.dayModes)) {
-    const modes = Object.entries(settings.dayModes).filter(([date]) => validDateKey(date)).sort(([left], [right]) => left.localeCompare(right)).slice(-400);
-    for (const [date, mode] of modes) {
-      if (validDateKey(date) && (mode === "deep" || mode === "light")) dayModes[date] = mode;
-    }
-  }
   const anchors = (Array.isArray(settings.anchors) ? settings.anchors : []).map(cleanAnchor).filter(Boolean).slice(0, 4);
   const activityByDay = {};
   if (isObject(raw.activityByDay)) {
@@ -130,11 +136,13 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
   }).slice(-2000);
   const sessions = (Array.isArray(raw.sessions) ? raw.sessions : []).flatMap(session => {
     if (!isObject(session) || !Number.isSafeInteger(session.rukuId) || session.rukuId < 1 || session.rukuId > rukuCount) return [];
-    if (!validDateKey(session.date) || !MODES.has(session.mode)) return [];
+    if (!validDateKey(session.date)) return [];
+    const mode = normalizeMode(session.mode);
+    if (!mode) return [];
     return [{
       date: session.date,
       rukuId: session.rukuId,
-      mode: session.mode,
+      mode,
       completedAt: Number.isSafeInteger(session.completedAt) ? session.completedAt : 0,
     }];
   }).slice(-5000);
@@ -155,7 +163,6 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
     settings: {
       dailyTarget: boundedInteger(settings.dailyTarget, defaults.settings.dailyTarget, 1, 10),
       dayBoundaryHour: boundedInteger(settings.dayBoundaryHour, 0, 0, 23),
-      dayModes,
       anchors,
       remindersEnabled: Boolean(settings.remindersEnabled),
       focusMode: Boolean(settings.focusMode),
@@ -192,20 +199,19 @@ export function getTodayStats(readingData, date = new Date()) {
   const { settings } = readingData;
   const key = getDayKey(date, settings.dayBoundaryHour);
   const activity = readingData.activityByDay[key];
-  const mode = settings.dayModes[key] || "deep";
-  const target = mode === "light" ? 1 : settings.dailyTarget;
+  const target = settings.dailyTarget;
   const completed = activity?.rukuIds.length ?? 0;
-  return { date: key, mode, target, completed, bonus: Math.max(0, completed - target), reached: completed >= target };
+  return { date: key, target, completed, bonus: Math.max(0, completed - target), reached: completed >= target };
 }
 
-export function recordVerseVisit(readingData, position, mode, date = new Date()) {
+export function recordVerseVisit(readingData, position, date = new Date()) {
   const key = `${position.chapter}:${position.verse}`;
   const boundaryHour = readingData.settings.dayBoundaryHour;
   const day = getDayKey(date, boundaryHour);
   const wasRead = readingData.verseReadKeys.includes(key);
   const prior = readingData.activityByDay[day] ?? {
     active: false, rukuIds: [], rukuCompletions: 0,
-    modeCounts: { deep: 0, light: 0, flow: 0 }, sessionStarts: [], lastReadAt: 0,
+    modeCounts: { full: 0, flow: 0 }, sessionStarts: [], lastReadAt: 0,
   };
   const sessions = prior.sessionStarts.slice();
   if (!sessions.length || date.getTime() - sessions.at(-1) >= 30 * 60 * 1000) sessions.push(date.getTime());
@@ -275,11 +281,11 @@ export function recordRukusAsRead(readingData, currentRukuId, rukus) {
   };
 }
 
-export function recordRukuCompletion(readingData, ruku, mode = "deep", date = new Date()) {
+export function recordRukuCompletion(readingData, ruku, mode = "full", date = new Date()) {
   const day = getDayKey(date, readingData.settings.dayBoundaryHour);
   const prior = readingData.activityByDay[day] ?? {
     active: false, rukuIds: [], rukuCompletions: 0,
-    modeCounts: { deep: 0, light: 0, flow: 0 }, sessionStarts: [], lastReadAt: 0,
+    modeCounts: { full: 0, flow: 0 }, sessionStarts: [], lastReadAt: 0,
   };
   let verseReadKeys = new Set(readingData.verseReadKeys);
   for (const key of rukuVerseKeys(ruku)) {
@@ -287,7 +293,7 @@ export function recordRukuCompletion(readingData, ruku, mode = "deep", date = ne
   }
   const isNewDailyRuku = !prior.rukuIds.includes(ruku.id);
   const isNewDailyReadingDay = !prior.active;
-  const modeKey = MODES.has(mode) ? mode : "deep";
+  const modeKey = normalizeMode(mode) ?? "full";
   const activityByDay = {
     ...readingData.activityByDay,
     [day]: {
@@ -433,9 +439,10 @@ export function getWeekKeys(date = new Date(), boundaryHour = 0) {
 }
 
 export function getModeTotals(readingData) {
-  const modes = { deep: 0, light: 0, flow: 0 };
+  const modes = { full: 0, flow: 0 };
   for (const session of readingData.sessions) {
-    if (Object.hasOwn(modes, session.mode)) modes[session.mode] += 1;
+    const mode = normalizeMode(session.mode);
+    if (mode) modes[mode] += 1;
   }
   return modes;
 }
@@ -445,12 +452,11 @@ export function getWeeklySummary(readingData, date = new Date()) {
   const previousWeek = thisWeek.map(day => shiftDayKey(day, -7));
   const sumWeek = days => days.reduce((total, day) => total + (readingData.activityByDay[day]?.rukuCompletions ?? 0), 0);
   const readDays = thisWeek.filter(day => readingData.activityByDay[day]?.active).length;
-  const modes = { deep: 0, light: 0, flow: 0 };
+  const modes = { full: 0, flow: 0 };
   for (const day of thisWeek) {
     const counts = readingData.activityByDay[day]?.modeCounts;
     if (!counts) continue;
-    modes.deep += counts.deep ?? 0;
-    modes.light += counts.light ?? 0;
+    modes.full += (counts.full ?? 0) + (counts.deep ?? 0) + (counts.light ?? 0);
     modes.flow += counts.flow ?? 0;
   }
   const weekSet = new Set(thisWeek);

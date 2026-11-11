@@ -307,11 +307,13 @@ function renderVerses() {
   if (ayah && currentRuku) {
     const progress = getRukuProgress(ayah, globalThis.QuranData, chapters);
     const value = flowMode ? progress.max : progress.value;
-    $("ruku-progress").max = progress.max;
-    $("ruku-progress").value = value;
+    const percent = progress.max ? Math.min(100, Math.max(0, value / progress.max * 100)) : 0;
+    $("ruku-progress").setAttribute("aria-valuemax", String(progress.max));
+    $("ruku-progress").setAttribute("aria-valuenow", String(value));
     $("ruku-progress").setAttribute("aria-valuetext", flowMode
       ? `Flow reading ruku ${currentRuku.id} of ${rukus.length}`
       : `Ayah ${progress.value} of ${progress.max} in this ruku`);
+    $("ruku-ring-value").style.strokeDashoffset = String(100 - percent);
     $("ruku-progress-label").textContent = flowMode
       ? `Flow mode · Ruku ${currentRuku.id} of ${rukus.length}`
       : `Verse ${progress.value} of ${progress.max} in this ruku`;

@@ -65,11 +65,20 @@
           <div class="reader-header">
             <div id="chapter-heading" class="chapter-heading"></div>
           </div>
-          <section id="daily-panel" class="daily-panel" aria-label="Today’s reading progress">
+          <section id="daily-panel" class="daily-panel" aria-label="Reading progress">
             <div class="daily-panel-main">
-              <div>
+              <div class="daily-panel-copy">
                 <span id="today-progress" class="today-progress">Today: 0 / 3</span>
                 <span id="target-reached-label" class="target-reached-label" hidden>Target reached</span>
+              </div>
+              <div id="ruku-progress-wrap" class="ruku-progress-wrap" hidden>
+                <span id="ruku-progress-label" class="ruku-progress-label"></span>
+                <div id="ruku-progress" class="ruku-ring" role="progressbar" aria-label="Ruku reading progress" aria-valuemin="0" aria-valuemax="7" aria-valuenow="1">
+                  <svg class="ruku-ring-svg" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
+                    <circle class="ruku-ring-track" cx="18" cy="18" r="15"></circle>
+                    <circle id="ruku-ring-value" class="ruku-ring-value" cx="18" cy="18" r="15" pathLength="100"></circle>
+                  </svg>
+                </div>
               </div>
             </div>
             <div id="anchor-chips" class="anchor-chips" aria-label="Reading anchors"></div>
@@ -79,10 +88,6 @@
             </div>
           </section>
           <div id="ayah-status" class="sr-only" role="status" hidden></div>
-          <div id="ruku-progress-wrap" class="ruku-progress-wrap" hidden>
-            <span id="ruku-progress-label" class="ruku-progress-label"></span>
-            <progress id="ruku-progress" class="ruku-progress" aria-label="Ruku reading progress" max="7" value="1"></progress>
-          </div>
           <details id="ruku-summary" class="ruku-summary" hidden>
             <summary>About this ruku</summary>
             <div id="ruku-summary-content"></div>

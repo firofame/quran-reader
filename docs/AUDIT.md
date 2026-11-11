@@ -37,7 +37,7 @@
 - The reader also has a Settings view for reading preferences and anchors.
 - Browser reminders request notification permission only when enabled and only schedule while the page is open. The app is an installable PWA; the service worker caches its local reading assets for offline use.
 - One-verse recitation is available from the play icon beside each ayah. It streams Alafasy 128 kbps from Al Quran Cloud only after a direct user action and stops after the selected ayah. See the provider's current [terms](https://alquran.cloud/terms-and-conditions).
-- Ruku summaries and word-by-word meanings remain unpopulated because no sufficiently suitable and attributable source was selected. The app does not generate religious content.
+- Word-by-word meanings remain unpopulated because no sufficiently suitable and attributable source was selected. The app does not generate religious content.
 
 ## Tests
 

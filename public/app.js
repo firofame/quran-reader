@@ -77,9 +77,7 @@ function updateReadingData(update, { renderPages = true } = {}) {
 }
 
 function recordCurrentVerse() {
-  const currentRuku = findRuku(state.position, rukus);
   updateReadingData(readingData => recordVerseVisit(readingData, state.position, new Date()), { renderPages: false });
-  if (currentRuku) renderRukuSummary(currentRuku);
 }
 
 /** Counts the rukus before the current one that are not recorded as read yet. */
@@ -343,7 +341,6 @@ function renderVerses() {
   $("reading-content").replaceChildren(fragment);
   $("reading-content").setAttribute("aria-busy", "false");
   updateDocumentChrome();
-  if (currentRuku) renderRukuSummary(currentRuku);
   renderPagination(ayah);
 }
 
@@ -526,11 +523,6 @@ function anchorWasUsedToday(anchor, anchors, readingData) {
   return start >= dayStart && starts.some(timestamp => timestamp >= start && timestamp < end);
 }
 
-function renderRukuSummary() {
-  // No suitable sourced ruku summaries are bundled, so this card stays hidden.
-  $("ruku-summary").hidden = true;
-}
-
 function showPage(page) {
   activePage = page;
   $("reader-page").hidden = page !== "reader";
@@ -561,7 +553,6 @@ function completeCurrentRuku(ruku) {
 function renderSettings() {
   const settings = state.readingData.settings;
   $("daily-target").value = settings.dailyTarget;
-  $("ruku-summary-setting").value = settings.rukuSummary;
   $("resume-setting").checked = settings.resumeAtNextUnread;
   $("reminders-setting").checked = settings.remindersEnabled;
   renderAnchorEditor();
@@ -617,7 +608,6 @@ function initializeSettingsControls() {
     updateSetting("dailyTarget", value);
     $("daily-target").value = value;
   });
-  $("ruku-summary-setting").addEventListener("change", () => updateSetting("rukuSummary", $("ruku-summary-setting").value));
   $("resume-setting").addEventListener("change", () => updateSetting("resumeAtNextUnread", $("resume-setting").checked));
   $("reminders-setting").addEventListener("change", async () => {
     if (!$("reminders-setting").checked) {

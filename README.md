@@ -68,10 +68,8 @@ without a Cloudflare account.
   read** in Settings catches up the overall progress and the lifetime
   totals on this device. Daily activity is left unchanged,
   because the days are not known.
-- Reopening the app opens the next unread ayah, so a new sitting starts with
-  nothing to click. An ayah that has not been read yet is reopened exactly as
-  it was, and an explicit ayah link still wins. This can be turned off in
-  Settings.
+- Reopening the app returns to the exact saved ayah. An explicit ayah link
+  opens that ayah.
 - Press `/` to find a chapter, `Space` or `→` for the next ayah, `←` for the
   previous one, and `Escape` for the small reading menu.
 

@@ -235,24 +235,15 @@ function dispatch(action) {
 }
 
 const initialPosition = parseHash(location.hash, chapters);
-const navigation = globalThis.performance?.getEntriesByType?.("navigation")?.[0];
-// A browser reload should keep the visible ayah, even when it is already marked read.
-const startup = navigation?.type === "reload" && initialPosition
-  ? { position: initialPosition, source: "link" }
-  : resolveStartupPosition({
-      hashPosition: initialPosition,
-      savedPosition: state.position,
-      readingData: state.readingData,
-      chapters,
-      rukus,
-    });
+// A browser reload or explicit verse link should keep the visible ayah.
+const startup = resolveStartupPosition({
+  hashPosition: initialPosition,
+  savedPosition: state.position,
+});
 if (startup.source === "link") {
   state = reduceReaderState(state, { type: "position/set", position: startup.position }, chapters);
 } else if (location.hash && location.hash !== "#main" && !initialPosition) {
   notify("That verse link isn't valid. Your last reading position has been opened.");
-} else if (startup.source === "resume") {
-  state = reduceReaderState(state, { type: "position/set", position: startup.position }, chapters);
-  history.replaceState(null, "", `#${startup.position.chapter}:${startup.position.verse}`);
 }
 
 function applyPreferences() {
@@ -553,7 +544,6 @@ function completeCurrentRuku(ruku) {
 function renderSettings() {
   const settings = state.readingData.settings;
   $("daily-target").value = settings.dailyTarget;
-  $("resume-setting").checked = settings.resumeAtNextUnread;
   $("reminders-setting").checked = settings.remindersEnabled;
   renderAnchorEditor();
   renderMarkReadBlock();
@@ -608,7 +598,6 @@ function initializeSettingsControls() {
     updateSetting("dailyTarget", value);
     $("daily-target").value = value;
   });
-  $("resume-setting").addEventListener("change", () => updateSetting("resumeAtNextUnread", $("resume-setting").checked));
   $("reminders-setting").addEventListener("change", async () => {
     if (!$("reminders-setting").checked) {
       updateSetting("remindersEnabled", false);

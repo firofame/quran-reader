@@ -135,18 +135,6 @@ export function getDayKey(date = new Date(), boundaryHour = 0) {
   return `${adjusted.getFullYear()}-${String(adjusted.getMonth() + 1).padStart(2, "0")}-${String(adjusted.getDate()).padStart(2, "0")}`;
 }
 
-function shiftDayKey(key, amount) {
-  const [year, month, day] = key.split("-").map(Number);
-  const date = new Date(year, month - 1, day, 12);
-  date.setDate(date.getDate() + amount);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-export function getRecentDayKeys(date = new Date(), boundaryHour = 0, count = 7) {
-  const today = getDayKey(date, boundaryHour);
-  return Array.from({ length: count }, (_, index) => shiftDayKey(today, index - count + 1));
-}
-
 export function getTodayStats(readingData, date = new Date()) {
   const { settings } = readingData;
   const key = getDayKey(date, settings.dayBoundaryHour);
@@ -210,7 +198,7 @@ function rukuVerseKeys(ruku) {
  * This is a one-time backfill for a reader who has already read further than
  * this device knows about. The days are unknown, so only the cumulative facts
  * are updated: the completed rukus, the verses read, and the lifetime totals.
- * The daily and weekly activity is left untouched rather than inventing a
+ * The activity history is left untouched rather than inventing a
  * reading timeline.
  */
 export function recordRukusAsRead(readingData, currentRukuId, rukus) {
@@ -364,32 +352,4 @@ export function getSurahRukuProgress(chapterId, readingData, rukus) {
   const surahRukus = rukus.filter(ruku => ruku.chapter === chapterId);
   const completed = surahRukus.filter(ruku => readingData.completedRukuIds.includes(ruku.id)).length;
   return { completed, total: surahRukus.length };
-}
-
-export function getWeekKeys(date = new Date(), boundaryHour = 0) {
-  const today = getDayKey(date, boundaryHour);
-  const [year, month, day] = today.split("-").map(Number);
-  const localDate = new Date(year, month - 1, day, 12);
-  const daysSinceMonday = (localDate.getDay() + 6) % 7;
-  const monday = shiftDayKey(today, -daysSinceMonday);
-  return Array.from({ length: 7 }, (_, index) => shiftDayKey(monday, index));
-}
-
-export function getWeeklySummary(readingData, date = new Date()) {
-  const thisWeek = getWeekKeys(date, readingData.settings.dayBoundaryHour);
-  const previousWeek = thisWeek.map(day => shiftDayKey(day, -7));
-  const sumWeek = days => days.reduce((total, day) => total + (readingData.activityByDay[day]?.rukuCompletions ?? 0), 0);
-  const readDays = thisWeek.filter(day => readingData.activityByDay[day]?.active).length;
-  return {
-    days: thisWeek.map(day => ({ date: day, activity: readingData.activityByDay[day] ?? null })),
-    readDays,
-    thisWeekRukus: sumWeek(thisWeek),
-    previousWeekRukus: sumWeek(previousWeek),
-  };
-}
-
-export function formatDateKey(key, options = { month: "short", day: "numeric" }) {
-  if (!validDateKey(key)) return "";
-  const [year, month, day] = key.split("-").map(Number);
-  return new Date(year, month - 1, day, 12).toLocaleDateString(undefined, options);
 }

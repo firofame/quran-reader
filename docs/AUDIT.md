@@ -25,7 +25,7 @@
 - The existing shape is `{ translation, position: { chapter, verse }, fontSize, theme }`.
 - Every verse navigation saves the exact position. A valid `#chapter:verse` link overrides the saved position on load. Existing position, translation, text size, and theme survive migration; new reading history uses schema version 8.
 - On load the reader opens the next unread verse rather than repeating the last one read, so a new sitting starts with nothing to click. A saved position that has not been read yet is still reopened exactly, and the behaviour can be turned off in Settings.
-- Progress, activity, sessions, settings, anchors, and weekly history are stored locally in this browser.
+- Progress, activity, sessions, settings, and anchors are stored locally in this browser.
 - Reading data stays in this browser. The reader sends no reading position or translation to a server.
 - New fields will be added through a versioned migration that keeps the current position and preferences.
 
@@ -34,7 +34,7 @@
 - One reading screen shows one complete translated ayah at a time. Chapter navigation is in the left drawer, and the reading screen carries no controls of its own: text size and the catch-up action live in Settings. There is no translation picker, because Saheeh International is the only translation.
 - Previous/Continue buttons and left/right arrows navigate ayahs, including across chapter boundaries. Direct verse links use `#chapter:verse`. The last ayah of a ruku turns the next action into "Finish ruku". Space and `Escape` cover the rest of the reading shortcuts.
 - Current metadata includes page, ruku, manzil, hizb, juz, and sajda. A small ring in the daily panel tracks the current ayah within its ruku.
-- The reader also has Week and Settings views. The weekly view summarizes reading activity.
+- The reader also has a Settings view for reading preferences and anchors.
 - Browser reminders request notification permission only when enabled and only schedule while the page is open. The app is an installable PWA; the service worker caches its local reading assets for offline use.
 - One-verse recitation is optional and off by default. It streams Alafasy 128 kbps from Al Quran Cloud after a direct user action. See the provider's current [terms](https://alquran.cloud/terms-and-conditions).
 - Ruku summaries and word-by-word meanings remain unpopulated because no sufficiently suitable and attributable source was selected. The app does not generate religious content.
@@ -44,4 +44,4 @@
 - Tests use Node's built-in test runner: `npm test`.
 - Syntax validation runs with `npm run check`.
 - Existing coverage includes metadata and verse parsing, navigation, state validation, local storage, Worker behavior, deployment, and static asset serving.
-- New reading-data coverage checks the selected 556 Ruku convention, all per-surah counts, Juz and Manzil boundaries, local day boundaries, daily and lifetime totals, weekly summaries, schema migration, the resume and startup position rules, and the bundled English verse count.
+- New reading-data coverage checks the selected 556 Ruku convention, all per-surah counts, Juz and Manzil boundaries, local day boundaries, daily and lifetime totals, schema migration, the resume and startup position rules, and the bundled English verse count.

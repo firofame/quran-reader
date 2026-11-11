@@ -36,7 +36,6 @@
         </div>
         <nav id="app-navigation" class="app-navigation" aria-label="Reader pages">
           <button type="button" data-page="reader" aria-current="page">Read</button>
-          <button type="button" data-page="weekly">Week</button>
           <button type="button" data-page="settings">Settings</button>
         </nav>
         <div class="topbar-right">
@@ -87,12 +86,6 @@
           <p class="metadata-credit">Chapter metadata © Tanzil, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a>.</p>
         </footer>
         </div>
-        <section id="weekly-page" class="secondary-page" hidden>
-          <header class="page-heading"><span class="eyebrow">A GENTLE CHECK-IN</span><h1>This week</h1><p id="weekly-days-read"></p></header>
-          <section class="page-card"><h2>Last seven days</h2><div id="week-bars" class="week-bars"></div><p id="week-comparison"></p><p id="weekly-target-suggestion" class="muted-copy"></p></section>
-          <section class="page-card"><h2>Recent weeks</h2><div id="heatmap" class="heatmap" aria-label="Ruku completions over the last twelve weeks"></div></section>
-          <section class="page-card"><h2>Lifetime totals</h2><div id="lifetime-totals" class="lifetime-totals"></div></section>
-        </section>
         <section id="settings-page" class="secondary-page" hidden>
           <header class="page-heading"><span class="eyebrow">MAKE IT YOURS</span><h1>Settings</h1><p>Choose a pace and a reading setup that feels sustainable.</p></header>
           <section class="page-card settings-grid">
@@ -116,7 +109,7 @@
               </div>
               <div id="mark-read-block" class="reading-history-block" hidden>
                 <button id="mark-read-btn" type="button" class="secondary-button">Mark earlier rukus as read</button>
-                <p class="muted-copy">For when you have already read further on another device. It catches up the overall progress and the lifetime totals. The daily and weekly history stays as it is, because the days are not known.</p>
+                <p class="muted-copy">For when you have already read further on another device. It catches up the overall progress and the lifetime totals. Daily activity stays as it is, because the days are not known.</p>
               </div>
             </div>
           </section>

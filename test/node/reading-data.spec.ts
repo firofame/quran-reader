@@ -40,11 +40,11 @@ describe("Tanzil metadata", () => {
 });
 
 describe("reading history", () => {
-	it("follows the day boundary in local time and uses the daily target", () => {
-		const justBeforeBoundary = new Date(2026, 10, 10, 3, 59);
-		const justAfterBoundary = new Date(2026, 10, 10, 4, 1);
-		expect(getDayKey(justBeforeBoundary, 4)).toBe("2026-11-09");
-		expect(getDayKey(justAfterBoundary, 4)).toBe("2026-11-10");
+	it("uses local midnight as the fixed day boundary and uses the daily target", () => {
+		const justBeforeBoundary = new Date(2026, 10, 10, 23, 59);
+		const justAfterBoundary = new Date(2026, 10, 11, 0, 1);
+		expect(getDayKey(justBeforeBoundary)).toBe("2026-11-10");
+		expect(getDayKey(justAfterBoundary)).toBe("2026-11-11");
 
 		let reading = createDefaultReadingData();
 		reading = { ...reading, settings: { ...reading.settings, dailyTarget: 3 } };
@@ -119,7 +119,7 @@ describe("reading history", () => {
 		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.completedRukuIds).toEqual([1]);
 		expect(migrated.settings.dailyTarget).toBe(10);
-		expect(migrated.settings.dayBoundaryHour).toBe(22);
+		expect(migrated.settings.dayBoundaryHour).toBeUndefined();
 		expect(migrated.settings.anchors[0].name).toBe("After Fajr");
 		expect(migrated.settings.resumeAtNextUnread).toBe(true);
 	});

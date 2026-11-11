@@ -44,9 +44,9 @@ without a Cloudflare account.
 
 - See the current ayah's page, ruku, manzil, hizb, and juz; sajda ayahs carry a
   subtle ۩ marker.
-- The daily panel shows today's target next to a small gold ring that tracks your
-  position within the current ruku, filling at its last ayah and resetting when
-  you enter another ruku.
+- The daily panel shows today's progress toward a fixed target of five rukus.
+  A small gold ring tracks your position within the current ruku, filling at its
+  last ayah and resetting when you enter another ruku.
 - Read one ayah at a time, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.

@@ -466,7 +466,7 @@ function renderProgressSummary() {
   const readingData = state.readingData;
   const today = getTodayStats(readingData);
   $("today-completed").textContent = today.completed;
-  $("daily-target").value = today.target;
+  $("today-target").textContent = today.target;
   $("today-bonus").textContent = today.bonus ? ` · +${today.bonus} bonus` : "";
   $("target-reached-label").hidden = !today.reached;
   $("target-reached-label").textContent = today.bonus ? `Target reached · +${today.bonus} bonus` : "Target reached";
@@ -594,11 +594,6 @@ function updateSetting(name, value, renderPages = false) {
 }
 
 function initializeSettingsControls() {
-  $("daily-target").addEventListener("change", () => {
-    const value = Math.max(1, Math.min(10, Number($("daily-target").value) || 3));
-    updateSetting("dailyTarget", value);
-    $("daily-target").value = value;
-  });
   $("reminders-setting").addEventListener("change", async () => {
     if (!$("reminders-setting").checked) {
       updateSetting("remindersEnabled", false);

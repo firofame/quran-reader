@@ -39,7 +39,7 @@ describe("Tanzil metadata", () => {
 });
 
 describe("reading history", () => {
-	it("uses local midnight as the fixed day boundary and uses the daily target", () => {
+	it("uses local midnight and keeps the daily target fixed at five", () => {
 		const justBeforeBoundary = new Date(2026, 10, 10, 23, 59);
 		const justAfterBoundary = new Date(2026, 10, 11, 0, 1);
 		expect(getDayKey(justBeforeBoundary)).toBe("2026-11-10");
@@ -51,7 +51,7 @@ describe("reading history", () => {
 		reading = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 5));
 		const stats = getTodayStats(reading, new Date(2026, 10, 10, 5));
 		expect({ target: stats.target, completed: stats.completed, reached: stats.reached }).toEqual({
-			target: 3,
+			target: 5,
 			completed: 1,
 			reached: false,
 		});
@@ -122,7 +122,7 @@ describe("reading history", () => {
 		);
 		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.completedRukuIds).toEqual([1]);
-		expect(migrated.settings.dailyTarget).toBe(10);
+		expect(migrated.settings.dailyTarget).toBe(5);
 		expect(migrated.settings.dayBoundaryHour).toBeUndefined();
 		expect(migrated.settings.anchors[0].name).toBe("After Fajr");
 		expect(Object.hasOwn(migrated.settings, "resumeAtNextUnread")).toBe(false);

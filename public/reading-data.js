@@ -1,5 +1,6 @@
 export const READER_SCHEMA_VERSION = 9;
 export const DEFAULT_RUKU_COUNT = 556;
+export const DEFAULT_DAILY_TARGET = 5;
 export const DAY_BOUNDARY_HOUR = 0;
 
 /**
@@ -19,7 +20,7 @@ export function createDefaultReadingData() {
     activityByDay: {},
     sessions: [],
     settings: {
-      dailyTarget: 3,
+      dailyTarget: DEFAULT_DAILY_TARGET,
       anchors: [],
       remindersEnabled: false,
       shortcutsSeen: false,
@@ -113,7 +114,7 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
     activityByDay,
     sessions,
     settings: {
-      dailyTarget: boundedInteger(settings.dailyTarget, defaults.settings.dailyTarget, 1, 10),
+      dailyTarget: DEFAULT_DAILY_TARGET,
       anchors,
       remindersEnabled: Boolean(settings.remindersEnabled),
       shortcutsSeen: Boolean(settings.shortcutsSeen),
@@ -127,10 +128,9 @@ export function getDayKey(date = new Date()) {
 }
 
 export function getTodayStats(readingData, date = new Date()) {
-  const { settings } = readingData;
   const key = getDayKey(date);
   const activity = readingData.activityByDay[key];
-  const target = settings.dailyTarget;
+  const target = DEFAULT_DAILY_TARGET;
   const completed = activity?.rukuIds.length ?? 0;
   return { date: key, target, completed, bonus: Math.max(0, completed - target), reached: completed >= target };
 }

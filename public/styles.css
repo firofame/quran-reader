@@ -224,13 +224,6 @@ select option { background: var(--paper); color: var(--text); }
 .pagination-button.next strong { font-weight: 600; }
 .pagination-button:hover:not(:disabled) strong { text-decoration: underline; text-underline-offset: 4px; }
 
-/* ─── Ruku completion ──────────────────────────────────────────── */
-.ruku-completion { margin: 20px 40px 28px; padding: 24px 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--hover); }
-.ruku-completion h2 { margin: 6px 0; color: var(--ink); font: 400 24px/1.3 var(--serif); }
-.ruku-completion p { color: var(--muted); font-size: 11px; line-height: 1.6; }
-.completion-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
-.completion-actions .primary-button { margin-top: 0; }
-
 /* ─── Footer ───────────────────────────────────────────────────── */
 .reader-footer { text-align: center; margin-top: var(--reader-gutter); padding: 16px 24px 28px; color: var(--muted); }
 .reader-footer p { font-size: 9px; line-height: 1.8; margin: 7px 0 0; }
@@ -336,7 +329,6 @@ select option { background: var(--paper); color: var(--text); }
   .app-navigation button { padding: 0 6px; font-size: 10px; }
   .overall-progress { width: 120px; }
   .ruku-summary { margin: 0 24px; }
-  .ruku-completion { margin-left: 24px; margin-right: 24px; }
 }
 
 /* ─── Responsive: mobile ───────────────────────────────────────── */
@@ -361,7 +353,6 @@ select option { background: var(--paper); color: var(--text); }
   .overall-progress { width: 118px; }
   .daily-panel { padding: 8px 16px; }
   .ruku-summary { margin: 0 18px; }
-  .ruku-completion { margin-left: 16px; margin-right: 16px; }
 }
 
 @media (any-pointer: coarse) {

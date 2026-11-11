@@ -33,7 +33,6 @@ let noticeTimer;
 let storageFailed = false;
 let loading = false;
 let activePage = "reader";
-let completedRuku = null;
 let reminderTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
@@ -567,24 +566,10 @@ function renderWeekly() {
 }
 
 function completeCurrentRuku(ruku) {
-  const completionTime = new Date();
-  const updated = recordRukuCompletion(state.readingData, ruku, completionTime);
+  const updated = recordRukuCompletion(state.readingData, ruku, new Date());
   updateReadingData(() => updated);
-  completedRuku = ruku;
-  const today = getTodayStats(state.readingData, completionTime);
-  const completedCount = state.readingData.completedRukuIds.length;
-  const percent = completedCount === 0 || completedCount === rukus.length
-    ? Math.round(completedCount / rukus.length * 100)
-    : Number((completedCount / rukus.length * 100).toFixed(1));
-  $("completion-title").textContent = `${chapters[ruku.chapter - 1].name} · ruku ${ruku.localNumber} complete`;
-  $("completion-progress").textContent = `Overall: ${state.readingData.completedRukuIds.length} / ${rukus.length} rukus (${percent}%) · Today: ${today.completed} / ${today.target}${today.reached ? " · Target reached" : ""}${today.bonus ? ` · +${today.bonus} bonus` : ""}`;
-  $("next-ruku").disabled = !rukus[ruku.id];
-  $("ruku-completion").hidden = false;
-  $("reading-content").hidden = true;
-  $("ayah-navigation").hidden = true;
-  $("navigation-hint").hidden = true;
-  $("ruku-progress-wrap").hidden = true;
-  $("ruku-completion").scrollIntoView({ block: "center", behavior: "smooth" });
+  const next = rukus[ruku.id];
+  if (next) navigate(next.start.chapter, next.start.verse);
 }
 
 function renderSettings() {
@@ -752,7 +737,6 @@ async function loadReading({ scroll = false } = {}) {
   $("ayah-status").hidden = true;
   $("navigation-hint").hidden = true;
   $("ruku-progress-wrap").hidden = true;
-  $("ruku-completion").hidden = true;
   $("reading-content").setAttribute("aria-busy", "true");
   $("reading-content").hidden = false;
   $("reading-content").innerHTML = '<div class="loading-state"><span class="loading-dot"></span>Opening the words…</div>';
@@ -819,7 +803,6 @@ function closeMenu() {
 
 function navigate(chapter, verse = 1, { record = false } = {}) {
   if (activePage !== "reader") showPage("reader");
-  completedRuku = null;
   savePosition({ chapter, verse });
   if (record) recordCurrentVerse();
   closeMenu();
@@ -842,17 +825,6 @@ function initializeFeatureInteractions() {
     }
   });
 
-  $("next-ruku").addEventListener("click", () => {
-    const next = completedRuku && rukus[completedRuku.id];
-    $("ruku-completion").hidden = true;
-    if (next) navigate(next.start.chapter, next.start.verse);
-  });
-  $("done-for-now").addEventListener("click", () => {
-    $("ruku-completion").hidden = true;
-    $("reading-content").hidden = false;
-    completedRuku = null;
-    renderVerses();
-  });
   $("mark-read-btn").addEventListener("click", () => {
     const currentRuku = findRuku(state.position, rukus);
     const pending = pendingEarlierRukus();

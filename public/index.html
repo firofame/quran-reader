@@ -71,10 +71,6 @@
               </div>
             </div>
             <div id="anchor-chips" class="anchor-chips" aria-label="Reading anchors"></div>
-            <div id="kahf-card" class="kahf-card" hidden>
-              <span id="kahf-progress">Friday · Al-Kahf 0 / 12 rukus</span>
-              <button id="open-kahf" type="button" class="quiet-link">Continue Al-Kahf</button>
-            </div>
           </section>
           <div id="ayah-status" class="sr-only" role="status" hidden></div>
           <details id="ruku-summary" class="ruku-summary" hidden>
@@ -106,7 +102,6 @@
           <section class="page-card"><h2>Juz</h2><div id="juz-grid" class="juz-grid"></div></section>
           <section class="page-card"><h2>Manzil</h2><div id="manzil-list" class="manzil-list"></div></section>
           <section class="page-card"><h2>Your pace</h2><p id="pace-summary"></p><label class="what-if-control">What if I read <input id="what-if-target" type="number" min="1" max="100" value="3"> rukus each day?</label><p id="finish-estimate" class="finish-estimate"></p></section>
-          <section id="friday-kahf-page-card" class="page-card" hidden><h2>This week in Al-Kahf</h2><p id="kahf-week-summary"></p><button id="journey-open-kahf" class="secondary-button" type="button">Open the first unread ruku</button></section>
         </section>
         <section id="weekly-page" class="secondary-page" hidden>
           <header class="page-heading"><span class="eyebrow">A GENTLE CHECK-IN</span><h1>This week</h1><p id="weekly-days-read"></p></header>
@@ -121,7 +116,6 @@
             <label>Day starts at <select id="day-boundary"></select></label>
             <label>Translation typeface <select id="translation-font"><option value="serif">Serif</option><option value="sans">Sans serif</option></select></label>
             <label>Ruku context <select id="ruku-summary-setting"><option value="auto">Show when a sourced summary is available</option><option value="always">Always show available summaries</option><option value="never">Hide summaries</option></select></label>
-            <label class="setting-check"><input id="kahf-friday-setting" type="checkbox"> Suggest Al-Kahf on Fridays</label>
             <label class="setting-check"><input id="focus-mode-setting" type="checkbox"> Focus mode</label>
             <label class="setting-check"><input id="resume-setting" type="checkbox"> Open at the next unread verse</label>
             <label class="setting-check"><input id="reminders-setting" type="checkbox"> Browser reminders at my anchors</label>

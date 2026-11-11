@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeekKeys, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getRecentDayKeys, getRecentPace, getRukuIndex, getSectionRukus, getSurahRukuProgress, getTodayStats, getWeeklySummary, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -471,13 +471,6 @@ function renderProgressSummary() {
     chips.append(button);
   }
   chips.hidden = !anchors.length;
-
-  const isFriday = new Date().getDay() === 5;
-  const showKahf = isFriday && readingData.settings.kahfFridayEnabled;
-  $("kahf-card").hidden = !showKahf;
-  $("friday-kahf-page-card").hidden = !readingData.settings.kahfFridayEnabled;
-  $("kahf-week-summary").textContent = kahfWeekProgress(readingData).text;
-  $("kahf-progress").textContent = `Friday · ${kahfWeekProgress(readingData).text}`;
 }
 
 function anchorWasUsedToday(anchor, anchors, readingData) {
@@ -503,15 +496,6 @@ function anchorWasUsedToday(anchor, anchors, readingData) {
   end = Math.min(end, dayEnd);
   const starts = readingData.activityByDay[today]?.sessionStarts ?? [];
   return start >= dayStart && starts.some(timestamp => timestamp >= start && timestamp < end);
-}
-
-function kahfWeekProgress(readingData) {
-  const days = getWeekKeys(new Date(), readingData.settings.dayBoundaryHour);
-  const weekRukus = new Set(days.flatMap(day => readingData.activityByDay[day]?.rukuIds ?? []));
-  const kahfRukus = rukus.filter(ruku => ruku.chapter === 18);
-  const completed = kahfRukus.filter(ruku => weekRukus.has(ruku.id)).length;
-  const next = kahfRukus.find(ruku => !weekRukus.has(ruku.id));
-  return { completed, total: kahfRukus.length, next, text: `Al-Kahf: ${completed} / ${kahfRukus.length} rukus this week` };
 }
 
 function renderRukuSummary() {
@@ -582,7 +566,6 @@ function renderJourney() {
     $("what-if-target").dataset.initialized = "true";
   }
   renderFinishEstimate();
-  $("kahf-week-summary").textContent = kahfWeekProgress(state.readingData).text;
 }
 
 function renderFinishEstimate() {
@@ -672,7 +655,6 @@ function renderSettings() {
   $("day-boundary").value = String(settings.dayBoundaryHour);
   $("translation-font").value = settings.translationFont;
   $("ruku-summary-setting").value = settings.rukuSummary;
-  $("kahf-friday-setting").checked = settings.kahfFridayEnabled;
   $("focus-mode-setting").checked = settings.focusMode;
   $("resume-setting").checked = settings.resumeAtNextUnread;
   $("reminders-setting").checked = settings.remindersEnabled;
@@ -759,7 +741,6 @@ function initializeSettingsControls() {
     if (!$("listen-echo-setting").checked) stopVerseAudio();
     renderVerses();
   });
-  $("kahf-friday-setting").addEventListener("change", () => updateSetting("kahfFridayEnabled", $("kahf-friday-setting").checked));
   $("focus-mode-setting").addEventListener("change", () => {
     updateSetting("focusMode", $("focus-mode-setting").checked);
     applyPreferences();
@@ -931,12 +912,6 @@ function openSection(type, number) {
   if (target) navigate(target.start.chapter, target.start.verse);
 }
 
-function openKahf() {
-  const progress = kahfWeekProgress(state.readingData);
-  if (progress.next) navigate(progress.next.start.chapter, progress.next.start.verse);
-  else notify("You’ve completed all 12 Al-Kahf rukus this week.");
-}
-
 function exportBackup() {
   updateSetting("lastBackupExportedAt", Date.now());
   const backup = {
@@ -997,8 +972,6 @@ function initializeFeatureInteractions() {
     }
   });
 
-  $("open-kahf").addEventListener("click", openKahf);
-  $("journey-open-kahf").addEventListener("click", openKahf);
   $("what-if-target").addEventListener("input", renderFinishEstimate);
   $("next-ruku").addEventListener("click", () => {
     const next = completedRuku && rukus[completedRuku.id];

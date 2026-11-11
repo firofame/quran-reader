@@ -171,7 +171,6 @@ select option { background: var(--paper); color: var(--text); }
 .anchor-chip { min-height: 28px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); font-size: 9px; font-weight: 500; transition: border-color .15s, background .15s; }
 .anchor-chip.is-done { border-color: var(--green); color: var(--green); background: var(--green-soft); }
 
-.kahf-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--text); font-size: 10px; }
 .chapter-ruku-progress { color: var(--green) !important; }
 
 /* ─── Reading content ──────────────────────────────────────────── */
@@ -348,7 +347,7 @@ body.focus-mode #reading-content.focused .verse { min-height: 100svh; }
 body.focus-mode .verse-actions { display: none; }
 body.focus-mode .daily-panel { position: fixed; inset: 0 0 auto; z-index: 80; padding: 10px 16px; border: 0; background: none; }
 body.focus-mode .daily-panel-main { justify-content: flex-start; }
-body.focus-mode .daily-panel-copy, body.focus-mode .anchor-chips, body.focus-mode .kahf-card { display: none; }
+body.focus-mode .daily-panel-copy, body.focus-mode .anchor-chips { display: none; }
 body.focus-mode .ruku-progress-label { display: none; }
 body.focus-mode .minimal-menu { display: flex; }
 body.focus-mode .minimal-menu[hidden] { display: none; }

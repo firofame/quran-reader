@@ -10,7 +10,6 @@ const icons = {
   moon: '<path d="M20 14A8.5 8.5 0 0 1 10 4a8.5 8.5 0 1 0 10 10Z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-  settings: '<path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="2" fill="var(--paper)"/><circle cx="16" cy="17" r="2" fill="var(--paper)"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   left: '<path d="m14 6-6 6 6 6M8 12h12"/>',
   right: '<path d="m10 6 6 6-6 6M16 12H4"/>',
@@ -100,6 +99,13 @@ function pendingEarlierRukus() {
   return pending;
 }
 
+/** Shows the “mark earlier rukus as read” action on the Settings page. */
+function renderMarkReadBlock() {
+  const pendingEarlier = pendingEarlierRukus();
+  $("mark-read-block").hidden = pendingEarlier === 0;
+  $("mark-read-btn").textContent = `Mark ${pendingEarlier} earlier ruku${pendingEarlier === 1 ? "" : "s"} as read`;
+}
+
 function stopVerseAudio() {
   audioRequestId++;
   const audio = $("verse-audio");
@@ -173,9 +179,7 @@ function updateDocumentChrome() {
   $("overall-progress-label").textContent = `${progress} / ${rukus.length} rukus · ${percent}%`;
   $("overall-progress-bar").max = rukus.length;
   $("overall-progress-bar").value = progress;
-  const pendingEarlier = pendingEarlierRukus();
-  $("mark-read-block").hidden = pendingEarlier === 0;
-  $("mark-read-btn").textContent = `Mark ${pendingEarlier} earlier ruku${pendingEarlier === 1 ? "" : "s"} as read`;
+  renderMarkReadBlock();
 
   try {
     const canvas = document.createElement("canvas");
@@ -931,6 +935,7 @@ function renderSettings() {
     : "Your backup is a single JSON file you can keep somewhere safe.";
   if (!$("plan-start-date").value) $("plan-start-date").value = getDayKey(new Date(), settings.dayBoundaryHour);
   renderAnchorEditor();
+  renderMarkReadBlock();
 }
 
 function renderAnchorEditor() {
@@ -1177,7 +1182,6 @@ function navigate(chapter, verse = 1, { record = false } = {}) {
   completedRuku = null;
   savePosition({ chapter, verse });
   if (record) recordCurrentVerse();
-  $("reading-controls").open = false;
   closeMenu();
   loadReading({ scroll: true });
 }

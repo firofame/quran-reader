@@ -172,11 +172,8 @@ select option { background: var(--paper); color: var(--text); }
 .daily-panel { display: flex; flex-direction: column; gap: 8px; padding: 6px 28px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 90%, var(--green-soft)); }
 .daily-panel-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 26px; }
 .today-progress { color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.today-mode-label, .target-reached-label { margin-left: 10px; color: var(--muted); font-size: 10px; }
-.target-reached-label { color: var(--green); font-weight: 500; }
-.quiet-toggle, .quiet-link { color: var(--green); font-size: 10px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
-.quiet-toggle { padding: 7px 12px; border: 1px solid var(--line); border-radius: 20px; text-decoration: none; }
-.quiet-toggle[aria-pressed="true"] { border-color: var(--gold); background: var(--hover); color: var(--ink); }
+.target-reached-label { margin-left: 10px; color: var(--green); font-weight: 500; font-size: 10px; }
+.quiet-link { color: var(--green); font-size: 10px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 
 .anchor-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .anchor-chip { min-height: 28px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); font-size: 9px; font-weight: 500; transition: border-color .15s, background .15s; }
@@ -462,7 +459,7 @@ body.focus-mode .minimal-menu[hidden] { display: none; }
   .overall-progress-label { font-size: 7px; }
   .topbar-right { gap: 6px; }
   .daily-panel-main { align-items: flex-start; }
-  .today-mode-label, .target-reached-label { display: block; margin: 4px 0 0; }
+  .target-reached-label { display: block; margin: 4px 0 0; }
   .juz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .manzil-row { grid-template-columns: 65px 1fr; }
   .manzil-row progress { grid-column: 1 / -1; }

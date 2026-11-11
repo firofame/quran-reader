@@ -14,8 +14,8 @@ translation.
   activity stay in this browser by default.
 - Journey, weekly review, Friday Al-Kahf progress, manual reading anchors,
   optional browser reminders, and a separate seven-day Flow plan. The weekly
-  review separates deep reading, light days, and flow reading, and counts the
-  reflections written.
+  review separates full reading and flow reading, and counts the reflections
+  written.
 - Optional one-ayah recitation is off by default and only plays after a direct
   click. The reader never starts audio automatically.
 - Installable PWA with an offline cache for the reader and the translation.

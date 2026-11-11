@@ -70,37 +70,36 @@ describe("Tanzil metadata", () => {
 });
 
 describe("reading history", () => {
-	it("follows the day boundary in local time and lowers only that day's target", () => {
+	it("follows the day boundary in local time and uses the daily target", () => {
 		const justBeforeBoundary = new Date(2026, 10, 10, 3, 59);
 		const justAfterBoundary = new Date(2026, 10, 10, 4, 1);
 		expect(getDayKey(justBeforeBoundary, 4)).toBe("2026-11-09");
 		expect(getDayKey(justAfterBoundary, 4)).toBe("2026-11-10");
 
 		let reading = createDefaultReadingData();
-		reading = { ...reading, settings: { ...reading.settings, dailyTarget: 3, dayModes: { "2026-11-10": "light" } } };
+		reading = { ...reading, settings: { ...reading.settings, dailyTarget: 3 } };
 		const rukus = getRukuIndex(data, chapters);
-		reading = recordRukuCompletion(reading, rukus[0], "light", new Date(2026, 10, 10, 5));
+		reading = recordRukuCompletion(reading, rukus[0], "full", new Date(2026, 10, 10, 5));
 		const stats = getTodayStats(reading, new Date(2026, 10, 10, 5));
-		expect({ mode: stats.mode, target: stats.target, completed: stats.completed, reached: stats.reached }).toEqual({
-			mode: "light",
-			target: 1,
+		expect({ target: stats.target, completed: stats.completed, reached: stats.reached }).toEqual({
+			target: 3,
 			completed: 1,
-			reached: true,
+			reached: false,
 		});
 	});
 
 	it("counts unique verses and reading days while ruku sessions retain repeat totals", () => {
 		let reading = createDefaultReadingData();
 		const first = new Date(2026, 10, 10, 8);
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, "deep", first);
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, "deep", new Date(2026, 10, 10, 8, 1));
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 2 }, "deep", new Date(2026, 10, 10, 8, 2));
+		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, first);
+		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, new Date(2026, 10, 10, 8, 1));
+		reading = recordVerseVisit(reading, { chapter: 1, verse: 2 }, new Date(2026, 10, 10, 8, 2));
 		expect(reading.totals.verseRead).toBe(2);
 		expect(reading.totals.readingDays).toBe(1);
 		expect(reading.activityByDay["2026-11-10"].active).toBe(true);
 
 		const ruku = findRuku({ chapter: 1, verse: 1 }, rukus);
-		reading = recordRukuCompletion(reading, ruku, "deep", new Date(2026, 10, 10, 8, 3));
+		reading = recordRukuCompletion(reading, ruku, "full", new Date(2026, 10, 10, 8, 3));
 		reading = recordRukuCompletion(reading, ruku, "flow", new Date(2026, 10, 10, 9));
 		expect(reading.completedRukuIds).toEqual([1]);
 		expect(reading.totals.rukuRead).toBe(2);
@@ -113,19 +112,19 @@ describe("reading history", () => {
 	it("counts reading days and current and previous week totals in the weekly summary", () => {
 		let reading = createDefaultReadingData();
 		const rukus = getRukuIndex(data, chapters);
-		reading = recordRukuCompletion(reading, rukus[0], "deep", new Date(2026, 10, 10, 8));
-		reading = recordRukuCompletion(reading, rukus[1], "deep", new Date(2026, 10, 10, 9));
+		reading = recordRukuCompletion(reading, rukus[0], "full", new Date(2026, 10, 10, 8));
+		reading = recordRukuCompletion(reading, rukus[1], "full", new Date(2026, 10, 10, 9));
 		const summary = getWeeklySummary(reading, new Date(2026, 10, 10, 12));
 		expect(summary.thisWeekRukus).toBe(2);
 		expect(summary.readDays).toBe(1);
 		expect(summary.previousWeekRukus).toBe(0);
 	});
 
-	it("separates deep, light and flow reading in the weekly summary and counts notes written", () => {
+	it("separates full and flow reading in the weekly summary and counts notes written", () => {
 		let reading = createDefaultReadingData();
 		const rukus = getRukuIndex(data, chapters);
-		reading = recordRukuCompletion(reading, rukus[0], "deep", new Date(2026, 10, 10, 8));
-		reading = recordRukuCompletion(reading, rukus[1], "light", new Date(2026, 10, 10, 9));
+		reading = recordRukuCompletion(reading, rukus[0], "full", new Date(2026, 10, 10, 8));
+		reading = recordRukuCompletion(reading, rukus[1], "full", new Date(2026, 10, 10, 9));
 		reading = recordRukuCompletion(reading, rukus[2], "flow", new Date(2026, 10, 10, 10));
 		reading = {
 			...reading,
@@ -135,9 +134,37 @@ describe("reading history", () => {
 			] as any[],
 		} as any;
 		const summary = getWeeklySummary(reading, new Date(2026, 10, 10, 12));
-		expect(summary.modes).toEqual({ deep: 1, light: 1, flow: 1 });
+		expect(summary.modes).toEqual({ full: 2, flow: 1 });
 		expect(summary.notes).toBe(1);
-		expect(getModeTotals(reading)).toEqual({ deep: 1, light: 1, flow: 1 });
+		expect(getModeTotals(reading)).toEqual({ full: 2, flow: 1 });
+	});
+
+	it("folds the retired light day and deep name into full reading when migrating", () => {
+		const migrated = normalizeReadingData(
+			{
+				version: 5,
+				settings: { dailyTarget: 3, dayModes: { "2026-11-10": "light" } },
+				sessions: [
+					{ date: "2026-11-10", rukuId: 1, mode: "light", completedAt: 1 },
+					{ date: "2026-11-10", rukuId: 2, mode: "deep", completedAt: 2 },
+					{ date: "2026-11-10", rukuId: 3, mode: "flow", completedAt: 3 },
+				],
+				activityByDay: {
+					"2026-11-10": {
+						active: true,
+						rukuIds: [1, 2],
+						rukuCompletions: 3,
+						modeCounts: { deep: 1, light: 1, flow: 1 },
+					},
+				},
+			},
+			chapters,
+		);
+		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
+		expect(migrated.settings.dayModes).toBeUndefined();
+		expect(migrated.sessions.map(session => session.mode)).toEqual(["full", "full", "flow"]);
+		expect(migrated.activityByDay["2026-11-10"].modeCounts).toEqual({ full: 2, flow: 1 });
+		expect(getModeTotals(migrated)).toEqual({ full: 2, flow: 1 });
 	});
 
 	it("keeps valid saved fields and drops invalid records when migrating", () => {
@@ -172,7 +199,7 @@ describe("reading history", () => {
 						verseKeys: ["1:1", "1:2"],
 						rukuIds: [1],
 						rukuCompletions: 1,
-						modeCounts: { deep: 1 },
+						modeCounts: { full: 1 },
 						sessionStarts: [Date.now()],
 					},
 				},
@@ -189,20 +216,20 @@ describe("reading history", () => {
 describe("resume position", () => {
 	it("opens the next unread verse and never rewinds to an unread stop", () => {
 		let reading = createDefaultReadingData();
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, "deep", new Date(2026, 10, 10, 8));
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 2 }, "deep", new Date(2026, 10, 10, 8, 1));
+		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, new Date(2026, 10, 10, 8));
+		reading = recordVerseVisit(reading, { chapter: 1, verse: 2 }, new Date(2026, 10, 10, 8, 1));
 
 		expect(getResumePosition({ chapter: 1, verse: 2 }, reading, chapters, rukus)).toEqual({ chapter: 1, verse: 3 });
 		expect(getResumePosition({ chapter: 1, verse: 1 }, reading, chapters, rukus)).toEqual({ chapter: 1, verse: 3 });
 		expect(getResumePosition({ chapter: 2, verse: 1 }, reading, chapters, rukus)).toEqual({ chapter: 2, verse: 1 });
 
-		const finished = recordRukuCompletion(reading, rukus[0], "deep", new Date(2026, 10, 10, 8, 2));
+		const finished = recordRukuCompletion(reading, rukus[0], "full", new Date(2026, 10, 10, 8, 2));
 		expect(getResumePosition({ chapter: 1, verse: 7 }, finished, chapters, rukus)).toEqual({ chapter: 2, verse: 1 });
 	});
 
 	it("stays inside the ruku when later verses are still unread", () => {
 		let reading = createDefaultReadingData();
-		reading = recordVerseVisit(reading, { chapter: 2, verse: 142 }, "deep", new Date(2026, 10, 10, 8));
+		reading = recordVerseVisit(reading, { chapter: 2, verse: 142 }, new Date(2026, 10, 10, 8));
 		const resumed = getResumePosition({ chapter: 2, verse: 142 }, reading, chapters, rukus);
 		expect(resumed).toEqual({ chapter: 2, verse: 143 });
 		expect(findRuku(resumed, rukus).id).toBe(findRuku({ chapter: 2, verse: 142 }, rukus).id);
@@ -210,7 +237,7 @@ describe("resume position", () => {
 
 	it("follows an explicit link, resumes past a read verse and honours the setting", () => {
 		let reading = createDefaultReadingData();
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, "deep", new Date(2026, 10, 10, 8));
+		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, new Date(2026, 10, 10, 8));
 		const saved = { chapter: 1, verse: 1 };
 
 		const linked = resolveStartupPosition({
@@ -271,7 +298,7 @@ describe("backfill", () => {
 
 	it("keeps the verses that were already read and skips the current ruku", () => {
 		let reading = createDefaultReadingData();
-		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, "deep", new Date(2026, 10, 10, 8));
+		reading = recordVerseVisit(reading, { chapter: 1, verse: 1 }, new Date(2026, 10, 10, 8));
 		const updated = recordRukusAsRead(reading, 3, rukus);
 
 		expect(updated.completedRukuIds).toEqual([1, 2]);

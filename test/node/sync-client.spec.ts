@@ -405,6 +405,8 @@ describe("sync client", () => {
 	it("pulls newer remote state and triggers onRemoteUpdate", async () => {
 		const storage = createStorage();
 
+		// A remote space written by an older reader still carries its own
+		// translation identifier, and the client forwards it unchanged.
 		const remotePayload = {
 			empty: false,
 			chapter: 3,

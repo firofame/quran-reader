@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, splitTranslationParagraphs, selectAyah, adjacentPosition, matchesChapter, decodeState, validPosition, parseTranslation } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, splitTranslationParagraphs, selectAyah, adjacentPosition, matchesChapter, decodeState, validPosition } from "./reader.js";
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
@@ -8,7 +8,6 @@ import { DEFAULT_RUKU_COUNT, findRuku, formatDateKey, getDayKey, getModeTotals, 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
-  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/>',
   moon: '<path d="M20 14A8.5 8.5 0 0 1 10 4a8.5 8.5 0 1 0 10 10Z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
@@ -31,8 +30,6 @@ const preferences = createPreferencesStore({
 }, chapters);
 const translations = createTranslationRepository();
 let state;
-let arabicPromise;
-let arabicVerses;
 let requestId = 0;
 let noticeTimer;
 let storageFailed = false;
@@ -210,18 +207,6 @@ function playVerseAudio(position, button) {
   };
 }
 
-function loadArabicText() {
-  if (!arabicPromise) {
-    arabicPromise = fetch("ar.uthmani.txt")
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.text();
-      })
-      .then(text => parseTranslation(text, chapters));
-  }
-  return arabicPromise;
-}
-
 function updateDocumentChrome() {
   const currentRuku = findRuku(state.position, rukus);
   const today = getTodayStats(state.readingData);
@@ -291,11 +276,8 @@ if (startup.source === "link") {
 function applyPreferences() {
   document.documentElement.dataset.theme = state.theme;
   document.documentElement.style.setProperty("--reading-size", `${state.fontSize}px`);
-  document.documentElement.style.setProperty("--arabic-size", `${state.readingData.settings.arabicSize}px`);
   document.documentElement.dataset.translationFont = state.readingData.settings.translationFont;
-  document.documentElement.dataset.arabicFont = state.readingData.settings.arabicFont;
   document.body.classList.toggle("focus-mode", state.readingData.settings.focusMode);
-  $("translation").value = state.translation;
   $("theme-toggle").innerHTML = icon(state.theme === "dark" ? "sun" : "moon");
   $("theme-toggle").setAttribute("aria-label", `Switch to ${state.theme === "dark" ? "light" : "dark"} theme`);
   $("font-down").disabled = state.fontSize <= 17;
@@ -333,7 +315,7 @@ function renderHeading() {
   const currentRuku = findRuku(state.position, rukus);
   const surahProgress = getSurahRukuProgress(chapter.id, state.readingData, rukus);
   const localRuku = currentRuku?.localNumber ?? 0;
-  $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed<span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div><span class="chapter-arabic" lang="ar" dir="rtl">${chapter.arabic}</span>`;
+  $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed<span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div>`;
   renderReadingMetadata(currentAyah);
   const jumpOptions = Array.from({ length: chapter.verses }, (_, index) => new Option(index + 1, index + 1));
   $("verse-jump").replaceChildren(...jumpOptions);
@@ -488,15 +470,6 @@ function createVerse(verse, showActions = true) {
   const textContainer = document.createElement("div");
   textContainer.className = "verse-body";
   const language = TRANSLATIONS[state.translation].language;
-  const arabicVerse = arabicVerses?.[verse.chapter - 1]?.[verse.verse - 1];
-  if (arabicVerse) {
-    const arabic = document.createElement("p");
-    arabic.className = "verse-arabic";
-    arabic.lang = "ar";
-    arabic.dir = "rtl";
-    arabic.textContent = arabicVerse.text;
-    textContainer.append(arabic);
-  }
   for (const paragraph of splitTranslationParagraphs(verse.text, language)) {
     const text = document.createElement("p");
     text.lang = language;
@@ -1011,8 +984,6 @@ function renderSettings() {
   $("daily-target").value = settings.dailyTarget;
   $("day-boundary").value = String(settings.dayBoundaryHour);
   $("translation-font").value = settings.translationFont;
-  $("arabic-font").value = settings.arabicFont;
-  $("arabic-size").value = settings.arabicSize;
   $("ruku-summary-setting").value = settings.rukuSummary;
   $("kahf-friday-setting").checked = settings.kahfFridayEnabled;
   $("weekly-plan-setting").checked = settings.weeklyPlanEnabled;
@@ -1094,14 +1065,6 @@ function initializeSettingsControls() {
   boundary.addEventListener("change", () => updateSetting("dayBoundaryHour", Number(boundary.value)));
   $("translation-font").addEventListener("change", () => {
     updateSetting("translationFont", $("translation-font").value);
-    applyPreferences();
-  });
-  $("arabic-font").addEventListener("change", () => {
-    updateSetting("arabicFont", $("arabic-font").value);
-    applyPreferences();
-  });
-  $("arabic-size").addEventListener("input", () => {
-    updateSetting("arabicSize", Number($("arabic-size").value));
     applyPreferences();
   });
   $("ruku-summary-setting").addEventListener("change", () => updateSetting("rukuSummary", $("ruku-summary-setting").value));
@@ -1214,27 +1177,9 @@ async function loadReading({ scroll = false } = {}) {
   if (scroll) window.scrollTo({ top: 0, behavior: "instant" });
   try {
     const translationId = state.translation;
-    const [data, arabic] = await Promise.all([
-      translations.load(translationId, chapters),
-      loadArabicText().catch(error => {
-        console.error("Unable to load Tanzil Arabic text:", error);
-        return null;
-      }),
-    ]);
+    const data = await translations.load(translationId, chapters);
     if (request !== requestId) return;
     loading = false;
-    arabicVerses = arabic;
-    $("arabic-attribution").hidden = !arabic;
-    if (arabic) {
-      const source = $("arabic-attribution");
-      source.replaceChildren(document.createTextNode("Arabic Quran text: Tanzil Project, Uthmani text v1.1 · "));
-      const link = document.createElement("a");
-      link.href = "https://tanzil.net/";
-      link.target = "_blank";
-      link.rel = "noreferrer";
-      link.textContent = "CC BY 3.0 · text shown unchanged";
-      source.append(link);
-    }
     synchronizeSearchPosition(data);
     renderVerses();
   } catch (error) {
@@ -1559,10 +1504,6 @@ $("verse-jump").addEventListener("change", () => {
   $("reading-controls").open = false;
   showAyah({ chapter: state.position.chapter, verse: Number($("verse-jump").value) });
   $("reading-controls").querySelector("summary").focus({ preventScroll: true });
-});
-$("translation").addEventListener("change", () => {
-  dispatch({ type: "translation/set", translation: $("translation").value });
-  loadReading();
 });
 
 for (const [id, increment] of [["font-down", -2], ["font-up", 2]]) {

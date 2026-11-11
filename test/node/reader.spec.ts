@@ -96,13 +96,11 @@ describe("ruku progress", () => {
 });
 
 describe("translations", () => {
-	it("match the supported English and Malayalam translations", async () => {
-		expect(Object.keys(TRANSLATIONS)).toEqual(["en.sahih", "ml.abdulhameed"]);
+	it("ships the Saheeh International translation only", async () => {
+		expect(Object.keys(TRANSLATIONS)).toEqual(["en.sahih"]);
 		const html = await readFile(fileURLToPath(new URL("../../public/index.html", import.meta.url).href), "utf8");
-		const select = /<select id="translation">([\s\S]*?)<\/select>/.exec(html);
-		expect(select).toBeTruthy();
-		const options = Array.from(select![1].matchAll(/<option value="([^"]+)">/g), match => match[1]);
-		expect(options).toEqual(Object.keys(TRANSLATIONS));
+		expect(html).not.toMatch(/id="translation"/);
+		expect(html).not.toMatch(/abdulhameed/i);
 	});
 
 	for (const [id, translation] of Object.entries(TRANSLATIONS)) {
@@ -334,10 +332,10 @@ describe("reading comfort", () => {
 });
 
 describe("chapter search", () => {
-	it("supports names, punctuation, meaning, Arabic, and numbers", () => {
+	it("supports names, punctuation, meaning, and numbers", () => {
 		expect(matchesChapter(chapters[0], "al faatiha".replace(" ", "-"))).toBeTruthy();
 		expect(matchesChapter(chapters[0], "opening")).toBeTruthy();
-		expect(matchesChapter(chapters[0], "الفاتحة")).toBeTruthy();
+		expect(matchesChapter(chapters[0], "الفاتحة")).toBeFalsy();
 		expect(matchesChapter(chapters[111], "112")).toBeTruthy();
 		expect(matchesChapter(chapters[5], "al anaam".replace(" ", "-"))).toBeTruthy();
 		expect(matchesChapter(chapters[0], "unmatched")).toBeFalsy();
@@ -403,11 +401,11 @@ describe("saved state", () => {
 			positioned,
 			{
 				type: "translation/set",
-				translation: "ml.abdulhameed",
+				translation: "en.sahih",
 			},
 			chapters,
 		);
-		expect(translated.translation).toBe("ml.abdulhameed");
+		expect(translated.translation).toBe("en.sahih");
 		expect(reduceReaderState(translated, { type: "font-size/adjust", delta: 20 }, chapters).fontSize).toBe(29);
 		expect(reduceReaderState(initial, { type: "font-size/adjust", delta: -20 }, chapters).fontSize).toBe(17);
 		expect(reduceReaderState(initial, { type: "theme/toggle" }, chapters).theme).toBe("dark");

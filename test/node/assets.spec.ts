@@ -21,9 +21,7 @@ const READER_FILES = [
 	"favicon.svg",
 	"icon-192.png",
 	"icon-512.png",
-	"ar.uthmani.txt",
 	"en.sahih.txt",
-	"ml.abdulhameed.txt",
 ];
 
 async function readPublicFile(name: string): Promise<string> {

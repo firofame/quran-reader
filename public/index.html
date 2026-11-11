@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f8f7f2">
-    <meta name="description" content="A quiet space to read and reflect on Quran translations. Explore 114 chapters in English and Malayalam.">
+    <meta name="description" content="A quiet space to read and reflect on Quran translations. Explore 114 chapters in English.">
     <link rel="manifest" href="manifest.webmanifest">
     <title>The Quran — A space for reflection</title>
     <link id="app-icon" rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -68,14 +68,6 @@
               <summary><span data-icon="settings"></span>Controls</summary>
               <div class="reading-options">
                 <div class="reading-toolbar">
-                  <label class="translation-control">
-                    <span data-icon="globe"></span>
-                    <span class="sr-only">Translation</span>
-                    <select id="translation">
-                      <option value="en.sahih">English · Saheeh International</option>
-                      <option value="ml.abdulhameed">Malayalam · Abdul Hameed & Parappoor</option>
-                    </select>
-                  </label>
                   <div class="font-controls" role="group" aria-label="Reading text size">
                     <button id="font-down" aria-label="Decrease text size">A<span>−</span></button>
                     <span class="control-divider"></span>
@@ -199,7 +191,6 @@
         <footer class="reader-footer">
           <p>A translation of the meanings of the Quran.</p>
           <p id="attribution"></p>
-          <p id="arabic-attribution" class="metadata-credit" hidden></p>
           <p class="metadata-credit">Chapter metadata © Tanzil, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a>.</p>
         </footer>
         </div>
@@ -232,8 +223,6 @@
             <label>Daily target <span class="setting-control"><input id="daily-target" type="number" min="1" max="10"> rukus</span></label>
             <label>Day starts at <select id="day-boundary"></select></label>
             <label>Translation typeface <select id="translation-font"><option value="serif">Serif</option><option value="sans">Sans serif</option></select></label>
-            <label>Arabic typeface <select id="arabic-font"><option value="naskh">Naskh</option><option value="serif">Serif</option><option value="sans">Sans serif</option></select></label>
-            <label>Arabic text size <input id="arabic-size" type="range" min="26" max="54" step="1"></label>
             <label>Ruku context <select id="ruku-summary-setting"><option value="auto">Show when a sourced summary is available</option><option value="always">Always show available summaries</option><option value="never">Hide summaries</option></select></label>
             <label class="setting-check"><input id="kahf-friday-setting" type="checkbox"> Suggest Al-Kahf on Fridays</label>
             <label class="setting-check"><input id="weekly-plan-setting" type="checkbox"> Show the weekly khatam plan</label>
@@ -249,7 +238,7 @@
       <div id="minimal-menu" class="minimal-menu" hidden role="dialog" aria-label="Reading menu"><button type="button" data-page="reader">Return to reading</button><button type="button" data-page="settings">Settings</button><button id="minimal-bookmark" type="button">Bookmark this verse</button><button id="focus-mode-exit" type="button">Exit focus mode</button></div>
       <audio id="verse-audio" preload="none" hidden></audio>
     </div>
-    <noscript><div class="noscript">Please enable JavaScript to load the local translations and use the reader.</div></noscript>
+    <noscript><div class="noscript">Please enable JavaScript to load the local translation and use the reader.</div></noscript>
     <script src="quran-data.js"></script>
     <script type="module" src="app.js"></script>
   </body>

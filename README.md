@@ -1,16 +1,14 @@
 # The Quran — A Space for Reflection
 
-A quiet, responsive Quran reader with the original Arabic text and English or
-Malayalam translations.
+A quiet, responsive Quran reader with the English Saheeh International
+translation.
 
-- Explore 114 chapters with search across chapter names, meanings, Arabic text,
-  and chapter numbers.
-- Switch between Saheeh International (English) and Cheriyamundam Abdul Hameed &
-  Kunhi Mohammed Parappoor (Malayalam).
+- Explore 114 chapters with search across chapter names, meanings, and chapter
+  numbers.
+- Read the Saheeh International (English) translation of all 6,236 ayahs.
 - Complete Tanzil chapter and ayah metadata is baked in: verses, revelation
   order, revelation place, rukus, pages, manzils, hizb quarters, juzs, and
   sajdas.
-- The original Uthmani Arabic text appears above the selected translation.
 - Resume the saved ayah, see overall and daily ruku progress, and finish with an
   optional reflection. Reading progress, bookmarks, notes, settings, and recent
   activity stay in this browser by default.
@@ -20,7 +18,7 @@ Malayalam translations.
   reflections written.
 - Optional one-ayah recitation is off by default and only plays after a direct
   click. The reader never starts audio automatically.
-- Installable PWA with an offline cache for the reader, text, and translations.
+- Installable PWA with an offline cache for the reader and the translation.
 
 ---
 
@@ -60,10 +58,9 @@ emulated in a local SQLite database.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes.
 - Read in a centered column no wider than 680px, with start-aligned translation
-  text (left for English and Malayalam), normal letter spacing, and 26px between
-  paragraphs. Default English text is 22px with 1.8 line height, or 20px on
-  phones up to 430px wide. Text-size controls still apply; Malayalam retains its
-  script-specific font and more generous line height.
+  text, normal letter spacing, and 26px between paragraphs. Default English text
+  is 22px with 1.8 line height, or 20px on phones up to 430px wide.
+  Text-size controls still apply.
 - Long translations (500 or more characters) are grouped at locale-aware
   sentence boundaries, aiming for about 300 characters per paragraph. Quoted
   passages and individual sentences can exceed that target rather than being
@@ -86,28 +83,22 @@ emulated in a local SQLite database.
   previous one, `b` to bookmark the current ayah, `r` to read it again, and
   `Escape` for the small reading menu.
 
-Translations are loaded from the supplied local files and retained in memory
+Translations are loaded from the supplied local file and retained in memory
 while the page is open. A fresh installation makes no cloud requests. After you
 choose **Start syncing** or **Join sync**, the app sends your reading position
 and selected translation identifier to the Quran Reader sync service;
-translation text remains local.
-Arabic and translation text are displayed together, with Arabic above the
-translation. Translation wording is unchanged; paragraph breaks are added only
-for display. Optional sentence-by-sentence Focus Reading is not implemented:
-complete ayahs remain visible.
+translation text remains local. Translation wording is unchanged; paragraph
+breaks are added only for display. Optional sentence-by-sentence Focus Reading
+is not implemented: complete ayahs remain visible.
 
 ## Reading data and sources
 
-- Arabic text: Tanzil Project, Uthmani text 1.1, CC BY 3.0. It is bundled
-  verbatim with Tanzil's copyright and license notice; changing the text is not
-  allowed. See the in-app attribution and [Tanzil's terms](https://tanzil.net/docs/Text_License).
 - Structural metadata: Tanzil Quran Metadata 1.0, CC BY 3.0. The app uses the
   documented Tanzil convention of **556 rukus** (40 in Al-Baqarah), with 30
   juzs and 7 manzils. This is the 556-division convention, not the separate 558
   convention referenced in the improvement brief.
-- Translations: English Saheeh International; Malayalam Cheriyamundam Abdul
-  Hameed and Kunhi Mohammed Parappoor. Files and attribution are supplied by the
-  project and are not modified.
+- Translation: English Saheeh International. The file and its attribution are
+  supplied by the project and are not modified.
 - Optional recitation: Mishary Rashid Alafasy at 128 kbps, streamed from Al
   Quran Cloud. Its [terms](https://alquran.cloud/terms-and-conditions) permit
   streaming for personal and educational use. The recitation button is hidden
@@ -205,11 +196,10 @@ from a fork.
 
 ## Sources
 
-The supplied Arabic and translation files include their original source and
-attribution. Arabic: Tanzil Uthmani text v1.1. English: Saheeh International. Malayalam:
-Cheriyamundam Abdul Hameed and Kunhi Mohammed Parappoor. Source:
-[Tanzil translations](https://tanzil.net/trans/). These files remain unchanged;
-their respective translators' rights and terms continue to apply.
+The supplied translation file includes its original source and attribution.
+English: Saheeh International. Source:
+[Tanzil translations](https://tanzil.net/trans/). The file remains unchanged;
+the translator's rights and terms continue to apply.
 
 Chapter metadata: copyright © 2008–2009 Tanzil.info, licensed under
 [Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/).

@@ -268,10 +268,6 @@ function renderHeading() {
   const localRuku = currentRuku?.localNumber ?? 0;
   $("chapter-heading").innerHTML = `<div><h1>${chapter.id}. ${chapter.name}</h1><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed<span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div>`;
   renderReadingMetadata(currentAyah);
-  const jumpOptions = Array.from({ length: chapter.verses }, (_, index) => new Option(index + 1, index + 1));
-  $("verse-jump").replaceChildren(...jumpOptions);
-  $("verse-jump").value = state.position.verse;
-  populateGotoControls();
   const translation = TRANSLATIONS[state.translation];
   const attribution = $("attribution");
   attribution.replaceChildren(document.createTextNode(`${translation.name} · `));
@@ -295,9 +291,6 @@ function renderVerses() {
   const chapter = chapters[state.position.chapter - 1];
   currentAyah = ayah;
   renderReadingMetadata(currentAyah);
-  if (ayah) {
-    $("verse-jump").value = state.position.verse;
-  }
   $("reading-content").classList.toggle("focused", !flowMode);
   $("reading-content").classList.toggle("flow-reading", flowMode);
   document.body.classList.toggle("flow-mode", flowMode);
@@ -1189,26 +1182,6 @@ function navigate(chapter, verse = 1, { record = false } = {}) {
   loadReading({ scroll: true });
 }
 
-function populateGotoControls() {
-  const surah = $("goto-surah");
-  if (!surah.options.length) {
-    surah.replaceChildren(...chapters.map(chapter => new Option(`${chapter.id}. ${chapter.name}`, chapter.id)));
-  }
-  if (!surah.value || !chapters[Number(surah.value) - 1]) surah.value = state.position.chapter;
-  const chapterId = Number(surah.value);
-  const chapterRukus = rukus.filter(ruku => ruku.chapter === chapterId);
-  const rukuSelect = $("goto-ruku");
-  const previousRuku = Number(rukuSelect.value);
-  rukuSelect.replaceChildren(...chapterRukus.map(ruku => new Option(`Ruku ${ruku.localNumber} · #${ruku.id}`, ruku.id)));
-  const selectedRuku = chapterRukus.find(ruku => ruku.id === previousRuku) || chapterRukus[0];
-  if (selectedRuku) rukuSelect.value = selectedRuku.id;
-  const verseSelect = $("goto-verse");
-  const previousVerse = Number(verseSelect.value);
-  verseSelect.replaceChildren(...Array.from({ length: chapters[chapterId - 1].verses }, (_, index) => new Option(index + 1, index + 1)));
-  const defaultVerse = selectedRuku?.start.verse ?? 1;
-  verseSelect.value = String(previousVerse >= 1 && previousVerse <= chapters[chapterId - 1].verses ? previousVerse : defaultVerse);
-}
-
 function openSection(type, number) {
   const section = getSectionRukus(type, number, globalThis.QuranData, chapters, rukus);
   const firstUnread = section.find(ruku => !state.readingData.completedRukuIds.includes(ruku.id));
@@ -1312,20 +1285,6 @@ function initializeFeatureInteractions() {
   });
   $("open-kahf").addEventListener("click", openKahf);
   $("journey-open-kahf").addEventListener("click", openKahf);
-  $("goto-surah").addEventListener("change", () => {
-    $("goto-verse").value = "";
-    populateGotoControls();
-    const selected = rukus[Number($("goto-ruku").value) - 1];
-    if (selected) $("goto-verse").value = String(selected.start.verse);
-  });
-  $("goto-ruku").addEventListener("change", () => {
-    const selected = rukus[Number($("goto-ruku").value) - 1];
-    if (selected) $("goto-verse").value = String(selected.start.verse);
-  });
-  $("goto-form").addEventListener("submit", event => {
-    event.preventDefault();
-    navigate(Number($("goto-surah").value), Number($("goto-verse").value), { record: true });
-  });
   $("notes-search").addEventListener("input", renderNotes);
   $("what-if-target").addEventListener("input", renderFinishEstimate);
   $("reflection-input").addEventListener("input", () => {
@@ -1397,11 +1356,6 @@ $("ayah-navigation").addEventListener("click", event => {
   if (button) moveAyah(Number(button.dataset.direction));
 });
 $("chapter-search").addEventListener("input", renderChapters);
-$("verse-jump").addEventListener("change", () => {
-  $("reading-controls").open = false;
-  showAyah({ chapter: state.position.chapter, verse: Number($("verse-jump").value) });
-  $("reading-controls").querySelector("summary").focus({ preventScroll: true });
-});
 
 for (const [id, increment] of [["font-down", -2], ["font-up", 2]]) {
   $(id).addEventListener("click", () => {
@@ -1491,7 +1445,6 @@ matchMedia("(max-width: 760px)").addEventListener("change", closeMenu);
 if (rukus.length !== DEFAULT_RUKU_COUNT) console.warn(`Expected ${DEFAULT_RUKU_COUNT} Tanzil rukus; found ${rukus.length}.`);
 initializeSettingsControls();
 initializeFeatureInteractions();
-populateGotoControls();
 applyPreferences();
 closeMenu();
 persist();

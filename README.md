@@ -53,7 +53,8 @@ without a Cloudflare account.
 - Focus on one ayah, then use **Back** / **Continue** or the left/right arrow keys
   to move through the Quran. Navigation continues across chapter boundaries.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
-- Adjust text size and switch between light and dark themes.
+- Adjust text size and switch between light and dark themes. Both live in
+  Settings, so the reading screen stays free of controls.
 - Read in a centered column no wider than 680px, with start-aligned translation
   text, normal letter spacing, and 26px between paragraphs. Default English text
   is 22px with 1.8 line height, or 20px on phones up to 430px wide.
@@ -68,7 +69,7 @@ without a Cloudflare account.
 - The exact selected ayah and preferences are saved in this browser's local
   storage. Nothing is sent to a server.
 - If you have already read further on another device, **Mark earlier rukus as
-  read** in the Controls panel catches up the overall progress and the lifetime
+  read** in Settings catches up the overall progress and the lifetime
   totals on this device. The daily and weekly history is left unchanged,
   because the days are not known.
 - Reopening the app opens the next unread ayah, so a new sitting starts with

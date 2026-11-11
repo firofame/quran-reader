@@ -130,15 +130,10 @@ main:focus { outline: none; }
 .reader { display: flex; flex-direction: column; min-height: calc(100svh - var(--topbar-height) - 2 * var(--reader-gutter)); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card); }
 .reader-header { position: relative; flex-shrink: 0; border-bottom: 1px solid var(--line); }
 
-/* Controls toggle */
-.reading-controls summary { position: absolute; top: 16px; right: 20px; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--green); font-size: 11px; font-weight: 500; cursor: pointer; list-style: none; transition: background .15s, border-color .15s; }
-.reading-controls summary::-webkit-details-marker { display: none; }
-.reading-controls summary svg { width: 15px; height: 15px; }
-.reading-controls summary:hover, .reading-controls[open] summary { background: var(--green-soft); border-color: var(--green); }
-.reading-options { border-top: 1px solid var(--line); }
-
-/* Toolbar */
-.reading-toolbar { display: flex; align-items: center; justify-content: flex-end; min-height: 44px; padding: 0 24px; gap: 16px; }
+/* Reading controls, shown on the Settings page */
+.reading-options { display: flex; flex-direction: column; }
+.reading-toolbar { display: flex; align-items: center; justify-content: flex-start; gap: 16px; }
+.reading-option-label { color: var(--text); font-size: 10px; }
 select option { background: var(--paper); color: var(--text); }
 
 .font-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
@@ -149,7 +144,7 @@ select option { background: var(--paper); color: var(--text); }
 .control-divider { height: 16px; width: 1px; background: var(--line); }
 
 /* Chapter heading */
-.chapter-heading { padding: 14px 140px 14px 28px; }
+.chapter-heading { padding: 14px 28px; }
 .chapter-heading > div { min-width: 0; }
 .chapter-heading h1 { color: var(--ink); font-family: var(--serif); font-size: 26px; line-height: 1.25; letter-spacing: -.5px; font-weight: 400; margin: 0 0 4px; overflow-wrap: anywhere; }
 .chapter-heading p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
@@ -262,7 +257,7 @@ select option { background: var(--paper); color: var(--text); }
 .reader-footer .metadata-credit { font-size: 8px; opacity: .85; }
 
 /* ─── Reading history ──────────────────────────────────────────── */
-.reading-history-block { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 24px 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.reading-history-block { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
 .reading-history-block p { flex: 1 1 220px; margin: 0; }
 
 /* ─── Empty & loading states ───────────────────────────────────── */
@@ -398,7 +393,7 @@ body.focus-mode .minimal-menu[hidden] { display: none; }
   .topbar { padding: 0 24px; }
   main { padding-left: 20px; padding-right: 20px; }
   .notice { left: calc(50% + 125px); }
-  .reading-toolbar { padding: 0 20px; }
+  .reading-toolbar { gap: 12px; }
   #reading-content { padding-left: 24px; padding-right: 24px; }
   .verse { column-gap: 12px; }
   .chapter-pagination { margin-left: 24px; margin-right: 24px; }
@@ -442,12 +437,11 @@ body.focus-mode .minimal-menu[hidden] { display: none; }
 /* ─── Responsive: small phone ──────────────────────────────────── */
 @media (max-width: 430px) {
   .topbar { padding: 0 12px; }
-  .reading-toolbar { padding: 0 14px; gap: 8px; }
+  .reading-toolbar { gap: 8px; }
   .font-controls { gap: 4px; }
   .font-controls button { padding-left: 2px; padding-right: 2px; }
-  .chapter-heading { padding: 14px 112px 14px 16px; }
+  .chapter-heading { padding: 14px 16px; }
   .chapter-heading h1 { font-size: 22px; }
-  .reading-controls summary { right: 12px; padding: 0 8px; }
   #reading-content { padding: 0 16px; }
   .verse { grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 24px 0; }
   .verse-number { font-size: 9px; padding-top: 10px; }

@@ -64,22 +64,6 @@
         <section class="reader" aria-label="Quran translation">
           <div class="reader-header">
             <div id="chapter-heading" class="chapter-heading"></div>
-            <details id="reading-controls" class="reading-controls">
-              <summary><span data-icon="settings"></span>Controls</summary>
-              <div class="reading-options">
-                <div class="reading-toolbar">
-                  <div class="font-controls" role="group" aria-label="Reading text size">
-                    <button id="font-down" aria-label="Decrease text size">A<span>−</span></button>
-                    <span class="control-divider"></span>
-                    <button id="font-up" aria-label="Increase text size">A<span>+</span></button>
-                  </div>
-                </div>
-                <div id="mark-read-block" class="reading-history-block" hidden>
-                  <button id="mark-read-btn" type="button" class="secondary-button">Mark earlier rukus as read</button>
-                  <p class="muted-copy">For when you have already read further on another device. It catches up the overall progress and the lifetime totals. The daily and weekly history stays as it is, because the days are not known.</p>
-                </div>
-              </div>
-            </details>
           </div>
           <section id="daily-panel" class="daily-panel" aria-label="Today’s reading progress">
             <div class="daily-panel-main">
@@ -163,6 +147,23 @@
             <label class="setting-check"><input id="focus-mode-setting" type="checkbox"> Focus mode</label>
             <label class="setting-check"><input id="resume-setting" type="checkbox"> Open at the next unread verse</label>
             <label class="setting-check"><input id="reminders-setting" type="checkbox"> Browser reminders at my anchors</label>
+          </section>
+          <section class="page-card reading-controls-card">
+            <h2>Reading controls</h2>
+            <div class="reading-options">
+              <div class="reading-toolbar">
+                <span class="reading-option-label">Text size</span>
+                <div class="font-controls" role="group" aria-label="Reading text size">
+                  <button id="font-down" type="button" aria-label="Decrease text size">A<span>−</span></button>
+                  <span class="control-divider"></span>
+                  <button id="font-up" type="button" aria-label="Increase text size">A<span>+</span></button>
+                </div>
+              </div>
+              <div id="mark-read-block" class="reading-history-block" hidden>
+                <button id="mark-read-btn" type="button" class="secondary-button">Mark earlier rukus as read</button>
+                <p class="muted-copy">For when you have already read further on another device. It catches up the overall progress and the lifetime totals. The daily and weekly history stays as it is, because the days are not known.</p>
+              </div>
+            </div>
           </section>
           <section class="page-card"><div class="card-heading-row"><div><h2>Reading anchors</h2><p>Times are manual and follow your device’s local time.</p></div><button id="add-anchor" type="button" class="secondary-button">Add anchor</button></div><div id="anchor-editor" class="anchor-editor"></div><p class="muted-copy">Browser reminders only fire while the browser is running.</p></section>
           <section class="page-card"><h2>Backup and portability</h2><p>Export includes reading position, progress, settings, notes, bookmarks, and activity.</p><div class="backup-actions"><button id="export-backup" type="button" class="secondary-button">Export backup</button><button id="import-backup" type="button" class="secondary-button">Import backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div><p id="backup-reminder" class="muted-copy"></p></section>

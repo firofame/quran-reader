@@ -102,6 +102,22 @@ function renderMarkReadBlock() {
   $("mark-read-btn").textContent = `Mark ${pendingEarlier} earlier ruku${pendingEarlier === 1 ? "" : "s"} as read`;
 }
 
+function setAudioButtonState(button, status) {
+  const [chapter, verse] = button.dataset.listenVerse.split(":");
+  const labels = {
+    play: `Play verse ${chapter}:${verse}`,
+    pause: `Pause verse ${chapter}:${verse}`,
+    loading: `Loading recitation for verse ${chapter}:${verse}`,
+  };
+  const iconPath = status === "pause"
+    ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>'
+    : '<path d="M8 5v14l11-7z"/>';
+  button.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${iconPath}</svg>`;
+  button.setAttribute("aria-label", labels[status]);
+  button.title = labels[status];
+  button.disabled = status === "loading";
+}
+
 function stopVerseAudio() {
   audioRequestId++;
   const audio = $("verse-audio");
@@ -110,8 +126,7 @@ function stopVerseAudio() {
   audio.removeAttribute("src");
   audio.load();
   if (activeAudioButton?.isConnected) {
-    activeAudioButton.disabled = false;
-    activeAudioButton.textContent = "Hear one verse";
+    setAudioButtonState(activeAudioButton, "play");
   }
   activeAudioButton = null;
 }
@@ -119,46 +134,60 @@ function stopVerseAudio() {
 function playVerseAudio(position, button) {
   const audio = $("verse-audio");
   const chapter = chapters[position.chapter - 1];
-  const ayahNumber = chapter.start + position.verse - 1;
+  // Tanzil's chapter start is zero-based, while the audio CDN expects a
+  // one-based global ayah number (for example, 2:254 is ayah 261).
+  const ayahNumber = chapter.start + position.verse;
   const source = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${ayahNumber}.mp3`;
   stopVerseAudio();
   const request = ++audioRequestId;
   activeAudioButton = button;
-  button.disabled = true;
-  button.textContent = "Loading recitation…";
+  setAudioButtonState(button, "loading");
   audio.src = source;
   audio.currentTime = 0;
-  audio.play().then(() => {
-    if (request !== audioRequestId) return;
-    if (activeAudioButton?.isConnected) {
-      activeAudioButton.disabled = false;
-      activeAudioButton.textContent = "Playing one verse…";
-    }
-  }).catch(error => {
-    if (request !== audioRequestId) return;
-    console.warn("Unable to play the selected recitation:", error);
-    if (activeAudioButton?.isConnected) {
-      activeAudioButton.disabled = false;
-      activeAudioButton.textContent = "Hear one verse";
-    }
-    notify("The recitation could not be opened. Check your connection and try again.");
-  });
   audio.onended = () => {
     if (request !== audioRequestId) return;
-    if (activeAudioButton?.isConnected) {
-      activeAudioButton.disabled = false;
-      activeAudioButton.textContent = "Hear one verse";
-    }
+    if (activeAudioButton?.isConnected) setAudioButtonState(activeAudioButton, "play");
     activeAudioButton = null;
   };
   audio.onerror = () => {
     if (request !== audioRequestId) return;
-    if (activeAudioButton?.isConnected) {
-      activeAudioButton.disabled = false;
-      activeAudioButton.textContent = "Hear one verse";
-    }
+    if (activeAudioButton?.isConnected) setAudioButtonState(activeAudioButton, "play");
     activeAudioButton = null;
   };
+  audio.play().then(() => {
+    if (request !== audioRequestId) return;
+    if (activeAudioButton?.isConnected) {
+      setAudioButtonState(activeAudioButton, "pause");
+    }
+  }).catch(error => {
+    if (request !== audioRequestId) return;
+    console.warn("Unable to play the selected recitation:", error);
+    if (activeAudioButton?.isConnected) setAudioButtonState(activeAudioButton, "play");
+    notify("The recitation could not be opened. Check your connection and try again.");
+  });
+}
+
+function toggleVerseAudio(position, button) {
+  const audio = $("verse-audio");
+  if (activeAudioButton !== button) {
+    playVerseAudio(position, button);
+    return;
+  }
+  if (!audio.paused) {
+    audio.pause();
+    setAudioButtonState(button, "play");
+    return;
+  }
+  const request = audioRequestId;
+  setAudioButtonState(button, "loading");
+  audio.play().then(() => {
+    if (request === audioRequestId && activeAudioButton === button) setAudioButtonState(button, "pause");
+  }).catch(error => {
+    if (request !== audioRequestId || activeAudioButton !== button) return;
+    console.warn("Unable to resume the selected recitation:", error);
+    setAudioButtonState(button, "play");
+    notify("The recitation could not be opened. Check your connection and try again.");
+  });
 }
 
 function updateDocumentChrome() {
@@ -371,17 +400,27 @@ function renderReadingMetadata(verse) {
   container.hidden = parts.length === 0;
 }
 
-function createVerse(verse, showActions = true) {
+function createVerse(verse) {
   const article = document.createElement("article");
   article.className = "verse";
   article.id = `verse-${verse.chapter}-${verse.verse}`;
   article.dataset.chapter = verse.chapter;
   article.dataset.verse = verse.verse;
+  const reference = document.createElement("div");
+  reference.className = "verse-reference";
   const number = document.createElement("a");
   number.className = "verse-number";
   number.textContent = `${verse.chapter}:${verse.verse}`;
   number.href = `#${verse.chapter}:${verse.verse}`;
   number.setAttribute("aria-label", `Link to verse ${verse.chapter}:${verse.verse}`);
+  const actions = document.createElement("div");
+  actions.className = "verse-audio-action";
+  const listen = document.createElement("button");
+  listen.type = "button";
+  listen.dataset.listenVerse = `${verse.chapter}:${verse.verse}`;
+  setAudioButtonState(listen, "play");
+  actions.append(listen);
+  reference.append(number, actions);
   const textContainer = document.createElement("div");
   textContainer.className = "verse-body";
   const language = TRANSLATIONS[state.translation].language;
@@ -392,18 +431,7 @@ function createVerse(verse, showActions = true) {
     text.textContent = paragraph;
     textContainer.append(text);
   }
-  article.append(number, textContainer);
-  if (showActions && state.readingData.settings.listenEchoEnabled) {
-    const actions = document.createElement("div");
-    actions.className = "verse-actions";
-    const listen = document.createElement("button");
-    listen.type = "button";
-    listen.dataset.listenVerse = `${verse.chapter}:${verse.verse}`;
-    listen.textContent = "Hear one verse";
-    listen.setAttribute("aria-label", `Hear verse ${verse.chapter}:${verse.verse} once, then read it aloud`);
-    actions.append(listen);
-    textContainer.append(actions);
-  }
+  article.append(reference, textContainer);
   return article;
 }
 
@@ -539,7 +567,6 @@ function renderSettings() {
   $("ruku-summary-setting").value = settings.rukuSummary;
   $("resume-setting").checked = settings.resumeAtNextUnread;
   $("reminders-setting").checked = settings.remindersEnabled;
-  $("listen-echo-setting").checked = settings.listenEchoEnabled;
   renderAnchorEditor();
   renderMarkReadBlock();
 }
@@ -606,11 +633,6 @@ function initializeSettingsControls() {
     applyPreferences();
   });
   $("ruku-summary-setting").addEventListener("change", () => updateSetting("rukuSummary", $("ruku-summary-setting").value));
-  $("listen-echo-setting").addEventListener("change", () => {
-    updateSetting("listenEchoEnabled", $("listen-echo-setting").checked);
-    if (!$("listen-echo-setting").checked) stopVerseAudio();
-    renderVerses();
-  });
   $("resume-setting").addEventListener("change", () => updateSetting("resumeAtNextUnread", $("resume-setting").checked));
   $("reminders-setting").addEventListener("change", async () => {
     if (!$("reminders-setting").checked) {
@@ -780,7 +802,7 @@ function initializeFeatureInteractions() {
     const listen = event.target.closest("[data-listen-verse]");
     if (listen) {
       const [chapter, verse] = listen.dataset.listenVerse.split(":").map(Number);
-      playVerseAudio({ chapter, verse }, listen);
+      toggleVerseAudio({ chapter, verse }, listen);
     }
   });
 

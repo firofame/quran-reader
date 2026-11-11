@@ -74,14 +74,10 @@ svg { width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; }
 
 /* ─── Sidebar ──────────────────────────────────────────────────── */
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; width: var(--sidebar-w); background: var(--sidebar); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
-.brand { display: flex; align-items: center; gap: 14px; margin: 32px 26px 0; text-decoration: none; color: var(--ink); font-family: var(--serif); font-size: 24px; letter-spacing: -.5px; }
+.brand { display: flex; align-items: center; gap: 14px; margin: 32px 26px 28px; text-decoration: none; color: var(--ink); font-family: var(--serif); font-size: 24px; letter-spacing: -.5px; }
 .brand-icon { display: grid; place-items: center; background: var(--green); color: var(--sidebar); width: 44px; height: 48px; border-radius: 14px 14px 6px 6px; box-shadow: 0 2px 8px rgba(46,110,78,.25); }
 .brand-icon svg { width: 24px; height: 24px; stroke-width: 1.4; }
 .brand-caption { display: block; margin-top: 5px; font: 600 8px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; }
-
-.sidebar-intro { margin: 40px 26px 28px; }
-.sidebar-intro .eyebrow { font-size: 9px; letter-spacing: 1.6px; }
-.sidebar-intro p { font-family: var(--serif); font-size: 18px; line-height: 1.6; color: var(--ink); margin: 14px 0 0; }
 
 .input-wrap { display: flex; align-items: center; gap: 10px; color: var(--muted); }
 .input-wrap svg { width: 15px; height: 15px; }
@@ -95,7 +91,7 @@ kbd { font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px s
 .chapter-list-label { display: flex; justify-content: space-between; padding: 0 26px 12px; font-size: 9px; letter-spacing: 1.8px; color: var(--muted); font-weight: 600; }
 .chapter-list-label span:last-child { font-size: 8px; letter-spacing: 1.2px; font-weight: 500; }
 
-.chapter-list { padding: 0 10px 15px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.chapter-list { padding: 0 10px 24px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .chapter-link { position: relative; display: flex; align-items: center; width: 100%; min-height: 60px; gap: 14px; padding: 10px 16px; border-radius: var(--radius-sm); text-align: left; margin-bottom: 2px; transition: background .15s, transform .1s; }
 .chapter-link:hover { background: var(--hover); }
 .chapter-link:active { transform: scale(.99); }
@@ -108,11 +104,6 @@ kbd { font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px s
 .chapter-names > span:last-child { color: var(--muted); font-size: 10px; line-height: 1.3; }
 .chapter-verse-count { margin-left: auto; color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
 .chapter-empty { font-size: 12px; line-height: 1.8; padding: 12px 15px; color: var(--muted); }
-
-.sidebar-bottom { flex-shrink: 0; text-align: center; border-top: 1px solid var(--line); padding: 22px 15px 26px; }
-.small-spark { color: var(--gold); font-size: 22px; }
-.sidebar-bottom p { color: var(--ink); font-family: var(--serif); font-size: 14px; margin: 6px 0 8px; letter-spacing: -.01em; }
-.sidebar-bottom > span:last-child { font-size: 9px; color: var(--muted); letter-spacing: .3px; }
 
 /* ─── Workspace & topbar ───────────────────────────────────────── */
 .workspace { margin-left: var(--sidebar-w); }

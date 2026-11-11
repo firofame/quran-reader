@@ -96,7 +96,7 @@ function pendingEarlierRukus() {
 /** Shows the “mark earlier rukus as read” action on the Settings page. */
 function renderMarkReadBlock() {
   const pendingEarlier = pendingEarlierRukus();
-  $("mark-read-block").hidden = pendingEarlier === 0;
+  $("reading-history-card").hidden = pendingEarlier === 0;
   $("mark-read-btn").textContent = `Mark ${pendingEarlier} earlier ruku${pendingEarlier === 1 ? "" : "s"} as read`;
 }
 

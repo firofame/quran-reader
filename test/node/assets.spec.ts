@@ -138,6 +138,14 @@ describe("published assets", () => {
 		expect(app).not.toMatch(/Verse \$\{progress\.value\}/);
 	});
 
+	it("keeps chapter progress indicators and labels out of the footer navigation", async () => {
+		const app = await readPublicFile("app.js");
+		const html = await readPublicFile("index.html");
+		expect(app).not.toMatch(/ayah-nav-position/);
+		expect(app).not.toMatch(/surah-progress/);
+		expect(html).not.toMatch(/surah-progress/);
+	});
+
 	it("keeps the reader free of anchor markup", async () => {
 		const app = await readPublicFile("app.js");
 		const html = await readPublicFile("index.html");

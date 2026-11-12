@@ -452,19 +452,6 @@ function renderPagination(ayah) {
       : direction === -1 ? "The beginning" : "The final ayah";
     button.innerHTML = `${icon(direction === -1 ? "left" : "right")}<strong>${title}</strong>`;
     nav.append(button);
-    if (direction === -1) {
-      const position = document.createElement("span");
-      position.className = "ayah-nav-position";
-      position.textContent = `${state.position.verse} / ${chapters[state.position.chapter - 1].verses}`;
-      const progress = document.createElement("progress");
-      progress.className = "surah-progress";
-      progress.max = chapters[state.position.chapter - 1].verses;
-      progress.value = state.position.verse;
-      progress.setAttribute("aria-label", "Surah reading progress");
-      progress.setAttribute("aria-valuetext", `Ayah ${state.position.verse} of ${progress.max} in this surah`);
-      position.append(progress);
-      nav.append(position);
-    }
   }
   if (focusedDirection) {
     nav.querySelector(`[data-direction="${focusedDirection}"]:not(:disabled)`)?.focus({ preventScroll: true });

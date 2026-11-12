@@ -10,10 +10,13 @@ import {
 	formatCountdown,
 	getDayKey,
 	getNextPrayerMoment,
+	getNextPrayerReminder,
 	getPrayerMoments,
+	getPrayerReminderMoments,
 	getPrayerSchedule,
 	getRukuIndex,
 	getTodayStats,
+	IQAMA_REMINDER_OFFSET_MINUTES,
 	normalizeReadingData,
 	PRAYERS,
 	READER_SCHEMA_VERSION,
@@ -228,6 +231,41 @@ describe("reading history", () => {
 		expect(moments).toHaveLength(10);
 		expect(moments.filter(moment => moment.kind === "adhan")).toHaveLength(5);
 		expect(moments.filter(moment => moment.kind === "iqama")).toHaveLength(5);
+	});
+
+	it("schedules prayer reminders at the adhan and 5 minutes before the iqama", () => {
+		expect(IQAMA_REMINDER_OFFSET_MINUTES).toBe(5);
+		const prayers = getPrayerSchedule(createDefaultReadingData());
+		// Before Fajr adhan, the next reminder is at the adhan (04:58).
+		const beforeFajr = new Date(2026, 10, 12, 4, 0);
+		const adhanReminder = getNextPrayerReminder(prayers, beforeFajr);
+		expect(adhanReminder?.kind).toBe("adhan");
+		expect(adhanReminder?.name).toBe("Fajr");
+		expect(new Date(adhanReminder!.at).getHours()).toBe(4);
+		expect(new Date(adhanReminder!.at).getMinutes()).toBe(58);
+
+		// Between adhan and 5 minutes before iqama (05:43 - 5 min = 05:38), reminder waits for 05:38.
+		const between = getNextPrayerReminder(prayers, new Date(2026, 10, 12, 5, 0));
+		expect(between?.kind).toBe("iqama");
+		expect(between?.name).toBe("Fajr");
+		expect(new Date(between!.at).getHours()).toBe(5);
+		expect(new Date(between!.at).getMinutes()).toBe(38);
+
+		// Once 05:38 has passed (e.g. 05:39), the next reminder moves forward (Dhuhr adhan).
+		const afterIqamaReminder = getNextPrayerReminder(prayers, new Date(2026, 10, 12, 5, 39));
+		expect(afterIqamaReminder?.kind).toBe("adhan");
+		expect(afterIqamaReminder?.name).toBe("Dhuhr");
+	});
+
+	it("lists an adhan and an iqama reminder moment for every prayer", () => {
+		const prayers = getPrayerSchedule(createDefaultReadingData());
+		const moments = getPrayerReminderMoments(prayers, new Date(2026, 10, 12, 0, 0));
+		expect(moments).toHaveLength(10);
+		expect(moments.filter(moment => moment.kind === "adhan")).toHaveLength(5);
+		expect(moments.filter(moment => moment.kind === "iqama")).toHaveLength(5);
+		const fajrIqama = moments.find(m => m.id === "fajr" && m.kind === "iqama");
+		expect(new Date(fajrIqama!.at).getHours()).toBe(5);
+		expect(new Date(fajrIqama!.at).getMinutes()).toBe(38);
 	});
 
 	it("formats a countdown as minutes, seconds, and hours", () => {

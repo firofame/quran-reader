@@ -211,6 +211,28 @@ export function getNextPrayerMoment(prayers, date = new Date()) {
   return getPrayerMoments(prayers, date).sort((left, right) => left.at - right.at)[0] ?? null;
 }
 
+export const IQAMA_REMINDER_OFFSET_MINUTES = 5;
+
+/**
+ * The reminder moments of every prayer: at the adhan, and five minutes before
+ * the iqama to allow time for wudu and reaching the masjid.
+ */
+export function getPrayerReminderMoments(prayers, date = new Date(), offsetMinutes = IQAMA_REMINDER_OFFSET_MINUTES) {
+  return prayers.flatMap(prayer => ["adhan", "iqama"].map(kind => {
+    const time = kind === "adhan" ? prayer.adhan : prayer.iqama;
+    const [hour, minute] = time.split(":").map(Number);
+    const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
+    if (kind === "iqama") moment.setMinutes(moment.getMinutes() - offsetMinutes);
+    while (moment <= date) moment.setDate(moment.getDate() + 1);
+    return { ...prayer, kind, time, at: moment.getTime() };
+  }));
+}
+
+/** The next prayer reminder moment of the day. */
+export function getNextPrayerReminder(prayers, date = new Date(), offsetMinutes = IQAMA_REMINDER_OFFSET_MINUTES) {
+  return getPrayerReminderMoments(prayers, date, offsetMinutes).sort((left, right) => left.at - right.at)[0] ?? null;
+}
+
 /**
  * Formats a remaining duration as a countdown, such as "38:12" or "2:15:00".
  */

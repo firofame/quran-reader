@@ -201,30 +201,6 @@ function updateDocumentChrome() {
     : `${today.completed}/${today.target} today`;
   document.title = `${currentRuku ? `Ruku ${currentRuku.id}` : `Ayah ${state.position.chapter}:${state.position.verse}`} · ${dayLabel} — The Quran`;
   renderMarkReadBlock();
-
-  try {
-    const canvas = document.createElement("canvas");
-    canvas.width = 32;
-    canvas.height = 32;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    const center = 16;
-    context.lineWidth = 3;
-    context.strokeStyle = state.theme === "dark" ? "#343d33" : "#e5e6dc";
-    context.beginPath();
-    context.arc(center, center, 12, 0, Math.PI * 2);
-    context.stroke();
-    context.strokeStyle = state.theme === "dark" ? "#c2ad83" : "#ac9468";
-    context.lineCap = "round";
-    context.beginPath();
-    context.arc(center, center, 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, today.completed / today.target));
-    context.stroke();
-    const favicon = $("app-icon");
-    favicon.href = canvas.toDataURL("image/png");
-    favicon.type = "image/png";
-  } catch {
-    // The linked static SVG remains available if canvas or data URLs are unavailable.
-  }
 }
 
 function dispatch(action) {

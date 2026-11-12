@@ -180,8 +180,8 @@ describe("glosses", () => {
 					for (const character of paragraph) {
 						if (character === "(" || character === "[") depth++;
 						else if ((character === ")" || character === "]") && depth > 0) depth--;
-						expect(depth, `${id} ${verse.chapter}:${verse.verse} depth never goes negative`).toBeGreaterThanOrEqual(0);
 					}
+					expect(depth, `${id} ${verse.chapter}:${verse.verse} depth never goes negative`).toBeGreaterThanOrEqual(0);
 					const isLastParagraph = index === paragraphs.length - 1;
 					expect(depth, `${id} ${verse.chapter}:${verse.verse} gloss does not cross a paragraph boundary`).toBe(isLastParagraph ? verseDepth : 0);
 				}

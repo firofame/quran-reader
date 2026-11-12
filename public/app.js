@@ -306,14 +306,17 @@ function renderVerses() {
   $("reading-content").setAttribute("aria-live", "polite");
   $("ayah-status").hidden = !ayah;
   $("ayah-status").textContent = `AYAH ${state.position.verse} OF ${chapter.verses}`;
-  $("ruku-progress-wrap").hidden = !ayah;
-  if (ayah && currentRuku) {
-    const progress = getRukuProgress(ayah, globalThis.QuranData, chapters);
-    const percent = progress.max ? Math.min(100, Math.max(0, progress.value / progress.max * 100)) : 0;
-    $("ruku-progress").setAttribute("aria-valuemax", String(progress.max));
-    $("ruku-progress").setAttribute("aria-valuenow", String(progress.value));
-    $("ruku-progress").setAttribute("aria-valuetext", `Ayah ${progress.value} of ${progress.max} in this ruku`);
-    $("ruku-ring-value").style.strokeDashoffset = String(100 - percent);
+  const rukuProgress = $("ruku-progress");
+  if (rukuProgress) {
+    rukuProgress.hidden = !ayah;
+    if (ayah && currentRuku) {
+      const progress = getRukuProgress(ayah, globalThis.QuranData, chapters);
+      rukuProgress.max = progress.max;
+      rukuProgress.value = progress.value;
+      rukuProgress.setAttribute("aria-valuemax", String(progress.max));
+      rukuProgress.setAttribute("aria-valuenow", String(progress.value));
+      rukuProgress.setAttribute("aria-valuetext", `Ayah ${progress.value} of ${progress.max} in this ruku`);
+    }
   }
   const fragment = document.createDocumentFragment();
   if (!filtered.length) {
@@ -691,7 +694,8 @@ async function loadReading({ scroll = false } = {}) {
   $("ayah-navigation").hidden = true;
   $("ayah-status").hidden = true;
   $("navigation-hint").hidden = true;
-  $("ruku-progress-wrap").hidden = true;
+  const rukuProgress = $("ruku-progress");
+  if (rukuProgress) rukuProgress.hidden = true;
   $("reading-content").setAttribute("aria-busy", "true");
   $("reading-content").hidden = false;
   $("reading-content").innerHTML = '<div class="loading-state"><span class="loading-dot"></span>Opening the words…</div>';

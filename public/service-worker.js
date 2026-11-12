@@ -1,4 +1,4 @@
-const CACHE_NAME = "quran-reader-static-v12";
+const CACHE_NAME = "quran-reader-static-v13";
 const ASSETS = [
   "./",
   "./index.html",

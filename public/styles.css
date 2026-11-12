@@ -160,8 +160,8 @@ select option { background: var(--paper); color: var(--text); }
 .secondary-button svg { width: 13px; height: 13px; }
 
 /* ─── Daily panel ──────────────────────────────────────────────── */
-.daily-panel { display: flex; flex-direction: column; gap: 8px; padding: 6px 28px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 90%, var(--green-soft)); }
-.daily-panel-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 26px; }
+.daily-panel { display: flex; flex-direction: column; background: color-mix(in srgb, var(--paper) 90%, var(--green-soft)); }
+.daily-panel-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 26px; padding: 6px 28px; }
 .daily-panel-copy { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .today-progress { color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .today-bonus { font-weight: 400; }
@@ -202,12 +202,10 @@ select option { background: var(--paper); color: var(--text); }
 .navigation-hint kbd { font-style: normal; border-color: var(--line); margin-left: 3px; font-size: 10px; }
 
 /* ─── Ruku progress ────────────────────────────────────────────── */
-.ruku-progress-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.ruku-progress-label { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ruku-ring { width: 22px; height: 22px; flex-shrink: 0; }
-.ruku-ring-svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
-.ruku-ring-track { fill: none; stroke: var(--line); stroke-width: 3; }
-.ruku-ring-value { fill: none; stroke: var(--gold); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset .3s ease-out; }
+.ruku-progress { display: block; width: 100%; height: 2px; border: 0; appearance: none; background: var(--line); color: var(--gold); }
+.ruku-progress::-webkit-progress-bar { background: var(--line); }
+.ruku-progress::-webkit-progress-value { background: var(--gold); transition: width .3s ease-out; }
+.ruku-progress::-moz-progress-bar { background: var(--gold); }
 .surah-progress { display: block; width: 64px; height: 2px; border: 0; appearance: none; background: var(--line); color: var(--green); border-radius: 1px; }
 .surah-progress::-webkit-progress-bar { background: var(--line); border-radius: 1px; }
 .surah-progress::-webkit-progress-value { background: var(--green); transition: width .2s ease-out; border-radius: 1px; }
@@ -326,7 +324,7 @@ select option { background: var(--paper); color: var(--text); }
   .notice { left: 50%; bottom: 18px; }
   .app-navigation { order: 3; width: 100%; overflow-x: auto; justify-content: flex-start; }
   .app-navigation button { flex: 0 0 auto; min-height: 30px; padding: 0 8px; }
-  .daily-panel { padding: 8px 16px; }
+  .daily-panel-main { padding: 8px 16px; }
 }
 
 @media (any-pointer: coarse) {
@@ -368,7 +366,6 @@ select option { background: var(--paper); color: var(--text); }
   .daily-panel-copy { gap: 4px 10px; }
   .prayer-countdown { font-size: 9px; gap: 5px; }
   .target-reached-label { flex-basis: 100%; }
-  .ruku-progress-label { font-size: 9px; }
   .settings-grid { grid-template-columns: 1fr; }
   .prayer-editor-head, .prayer-editor-row { grid-template-columns: 1fr 108px 108px; }
 }

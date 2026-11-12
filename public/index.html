@@ -53,15 +53,6 @@
               <div class="daily-panel-copy">
                 <span id="today-progress" class="today-progress">Today: <span id="today-completed">0</span> / <span id="today-target">5</span><span id="today-bonus" class="today-bonus"></span></span>
                 <span id="target-reached-label" class="target-reached-label" hidden>Target reached</span>
-                <div id="ruku-progress-wrap" class="ruku-progress-wrap" hidden>
-                  <span class="ruku-progress-label">Ruku</span>
-                  <div id="ruku-progress" class="ruku-ring" role="progressbar" aria-label="Ruku reading progress" aria-valuemin="0" aria-valuemax="7" aria-valuenow="1">
-                    <svg class="ruku-ring-svg" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
-                      <circle class="ruku-ring-track" cx="18" cy="18" r="15"></circle>
-                      <circle id="ruku-ring-value" class="ruku-ring-value" cx="18" cy="18" r="15" pathLength="100"></circle>
-                    </svg>
-                  </div>
-                </div>
               </div>
               <div id="prayer-countdown" class="prayer-countdown" hidden>
                 <span class="prayer-countdown-name"></span>
@@ -69,6 +60,7 @@
                 <span class="prayer-countdown-time"></span>
               </div>
             </div>
+            <progress id="ruku-progress" class="ruku-progress" max="7" value="1" aria-label="Ruku reading progress"></progress>
           </section>
           <div id="ayah-status" class="sr-only" role="status" hidden></div>
           <div id="reading-content" class="focused" aria-busy="true" aria-live="polite"></div>

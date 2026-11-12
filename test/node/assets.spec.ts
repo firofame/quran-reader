@@ -98,20 +98,20 @@ describe("published assets", () => {
 		expect(app).toMatch(/prayerIqama/);
 	});
 
-	it("counts down to the next prayer moment after the daily progress and the ruku", async () => {
+	it("counts down to the next prayer moment after the daily progress and shows ruku progress on the separation line", async () => {
 		const html = await readPublicFile("index.html");
 		const readerPage = html.slice(html.indexOf('id="reader-page"'), html.indexOf('id="settings-page"'));
 		// The prayer chips are gone.
 		expect(readerPage).not.toMatch(/id="prayer-chips"/);
 		expect(readerPage).not.toMatch(/prayer-chip/);
-		// The countdown sits after today's progress and the ruku indicator.
+		// The countdown sits in the daily panel, and ruku progress sits on the line below.
 		expect(readerPage).toMatch(/id="prayer-countdown"/);
 		expect(readerPage).toMatch(/prayer-countdown-time/);
 		const today = readerPage.indexOf('id="today-progress"');
-		const ruku = readerPage.indexOf('id="ruku-progress-wrap"');
 		const countdown = readerPage.indexOf('id="prayer-countdown"');
-		expect(today).toBeLessThan(ruku);
-		expect(ruku).toBeLessThan(countdown);
+		const ruku = readerPage.indexOf('id="ruku-progress"');
+		expect(today).toBeLessThan(countdown);
+		expect(countdown).toBeLessThan(ruku);
 	});
 
 	it("keeps overall ruku progress markup and progress bars out of the reader", async () => {
@@ -131,8 +131,10 @@ describe("published assets", () => {
 		// The chapter meaning and verse count stay available to screen readers.
 		expect(app).toMatch(/class="sr-only">\$\{chapter\.meaning\} · \$\{chapter\.verses\} ayahs/);
 		expect(app).not.toMatch(/ruku \$\{localRuku\} of/);
-		// The ruku indicator keeps a short label beside today's progress.
-		expect(html).toMatch(/class="ruku-progress-label">Ruku</);
+		// The circular ruku indicator and label are removed; progress is on the separation line without a label.
+		expect(html).not.toMatch(/class="ruku-progress-label"/);
+		expect(html).not.toMatch(/class="ruku-ring"/);
+		expect(html).toMatch(/class="ruku-progress"/);
 		expect(app).not.toMatch(/Verse \$\{progress\.value\}/);
 	});
 

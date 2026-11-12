@@ -13,6 +13,7 @@ import {
 	matchesChapter,
 	parseHash,
 	parseTranslation,
+	splitTranslationGlosses,
 	splitTranslationParagraphs,
 	validPosition,
 } from "../../public/reader.js";
@@ -147,6 +148,71 @@ describe("translations", () => {
 		]) {
 			expect(splitTranslationParagraphs(text, "en")).toEqual([text]);
 		}
+	});
+});
+
+describe("glosses", () => {
+	it("segments every verse into glosses without altering any character", async () => {
+		for (const [id, translation] of Object.entries(TRANSLATIONS)) {
+			const source = await readFile(fileURLToPath(new URL(`../../public/${translation.file}`, import.meta.url).href), "utf8");
+			const data = parseTranslation(source, chapters);
+			for (const verse of data.flat()) {
+				const segments = splitTranslationGlosses(verse.text);
+				expect(segments.map((segment: { text: string }) => segment.text).join(""), `${id} ${verse.chapter}:${verse.verse}`).toBe(verse.text);
+				expect(segments.every((segment: { text: string }) => segment.text.length > 0)).toBe(true);
+			}
+		}
+	});
+
+	it("never splits a gloss across paragraph boundaries", async () => {
+		for (const [id, translation] of Object.entries(TRANSLATIONS)) {
+			const source = await readFile(fileURLToPath(new URL(`../../public/${translation.file}`, import.meta.url).href), "utf8");
+			const data = parseTranslation(source, chapters);
+			for (const verse of data.flat()) {
+				const paragraphs = splitTranslationParagraphs(verse.text, translation.language);
+				let verseDepth = 0;
+				for (const character of verse.text) {
+					if (character === "(" || character === "[") verseDepth++;
+					else if ((character === ")" || character === "]") && verseDepth > 0) verseDepth--;
+				}
+				let depth = 0;
+				for (const [index, paragraph] of paragraphs.entries()) {
+					for (const character of paragraph) {
+						if (character === "(" || character === "[") depth++;
+						else if ((character === ")" || character === "]") && depth > 0) depth--;
+						expect(depth, `${id} ${verse.chapter}:${verse.verse} depth never goes negative`).toBeGreaterThanOrEqual(0);
+					}
+					const isLastParagraph = index === paragraphs.length - 1;
+					expect(depth, `${id} ${verse.chapter}:${verse.verse} gloss does not cross a paragraph boundary`).toBe(isLastParagraph ? verseDepth : 0);
+				}
+			}
+		}
+	});
+
+	it("keeps nested brackets inside a single gloss and tolerates unbalanced input", () => {
+		expect(splitTranslationGlosses("Plain sentence.")).toEqual([{ text: "Plain sentence.", gloss: false }]);
+		expect(splitTranslationGlosses("This is the Book (the Quran), a guidance to the Al-Muttaqun [the pious (abstaining from sin) and righteous].")).toEqual([
+			{ text: "This is the Book ", gloss: false },
+			{ text: "(the Quran)", gloss: true },
+			{ text: ", a guidance to the Al-Muttaqun ", gloss: false },
+			{ text: "[the pious (abstaining from sin) and righteous]", gloss: true },
+			{ text: ".", gloss: false },
+		]);
+		expect(splitTranslationGlosses("adjacent (a)(b) glosses")).toEqual([
+			{ text: "adjacent ", gloss: false },
+			{ text: "(a)", gloss: true },
+			{ text: "(b)", gloss: true },
+			{ text: " glosses", gloss: false },
+		]);
+		expect(splitTranslationGlosses("O you who believe (in Allah's Oneness and in His Messenger (Muhammad SAW)!")).toEqual([
+			{ text: "O you who believe ", gloss: false },
+			{ text: "(in Allah's Oneness and in His Messenger (Muhammad SAW)!", gloss: true },
+		]);
+		expect(splitTranslationGlosses("unclosed (gloss is left as plain text")).toEqual([
+			{ text: "unclosed ", gloss: false },
+			{ text: "(gloss is left as plain text", gloss: true },
+		]);
+		expect(splitTranslationGlosses("a stray ) bracket")).toEqual([{ text: "a stray ) bracket", gloss: false }]);
 	});
 });
 

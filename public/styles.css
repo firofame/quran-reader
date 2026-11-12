@@ -181,6 +181,7 @@ select option { background: var(--paper); color: var(--text); }
 .verse-number:hover { color: var(--green); }
 .verse-body { min-width: 0; }
 .verse-body > p { margin: 0; color: var(--text); font-family: var(--reading-serif); font-size: var(--reading-size); font-weight: 400; line-height: 1.7; letter-spacing: .005em; text-align: start; overflow-wrap: anywhere; }
+.verse-body > p .verse-gloss { font-size: .85em; color: var(--muted); }
 .verse-body > p + p { margin-block-start: 28px; }
 .verse-audio-action { display: flex; align-items: center; gap: 2px; }
 .verse-audio-action button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; color: var(--muted); }

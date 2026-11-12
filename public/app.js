@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DAY_BOUNDARY_HOUR, DEFAULT_PRAYER_TIMES, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, formatCountdown, getDayKey, getNextPrayerMoment, getPrayerSchedule, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DAY_BOUNDARY_HOUR, DEFAULT_PRAYER_TIMES, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, formatCountdown, getDayKey, getNextPrayerMoment, getPrayerSchedule, getRukuIndex, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -287,10 +287,7 @@ function renderChapters() {
 function renderHeading() {
   const chapter = chapters[state.position.chapter - 1];
   if (currentAyah && currentAyah.chapter !== chapter.id) currentAyah = null;
-  const currentRuku = findRuku(state.position, rukus);
-  const surahProgress = getSurahRukuProgress(chapter.id, state.readingData, rukus);
-  const localRuku = currentRuku?.localNumber ?? 0;
-  $("chapter-heading").innerHTML = `<div class="chapter-heading-title"><h1>${chapter.id}. ${chapter.name}</h1></div><div class="chapter-heading-meta"><p>${chapter.meaning} · ${chapter.verses} ayahs<span class="sr-only"> · ${chapter.origin}</span></p><p class="chapter-ruku-progress">${chapter.name}: ruku ${localRuku} of ${surahProgress.total} · ${surahProgress.completed} completed<span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div>`;
+  $("chapter-heading").innerHTML = `<div class="chapter-heading-title"><h1>${chapter.id}. ${chapter.name}</h1><span class="sr-only">${chapter.meaning} · ${chapter.verses} ayahs · ${chapter.origin}</span></div><div class="chapter-heading-meta"><p class="chapter-meta-line"><span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div>`;
   renderReadingMetadata(currentAyah);
   const translation = TRANSLATIONS[state.translation];
   const attribution = $("attribution");
@@ -324,7 +321,6 @@ function renderVerses() {
     $("ruku-progress").setAttribute("aria-valuenow", String(progress.value));
     $("ruku-progress").setAttribute("aria-valuetext", `Ayah ${progress.value} of ${progress.max} in this ruku`);
     $("ruku-ring-value").style.strokeDashoffset = String(100 - percent);
-    $("ruku-progress-label").textContent = `Verse ${progress.value} of ${progress.max} in this ruku`;
   }
   const fragment = document.createDocumentFragment();
   if (!filtered.length) {
@@ -382,12 +378,15 @@ function renderReadingMetadata(verse) {
     item.append(symbol, label);
     parts.push(item);
   }
-  for (const part of parts) {
-    const separator = document.createElement("span");
-    separator.className = "reading-metadata-separator";
-    separator.setAttribute("aria-hidden", "true");
-    separator.textContent = "·";
-    container.append(separator, part);
+  for (const [index, part] of parts.entries()) {
+    if (index > 0) {
+      const separator = document.createElement("span");
+      separator.className = "reading-metadata-separator";
+      separator.setAttribute("aria-hidden", "true");
+      separator.textContent = "·";
+      container.append(separator);
+    }
+    container.append(part);
   }
   container.hidden = parts.length === 0;
 }

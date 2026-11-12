@@ -405,9 +405,3 @@ export function resolveStartupPosition({ hashPosition, savedPosition }) {
     ? { position: hashPosition, source: "link" }
     : { position: savedPosition, source: "saved" };
 }
-
-export function getSurahRukuProgress(chapterId, readingData, rukus) {
-  const surahRukus = rukus.filter(ruku => ruku.chapter === chapterId);
-  const completed = surahRukus.filter(ruku => readingData.completedRukuIds.includes(ruku.id)).length;
-  return { completed, total: surahRukus.length };
-}

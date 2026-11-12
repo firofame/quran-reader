@@ -1,7 +1,7 @@
 import { READER_SCHEMA_VERSION, normalizeReadingData } from "./reading-data.js";
 
 export const TRANSLATIONS = {
-  "en.sahih": { name: "Saheeh International", language: "en-US", file: "en.sahih.txt" },
+  "en.hilali": { name: "Hilali & Khan", language: "en-US", file: "en.hilali.txt" },
 };
 
 export function createChapters(rows) {
@@ -141,7 +141,7 @@ export function matchesChapter(chapter, query) {
 export function decodeState(raw, chapters) {
   const defaults = {
     schemaVersion: READER_SCHEMA_VERSION,
-    translation: "en.sahih",
+    translation: "en.hilali",
     position: { chapter: 1, verse: 1 },
     fontSize: 21,
     theme: "light",

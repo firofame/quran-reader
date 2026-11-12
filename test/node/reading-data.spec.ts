@@ -328,9 +328,9 @@ describe("backfill", () => {
 
 describe("bundled English text", () => {
 	it("parses as 6,236 unchanged verse rows", async () => {
-		const source = await readFile(fileURLToPath(new URL("../../public/en.sahih.txt", import.meta.url).href), "utf8");
+		const source = await readFile(fileURLToPath(new URL("../../public/en.hilali.txt", import.meta.url).href), "utf8");
 		const parsed = parseTranslation(source, chapters);
 		expect(parsed.flat().length).toBe(6236);
-		expect(parsed[0][0].text).toMatch(/^In the name of Allah/);
+		expect(parsed[0][0].text).toMatch(/^In the Name of Allah/);
 	});
 });

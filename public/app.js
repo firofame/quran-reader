@@ -2,6 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
+import { SPEECH_SAMPLE_RATE, createWordGrouper, decodeAudio, pairWords, readReading, wordAt } from "./speech.js";
 import { DAY_BOUNDARY_HOUR, DEFAULT_PRAYER_TIMES, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, formatCountdown, getDayKey, getNextPrayerMoment, getPrayerSchedule, getRukuIndex, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
@@ -39,8 +40,25 @@ let activeAudioButton = null;
 let audioRequestId = 0;
 let activeSpeechButton = null;
 let speechRequestId = 0;
-let speechObjectUrl = null;
 let currentAyah = null;
+/** The readings the browser has already heard, so a second play asks for nothing. */
+const speechCache = new Map();
+/** How many readings the browser keeps. */
+const SPEECH_CACHE_SIZE = 8;
+/** The sound the translation is read with. */
+let speechContext = null;
+/** The pieces of the reading that are playing, so they can be stopped. */
+let speechSources = [];
+/** When the next piece of the reading should start, on the audio clock. */
+let speechScheduledUntil = 0;
+/** When the reading started, on the audio clock. */
+let speechStartedAt = 0;
+/** The frame that moves the highlight along with the reading. */
+let speechFrame = null;
+/** The words of the reading, with the page words they belong to. */
+let speechWords = [];
+/** The word that is being read right now. */
+let spokenWord = null;
 
 function notify(message, persistent = false) {
   if (storageFailed && !persistent) {
@@ -217,16 +235,18 @@ function setSpeechButtonState(button, status) {
 /** Stops the reading of a translation and frees the audio it was using. */
 function stopTranslationAudio() {
   speechRequestId++;
-  const audio = $("translation-audio");
-  if (audio) {
-    audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
+  cancelAnimationFrame(speechFrame);
+  speechFrame = null;
+  for (const source of speechSources) {
+    try { source.stop(); } catch {}
+    source.disconnect();
   }
-  if (speechObjectUrl) {
-    URL.revokeObjectURL(speechObjectUrl);
-    speechObjectUrl = null;
-  }
+  speechSources = [];
+  speechScheduledUntil = 0;
+  speechStartedAt = 0;
+  speechWords = [];
+  spokenWord?.classList.remove("speaking");
+  spokenWord = null;
   if (activeSpeechButton?.isConnected) {
     setSpeechButtonState(activeSpeechButton, "speak");
   }
@@ -240,13 +260,134 @@ function spokenTranslation(position) {
 }
 
 /**
+ * The sound the translation is read with.
+ *
+ * It is made while the reader is clicking, so the browser lets it play.
+ */
+function speechAudio() {
+  if (!speechContext) speechContext = new AudioContext();
+  return speechContext;
+}
+
+/** The words of an ayah on the page, in the order they are read. */
+function spokenWords(position) {
+  const article = position && document.getElementById(`verse-${position.chapter}-${position.verse}`);
+  if (!article) return [];
+  return Array.from(article.querySelectorAll(".word"));
+}
+
+/**
+ * Schedules a piece of the reading to play, right after the last one.
+ *
+ * The pieces are played back to back, so the reading keeps the pace Eleven
+ * gave it.
+ */
+function scheduleReading(context, samples) {
+  const buffer = context.createBuffer(1, samples.length, SPEECH_SAMPLE_RATE);
+  buffer.copyToChannel(samples, 0);
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(context.destination);
+  const startAt = speechScheduledUntil || context.currentTime + 0.02;
+  source.start(startAt);
+  speechScheduledUntil = startAt + buffer.duration;
+  speechSources.push(source);
+  if (!speechStartedAt) speechStartedAt = startAt;
+  return source;
+}
+
+/**
+ * Keeps a reading, so the ayah can be read again without a request.
+ */
+function rememberReading(text, pieces, words) {
+  const length = pieces.reduce((total, samples) => total + samples.length, 0);
+  const samples = new Float32Array(length);
+  let offset = 0;
+  for (const piece of pieces) {
+    samples.set(piece, offset);
+    offset += piece.length;
+  }
+  speechCache.set(text, {
+    samples,
+    words: words.map(word => ({ text: word.text, start: word.start, end: word.end })),
+  });
+  while (speechCache.size > SPEECH_CACHE_SIZE) {
+    const oldest = speechCache.keys().next();
+    if (oldest.done) return;
+    speechCache.delete(oldest.value);
+  }
+}
+
+/**
+ * Moves the highlight along with the reading.
+ *
+ * The words are found on the audio clock, so the highlight follows the voice
+ * rather than the download.
+ */
+function followReading(context) {
+  const step = () => {
+    if (!speechWords.length) {
+      speechFrame = requestAnimationFrame(step);
+      return;
+    }
+    const position = context.currentTime - speechStartedAt;
+    const word = wordAt(speechWords, position);
+    if (word !== spokenWord) {
+      spokenWord?.classList.remove("speaking");
+      spokenWord = word?.element ?? null;
+      spokenWord?.classList.add("speaking");
+    }
+    speechFrame = requestAnimationFrame(step);
+  };
+  speechFrame = requestAnimationFrame(step);
+}
+
+/**
+ * Plays a reading the browser has heard before.
+ *
+ * The audio and the timing of its words are kept, so the ayah can be read
+ * again without asking the Worker for anything.
+ */
+function playRememberedReading(context, remembered, request, position) {
+  const source = scheduleReading(context, remembered.samples);
+  speechWords = pairWords(remembered.words, spokenWords(position));
+  source.onended = () => { if (request === speechRequestId) stopTranslationAudio(); };
+  followReading(context);
+  if (activeSpeechButton) setSpeechButtonState(activeSpeechButton, "stop");
+}
+
+/**
+ * Plays a reading as it arrives, and follows it with the highlight.
+ */
+async function playReading(context, response, request, text, position) {
+  const grouper = createWordGrouper();
+  const pieces = [];
+  let last = null;
+  for await (const chunk of readReading(response)) {
+    if (request !== speechRequestId) return;
+    if (chunk.error) throw new Error(chunk.error);
+    grouper.add(chunk.characters ?? "", chunk.starts ?? [], chunk.ends ?? []);
+    const audio = decodeAudio(chunk.audio ?? "", SPEECH_SAMPLE_RATE);
+    pieces.push(audio.samples);
+    last = scheduleReading(context, audio.samples);
+  }
+  if (request !== speechRequestId) return;
+  speechWords = pairWords(grouper.words(), spokenWords(position));
+  // The whole reading is kept, so the ayah can be read again without a request.
+  rememberReading(text, pieces, grouper.words());
+  if (last) last.onended = () => { if (request === speechRequestId) stopTranslationAudio(); };
+  followReading(context);
+  if (activeSpeechButton) setSpeechButtonState(activeSpeechButton, "stop");
+}
+
+/**
  * Asks the Worker to read the translation of an ayah, then plays it.
  *
  * The ElevenLabs key stays in the Worker, so the browser only ever receives
- * the audio.
+ * the audio and the timing of its words. The audio is played as it arrives,
+ * so the reading starts before the whole ayah has been made.
  */
 async function readVerseAloud(position, button) {
-  const audio = $("translation-audio");
   const text = spokenTranslation(position);
   if (!text) {
     notify("This ayah is not ready to be read aloud yet.");
@@ -258,6 +399,14 @@ async function readVerseAloud(position, button) {
   activeSpeechButton = button;
   setSpeechButtonState(button, "loading");
   try {
+    const context = speechAudio();
+    await context.resume();
+    if (request !== speechRequestId) return;
+    const remembered = speechCache.get(text);
+    if (remembered) {
+      playRememberedReading(context, remembered, request, position);
+      return;
+    }
     const response = await fetch("/api/speech", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -265,20 +414,7 @@ async function readVerseAloud(position, button) {
     });
     if (request !== speechRequestId) return;
     if (!response.ok) throw new Error(`The reading failed (HTTP ${response.status}).`);
-    const recording = await response.blob();
-    if (request !== speechRequestId) return;
-    speechObjectUrl = URL.createObjectURL(recording);
-    audio.src = speechObjectUrl;
-    audio.currentTime = 0;
-    audio.onended = () => { if (request === speechRequestId) stopTranslationAudio(); };
-    audio.onerror = () => {
-      if (request !== speechRequestId) return;
-      stopTranslationAudio();
-      notify("The reading could not be played.");
-    };
-    await audio.play();
-    if (request !== speechRequestId) return;
-    setSpeechButtonState(button, "stop");
+    await playReading(context, response, request, text, position);
   } catch (error) {
     if (request !== speechRequestId) return;
     console.warn("Unable to read the translation aloud:", error);
@@ -288,8 +424,7 @@ async function readVerseAloud(position, button) {
 }
 
 function toggleVerseReading(position, button) {
-  const audio = $("translation-audio");
-  if (activeSpeechButton === button && audio && !audio.paused) {
+  if (activeSpeechButton === button) {
     stopTranslationAudio();
     return;
   }
@@ -494,6 +629,30 @@ function renderReadingMetadata(verse) {
   container.hidden = parts.length === 0;
 }
 
+/**
+ * Wraps the words of a paragraph, so the reading can highlight them.
+ *
+ * The words keep the text of the paragraph exactly as it was, spaces and all.
+ */
+function wrapWords(paragraph) {
+  const nodes = [];
+  const words = [];
+  for (const part of paragraph.textContent.split(/(\s+)/)) {
+    if (!part) continue;
+    if (/^\s+$/.test(part)) {
+      nodes.push(document.createTextNode(part));
+      continue;
+    }
+    const word = document.createElement("span");
+    word.className = "word";
+    word.textContent = part;
+    nodes.push(word);
+    words.push(word);
+  }
+  paragraph.replaceChildren(...nodes);
+  return words;
+}
+
 function createVerse(verse) {
   const article = document.createElement("article");
   article.className = "verse";
@@ -527,6 +686,7 @@ function createVerse(verse) {
     text.lang = language;
     text.dir = "auto";
     text.textContent = paragraph;
+    wrapWords(text);
     textContainer.append(text);
   }
   article.append(reference, textContainer);

@@ -13,6 +13,7 @@ const READER_FILES = [
 	"reader-state.js",
 	"reading-data.js",
 	"preferences-store.js",
+	"speech.js",
 	"translation-repository.js",
 	"quran-data.js",
 	"service-worker.js",
@@ -150,8 +151,15 @@ describe("published assets", () => {
 		// never reaches the reader.
 		expect(app).toMatch(/fetch\("\/api\/speech"/);
 		expect(app).toMatch(/dataset\.speakVerse/);
-		// The reading has an element of its own, apart from the recitation.
-		expect(html).toMatch(/id="translation-audio"/);
+		// The translation is read with the Web Audio API, so it plays while
+		// it downloads and needs no element of its own.
+		expect(app).toMatch(/new AudioContext\(\)/);
 		expect(html).toMatch(/id="verse-audio"/);
+		expect(html).not.toMatch(/id="translation-audio"/);
+	});
+
+	it("keeps the modules the reader needs in the offline cache", async () => {
+		const worker = await readPublicFile("service-worker.js");
+		expect(worker).toMatch(/\.\/speech\.js/);
 	});
 });

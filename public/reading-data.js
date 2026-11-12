@@ -1,7 +1,25 @@
-export const READER_SCHEMA_VERSION = 9;
+export const READER_SCHEMA_VERSION = 10;
 export const DEFAULT_RUKU_COUNT = 556;
 export const DEFAULT_DAILY_TARGET = 5;
 export const DAY_BOUNDARY_HOUR = 0;
+
+/** The five daily prayers, in the order they follow each other. */
+export const PRAYERS = [
+  { id: "fajr", name: "Fajr" },
+  { id: "dhuhr", name: "Dhuhr" },
+  { id: "asr", name: "Asr" },
+  { id: "maghrib", name: "Maghrib" },
+  { id: "isha", name: "Isha" },
+];
+
+/** The times the prayers start with, until the reader sets their own. */
+export const DEFAULT_PRAYER_TIMES = {
+  fajr: "05:00",
+  dhuhr: "12:30",
+  asr: "15:30",
+  maghrib: "18:00",
+  isha: "19:30",
+};
 
 /**
  * Sessions recorded under the retired light day, deep, and flow names still
@@ -10,6 +28,7 @@ export const DAY_BOUNDARY_HOUR = 0;
 const RETIRED_MODES = new Set(["full", "flow", "deep", "light"]);
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const VERSE_KEY = /^(\d{1,3}):(\d{1,3})$/;
+const TIME_KEY = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export function createDefaultReadingData() {
   return {
@@ -21,7 +40,7 @@ export function createDefaultReadingData() {
     sessions: [],
     settings: {
       dailyTarget: DEFAULT_DAILY_TARGET,
-      anchors: [],
+      prayerTimes: { ...DEFAULT_PRAYER_TIMES },
       remindersEnabled: false,
       shortcutsSeen: false,
     },
@@ -70,19 +89,25 @@ function cleanActivity(row, chapters, rukuCount) {
   };
 }
 
-function cleanAnchor(anchor) {
-  if (!isObject(anchor)) return null;
-  const name = typeof anchor.name === "string" ? anchor.name.trim().slice(0, 40) : "";
-  const time = typeof anchor.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(anchor.time) ? anchor.time : "";
-  if (!name || !time) return null;
-  return { id: typeof anchor.id === "string" ? anchor.id.slice(0, 80) : `${name}-${time}`, name, time };
+/**
+ * Keeps the saved prayer times and falls back to the default time of every
+ * prayer whose saved time is missing or not a valid time of day.
+ */
+function cleanPrayerTimes(value) {
+  const times = { ...DEFAULT_PRAYER_TIMES };
+  if (!isObject(value)) return times;
+  for (const prayer of PRAYERS) {
+    const time = value[prayer.id];
+    if (typeof time === "string" && TIME_KEY.test(time)) times[prayer.id] = time;
+  }
+  return times;
 }
 
 export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COUNT) {
   const defaults = createDefaultReadingData();
   if (!isObject(raw)) return defaults;
   const settings = isObject(raw.settings) ? raw.settings : {};
-  const anchors = (Array.isArray(settings.anchors) ? settings.anchors : []).map(cleanAnchor).filter(Boolean).slice(0, 4);
+  const prayerTimes = cleanPrayerTimes(settings.prayerTimes);
   const activityByDay = {};
   if (isObject(raw.activityByDay)) {
     const days = Object.entries(raw.activityByDay).filter(([date]) => validDateKey(date)).sort(([left], [right]) => left.localeCompare(right)).slice(-400);
@@ -115,11 +140,22 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
     sessions,
     settings: {
       dailyTarget: DEFAULT_DAILY_TARGET,
-      anchors,
+      prayerTimes,
       remindersEnabled: Boolean(settings.remindersEnabled),
       shortcutsSeen: Boolean(settings.shortcutsSeen),
     },
   };
+}
+
+/**
+ * Lists the five prayers in the order they occur in the day, each with the
+ * time the reader has set for it.
+ */
+export function getPrayerSchedule(readingData) {
+  const times = readingData?.settings?.prayerTimes ?? {};
+  return PRAYERS
+    .map(prayer => ({ ...prayer, time: times[prayer.id] ?? DEFAULT_PRAYER_TIMES[prayer.id] }))
+    .sort((left, right) => left.time.localeCompare(right.time));
 }
 
 export function getDayKey(date = new Date()) {

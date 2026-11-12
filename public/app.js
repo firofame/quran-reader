@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DAY_BOUNDARY_HOUR, DEFAULT_RUKU_COUNT, findRuku, getDayKey, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DAY_BOUNDARY_HOUR, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, getDayKey, getPrayerSchedule, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -476,32 +476,32 @@ function renderProgressSummary() {
   $("target-reached-label").textContent = today.bonus ? `Target reached · +${today.bonus} bonus` : "Target reached";
   updateDocumentChrome();
 
-  const chips = $("anchor-chips");
+  const chips = $("prayer-chips");
   chips.replaceChildren();
-  const anchors = [...readingData.settings.anchors].sort((a, b) => a.time.localeCompare(b.time));
-  for (const anchor of anchors) {
+  const prayers = getPrayerSchedule(readingData);
+  for (const prayer of prayers) {
     const button = document.createElement("button");
-    const done = anchorWasUsedToday(anchor, anchors, readingData);
+    const done = prayerWasUsedToday(prayer, prayers, readingData);
     button.type = "button";
-    button.className = `anchor-chip${done ? " is-done" : ""}`;
-    button.textContent = `${anchor.name} · ${done ? "done" : anchor.time}`;
-    button.title = done ? `A reading session happened during ${anchor.name}` : `Reading anchor at ${anchor.time}`;
+    button.className = `prayer-chip${done ? " is-done" : ""}`;
+    button.textContent = `${prayer.name} · ${done ? "done" : prayer.time}`;
+    button.title = done ? `A reading session happened during ${prayer.name}` : `${prayer.name} at ${prayer.time}`;
     button.addEventListener("click", () => {
       if (activePage !== "reader") showPage("reader");
       $("reading-content").scrollIntoView({ block: "center", behavior: "smooth" });
     });
     chips.append(button);
   }
-  chips.hidden = !anchors.length;
 }
 
-function anchorWasUsedToday(anchor, anchors, readingData) {
+/** Reports whether a reading session happened between this prayer and the next one. */
+function prayerWasUsedToday(prayer, prayers, readingData) {
   const now = new Date();
   const boundary = DAY_BOUNDARY_HOUR;
   const today = getDayKey(now);
-  const current = anchors.findIndex(item => item.id === anchor.id);
-  if (current < 0 || !anchors.length) return false;
-  const next = anchors[(current + 1) % anchors.length];
+  const current = prayers.findIndex(item => item.id === prayer.id);
+  if (current < 0 || !prayers.length) return false;
+  const next = prayers[(current + 1) % prayers.length];
   const [year, month, day] = today.split("-").map(Number);
   const dayStart = new Date(year, month - 1, day, boundary).getTime();
   const dayEndDate = new Date(year, month - 1, day + 1, boundary);
@@ -512,7 +512,7 @@ function anchorWasUsedToday(anchor, anchors, readingData) {
     if (hour < boundary) date.setDate(date.getDate() + 1);
     return date.getTime();
   };
-  const start = occurrenceInLogicalDay(anchor.time);
+  const start = occurrenceInLogicalDay(prayer.time);
   let end = occurrenceInLogicalDay(next.time);
   if (end <= start) end += 24 * 60 * 60 * 1000;
   end = Math.min(end, dayEnd);
@@ -550,42 +550,34 @@ function completeCurrentRuku(ruku) {
 function renderSettings() {
   const settings = state.readingData.settings;
   $("reminders-setting").checked = settings.remindersEnabled;
-  renderAnchorEditor();
+  renderPrayerEditor();
   renderMarkReadBlock();
 }
 
-function renderAnchorEditor() {
-  const container = $("anchor-editor");
+/**
+ * Lists the five daily prayers with their times. The prayers are fixed, so
+ * only the time of each one can be changed.
+ */
+function renderPrayerEditor() {
+  const container = $("prayer-editor");
   if (!container) return;
-  const anchors = state.readingData.settings.anchors;
-  const addButton = $("add-anchor");
-  if (addButton) addButton.disabled = anchors.length >= 4;
+  const times = state.readingData.settings.prayerTimes;
   container.replaceChildren();
-  if (!anchors.length) {
-    container.textContent = "No anchors set yet. Add up to four routines that fit your day.";
-    return;
-  }
-  for (const anchor of anchors) {
+  for (const prayer of PRAYERS) {
     const row = document.createElement("div");
-    row.className = "anchor-editor-row";
-    row.dataset.anchorId = anchor.id;
-    const name = document.createElement("input");
-    name.type = "text";
-    name.maxLength = 40;
-    name.value = anchor.name;
-    name.setAttribute("aria-label", "Anchor name");
-    name.dataset.anchorName = "";
+    row.className = "prayer-editor-row";
+    row.dataset.prayerId = prayer.id;
+    const label = document.createElement("label");
+    label.className = "prayer-editor-field";
+    const name = document.createElement("span");
+    name.className = "prayer-editor-name";
+    name.textContent = prayer.name;
     const time = document.createElement("input");
     time.type = "time";
-    time.value = anchor.time;
-    time.setAttribute("aria-label", `${anchor.name} time`);
-    time.dataset.anchorTime = "";
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "quiet-link";
-    remove.dataset.removeAnchor = anchor.id;
-    remove.textContent = "Remove";
-    row.append(name, time, remove);
+    time.value = times[prayer.id] ?? "";
+    time.dataset.prayerTime = "";
+    label.append(name, time);
+    row.append(label);
     container.append(row);
   }
 }
@@ -601,7 +593,7 @@ function initializeSettingsControls() {
   $("reminders-setting").addEventListener("change", async () => {
     if (!$("reminders-setting").checked) {
       updateSetting("remindersEnabled", false);
-      scheduleAnchorReminder();
+      schedulePrayerReminder();
       return;
     }
     if (!("Notification" in window)) {
@@ -612,64 +604,45 @@ function initializeSettingsControls() {
     const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
     if (permission !== "granted") {
       $("reminders-setting").checked = false;
-      notify("Notifications were not enabled. You can still use your anchor chips.");
+      notify("Notifications were not enabled. You can still use your prayer chips.");
       return;
     }
     updateSetting("remindersEnabled", true);
-    scheduleAnchorReminder();
+    schedulePrayerReminder();
     notify("Browser reminders are on while this tab is open.");
   });
-  $("add-anchor").addEventListener("click", () => {
-    const anchors = state.readingData.settings.anchors;
-    if (anchors.length >= 4) return;
-    const next = [...anchors, { id: `anchor-${Date.now()}`, name: `Anchor ${anchors.length + 1}`, time: "06:00" }];
-    updateSetting("anchors", next);
-    renderAnchorEditor();
-    scheduleAnchorReminder();
-  });
-  $("anchor-editor").addEventListener("change", event => {
-    const row = event.target.closest("[data-anchor-id]");
+  $("prayer-editor").addEventListener("change", event => {
+    const row = event.target.closest("[data-prayer-id]");
     if (!row) return;
-    const anchors = state.readingData.settings.anchors.map(anchor => {
-      if (anchor.id !== row.dataset.anchorId) return anchor;
-      const name = row.querySelector("[data-anchor-name]").value.trim().slice(0, 40) || anchor.name;
-      const time = row.querySelector("[data-anchor-time]").value || anchor.time;
-      return { ...anchor, name, time };
-    });
-    updateSetting("anchors", anchors);
-    renderProgressSummary();
-    scheduleAnchorReminder();
-  });
-  $("anchor-editor").addEventListener("click", event => {
-    const button = event.target.closest("[data-remove-anchor]");
-    if (!button) return;
-    updateSetting("anchors", state.readingData.settings.anchors.filter(anchor => anchor.id !== button.dataset.removeAnchor));
-    renderAnchorEditor();
-    scheduleAnchorReminder();
+    const prayerId = row.dataset.prayerId;
+    const time = row.querySelector("[data-prayer-time]").value;
+    if (!time) return;
+    updateSetting("prayerTimes", { ...state.readingData.settings.prayerTimes, [prayerId]: time });
+    schedulePrayerReminder();
   });
 }
 
-function scheduleAnchorReminder() {
+function schedulePrayerReminder() {
   clearTimeout(reminderTimer);
   const settings = state.readingData.settings;
-  if (!settings.remindersEnabled || !settings.anchors.length || !("Notification" in window) || Notification.permission !== "granted") return;
-  const anchors = [...settings.anchors].sort((a, b) => a.time.localeCompare(b.time));
+  if (!settings.remindersEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
+  const prayers = getPrayerSchedule(state.readingData);
   const now = new Date();
-  const next = anchors.map(anchor => {
-    const [hour, minute] = anchor.time.split(":").map(Number);
+  const next = prayers.map(prayer => {
+    const [hour, minute] = prayer.time.split(":").map(Number);
     const time = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
     if (time <= now) time.setDate(time.getDate() + 1);
-    return { ...anchor, fireAt: time.getTime() };
+    return { ...prayer, fireAt: time.getTime() };
   }).sort((a, b) => a.fireAt - b.fireAt)[0];
   reminderTimer = setTimeout(() => {
-    const currentAnchors = [...state.readingData.settings.anchors].sort((a, b) => a.time.localeCompare(b.time));
-    if (!anchorWasUsedToday(next, currentAnchors, state.readingData)) {
+    const currentPrayers = getPrayerSchedule(state.readingData);
+    if (!prayerWasUsedToday(next, currentPrayers, state.readingData)) {
       const currentRuku = findRuku(state.position, rukus);
       const chapter = chapters[state.position.chapter - 1];
       const notification = new Notification(`Next up: ${chapter.name}, ruku ${currentRuku?.localNumber ?? 1}. One ruku, whenever you’re ready.`);
       notification.onclick = () => { window.focus(); notification.close(); };
     }
-    scheduleAnchorReminder();
+    schedulePrayerReminder();
   }, Math.min(2147483647, Math.max(0, next.fireAt - now.getTime())));
 }
 
@@ -782,7 +755,7 @@ function initializeFeatureInteractions() {
     notify(`Marked ${pending} earlier ${plural} as read.`);
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") scheduleAnchorReminder();
+    if (document.visibilityState === "visible") schedulePrayerReminder();
   });
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" })
@@ -884,4 +857,4 @@ persist();
 renderProgressSummary();
 renderAllPages();
 loadReading();
-scheduleAnchorReminder();
+schedulePrayerReminder();

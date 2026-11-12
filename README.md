@@ -17,7 +17,8 @@ translation.
   Playback starts only after a direct click.
 - The English translation can be read aloud with Eleven v4 Turbo from the
   speaker icon beside each ayah. The Worker keeps the key and returns only the
-  audio.
+  audio, which arrives as it is made. The word being read is highlighted as it
+  is spoken.
 - Installable PWA with an offline cache for the reader and the translation.
 
 ---
@@ -39,6 +40,16 @@ without a Cloudflare account.
 The speaker icon beside an ayah reads its English translation with
 [ElevenLabs](https://elevenlabs.io). The Worker holds the key, so the browser
 only ever receives audio.
+
+The reading is streamed. The Worker asks ElevenLabs for the audio with the
+timing of every character, and sends each piece to the browser as it lands, so
+the reading starts before the whole ayah has been made. The browser plays it
+with the Web Audio API and follows the words, which are highlighted as they are
+spoken. The audio is raw PCM rather than MP3, because playing MP3 as it
+downloads needs Media Source Extensions, which iOS Safari does not support.
+
+A reading is kept in the browser, and another is kept by the Worker, so an ayah
+that is read again costs neither a request nor a call to ElevenLabs.
 
 Sign in and store a key for the project:
 
@@ -83,8 +94,10 @@ aloud is not configured.
   play/pause icon beside each ayah reference plays its Arabic recitation.
 - A speaker icon beside the same reference reads the English translation aloud
   with Eleven v4 Turbo. The request goes to the Worker, which keeps the
-  ElevenLabs key to itself and returns only the audio. The recitation stops
-  while the translation is being read, so the two never talk over each other.
+  ElevenLabs key to itself and returns only the audio and the timing of its
+  words. The audio is played as it arrives, and the word being read is
+  highlighted. The recitation stops while the translation is being read, so the
+  two never talk over each other.
 - Settings lists the five daily prayers, Fajr, Dhuhr, Asr, Maghrib, and Isha.
   Each prayer keeps its adhan and iqama times, which can be adjusted to match
   your location and season; the prayers themselves are fixed and cannot be
@@ -114,8 +127,10 @@ aloud is not configured.
 
 Translations are loaded from the supplied local file and retained in memory
 while the page is open. The app makes no cloud requests for your reading data.
-The one exception is the reading aloud, which asks the Worker for audio.
-Translation wording is unchanged; paragraph breaks are added only for display.
+The one exception is the reading aloud, which asks the Worker for audio. That
+audio is kept in the browser as well, so an ayah that is read again is played
+from the browser and makes no request at all. Translation wording is
+unchanged; paragraph breaks are added only for display.
 Optional sentence-by-sentence reading is not implemented: complete ayahs remain
 visible.
 

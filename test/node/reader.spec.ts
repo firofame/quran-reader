@@ -96,8 +96,8 @@ describe("ruku progress", () => {
 });
 
 describe("translations", () => {
-	it("ships the Saheeh International translation only", async () => {
-		expect(Object.keys(TRANSLATIONS)).toEqual(["en.sahih"]);
+	it("ships the Hilali & Khan translation only", async () => {
+		expect(Object.keys(TRANSLATIONS)).toEqual(["en.hilali"]);
 		const html = await readFile(fileURLToPath(new URL("../../public/index.html", import.meta.url).href), "utf8");
 		expect(html).not.toMatch(/id="translation"/);
 		expect(html).not.toMatch(/abdulhameed/i);
@@ -204,7 +204,7 @@ describe("navigation", () => {
 	});
 
 	it("moves the bottom previous and next buttons consecutively and disables them at the boundaries", () => {
-		let state = { translation: "en.sahih", position: { chapter: 1, verse: 1 }, fontSize: 21, theme: "light" };
+		let state = { translation: "en.hilali", position: { chapter: 1, verse: 1 }, fontSize: 21, theme: "light" };
 
 		// At the start of the Quran, previous button has no target (disabled)
 		const prevAtStart = adjacentPosition(state.position, -1, chapters);
@@ -334,7 +334,7 @@ describe("saved state", () => {
 			}),
 			chapters,
 		);
-		expect(saved.translation).toBe("en.sahih");
+		expect(saved.translation).toBe("en.hilali");
 		expect(saved.position).toEqual({ chapter: 1, verse: 1 });
 		expect(saved.fontSize).toBe(29);
 		expect(saved.theme).toBe("dark");
@@ -343,8 +343,8 @@ describe("saved state", () => {
 		expect(() => decodeState("null", chapters)).toThrow();
 	});
 
-	it("uses Saheeh International for new and removed translation preferences", () => {
-		expect(decodeState(null, chapters).translation).toBe("en.sahih");
+	it("uses Hilali & Khan for new and removed translation preferences", () => {
+		expect(decodeState(null, chapters).translation).toBe("en.hilali");
 		const saved = {
 			translation: "en.itani",
 			position: { chapter: 2, verse: 255 },
@@ -357,7 +357,7 @@ describe("saved state", () => {
 			position: migrated.position,
 			fontSize: migrated.fontSize,
 			theme: migrated.theme,
-		}).toEqual({ ...saved, translation: "en.sahih" });
+		}).toEqual({ ...saved, translation: "en.hilali" });
 		expect(migrated.schemaVersion).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.readingData).toEqual(createDefaultReadingData());
 		for (const translation of Object.keys(TRANSLATIONS)) {
@@ -382,11 +382,11 @@ describe("saved state", () => {
 			positioned,
 			{
 				type: "translation/set",
-				translation: "en.sahih",
+				translation: "en.hilali",
 			},
 			chapters,
 		);
-		expect(translated.translation).toBe("en.sahih");
+		expect(translated.translation).toBe("en.hilali");
 		expect(reduceReaderState(translated, { type: "font-size/adjust", delta: 20 }, chapters).fontSize).toBe(29);
 		expect(reduceReaderState(initial, { type: "font-size/adjust", delta: -20 }, chapters).fontSize).toBe(17);
 		expect(reduceReaderState(initial, { type: "theme/toggle" }, chapters).theme).toBe("dark");
@@ -409,7 +409,7 @@ describe("preferences storage", () => {
 			setItem: (key: string, value: string) => values.set(key, value),
 		};
 		const preferences = createPreferencesStore(storage, chapters);
-		expect(preferences.load().translation).toBe("en.sahih");
+		expect(preferences.load().translation).toBe("en.hilali");
 		const saved = {
 			...decodeState(null, chapters),
 			position: { chapter: 2, verse: 255 },
@@ -433,37 +433,37 @@ describe("preferences storage", () => {
 
 describe("translation repository", () => {
 	it("caches successful loads and shares concurrent requests", async () => {
-		const source = await readFile(fileURLToPath(new URL("../../public/en.sahih.txt", import.meta.url).href), "utf8");
+		const source = await readFile(fileURLToPath(new URL("../../public/en.hilali.txt", import.meta.url).href), "utf8");
 		let requests = 0;
 		const repository = createTranslationRepository((async (file: string) => {
 			requests++;
-			expect(file).toBe("en.sahih.txt");
+			expect(file).toBe("en.hilali.txt");
 			await Promise.resolve();
 			return { ok: true, status: 200, text: async () => source };
 		}) as any);
 		const [first, second] = await Promise.all([
-			repository.load("en.sahih", chapters),
-			repository.load("en.sahih", chapters),
+			repository.load("en.hilali", chapters),
+			repository.load("en.hilali", chapters),
 		]);
 		expect(first).toBe(second);
-		expect(repository.getLoaded("en.sahih")).toBe(first);
+		expect(repository.getLoaded("en.hilali")).toBe(first);
 		expect(requests).toBe(1);
-		expect(await repository.load("en.sahih", chapters)).toBe(first);
+		expect(await repository.load("en.hilali", chapters)).toBe(first);
 		expect(requests).toBe(1);
 		await expect(repository.load("missing", chapters)).rejects.toThrow(/Unknown translation/);
 	});
 
 	it("reports failed requests and retries them", async () => {
-		const source = await readFile(fileURLToPath(new URL("../../public/en.sahih.txt", import.meta.url).href), "utf8");
+		const source = await readFile(fileURLToPath(new URL("../../public/en.hilali.txt", import.meta.url).href), "utf8");
 		let requests = 0;
 		const repository = createTranslationRepository((async () => {
 			requests++;
 			if (requests === 1) return { ok: false, status: 503 };
 			return { ok: true, status: 200, text: async () => source };
 		}) as any);
-		await expect(repository.load("en.sahih", chapters)).rejects.toThrow(/503/);
-		expect(repository.getLoaded("en.sahih")).toBeUndefined();
-		expect((await repository.load("en.sahih", chapters)).flat().length).toBe(6236);
+		await expect(repository.load("en.hilali", chapters)).rejects.toThrow(/503/);
+		expect(repository.getLoaded("en.hilali")).toBeUndefined();
+		expect((await repository.load("en.hilali", chapters)).flat().length).toBe(6236);
 		expect(requests).toBe(2);
 	});
 });

@@ -10,7 +10,7 @@
 ## Quran and translation data
 
 - Chapter names and structural metadata are bundled in `public/quran-data.js`, based on Tanzil Quran Metadata 1.0 (CC BY 3.0). It includes 114 chapters, verse counts, ruku starts, juz starts, manzil starts, pages, hizb quarters, and sajda locations.
-- The reader shows only the English Saheeh International translation, supplied as `public/en.sahih.txt` and loaded by the browser. The Arabic Uthmani text and the Malayalam translation were removed; their bundled files, the Arabic ayah rendering, and the Arabic typeface and size settings are gone. Attribution and source are in the app and README.
+- The reader shows only the English Hilali & Khan translation, supplied as `public/en.hilali.txt` and loaded by the browser. The Arabic Uthmani text, the Malayalam translation, and the earlier Saheeh International translation were removed; their bundled files, the Arabic ayah rendering, and the Arabic typeface and size settings are gone. Attribution and source are in the app and README.
 
 ## Ruku, juz, and manzil verification
 
@@ -31,7 +31,7 @@
 
 ## Screens and navigation
 
-- One reading screen shows one complete translated ayah at a time. Chapter navigation is in the left drawer, with a small play/pause control beside each ayah reference. Text size and the catch-up action live in Settings. There is no translation picker, because Saheeh International is the only translation.
+- One reading screen shows one complete translated ayah at a time. Chapter navigation is in the left drawer, with a small play/pause control beside each ayah reference. Text size and the catch-up action live in Settings. There is no translation picker, because Hilali & Khan is the only translation.
 - Previous/Continue buttons and left/right arrows navigate ayahs, including across chapter boundaries. Direct verse links use `#chapter:verse`. The last ayah of a ruku turns the next action into "Finish ruku". Space and `Escape` cover the rest of the reading shortcuts.
 - Current metadata includes page, ruku, manzil, hizb, juz, and sajda. A small ring in the daily panel tracks the current ayah within its ruku. The daily panel also counts down to the next adhan or iqama moment.
 - The reader also has a Settings view for reading preferences and the five daily prayers. The manual reading anchors have been replaced by the fixed prayers, Fajr, Dhuhr, Asr, Maghrib, and Isha; each prayer keeps its adhan and iqama times, and only those times can be adjusted.

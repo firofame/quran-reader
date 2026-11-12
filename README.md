@@ -1,11 +1,11 @@
 # The Quran — A Space for Reflection
 
-A quiet, responsive Quran reader with the English Saheeh International
+A quiet, responsive Quran reader with the English Hilali & Khan
 translation.
 
 - Explore 114 chapters with search across chapter names, meanings, and chapter
   numbers.
-- Read the Saheeh International (English) translation of all 6,236 ayahs.
+- Read the Hilali & Khan (English) translation of all 6,236 ayahs.
 - Complete Tanzil chapter and ayah metadata is baked in: verses, revelation
   order, revelation place, rukus, pages, manzils, hizb quarters, juzs, and
   sajdas.
@@ -92,7 +92,7 @@ visible.
   documented Tanzil convention of **556 rukus** (40 in Al-Baqarah), with 30
   juzs and 7 manzils. This is the 556-division convention, not the separate 558
   convention referenced in the improvement brief.
-- Translation: English Saheeh International. The file and its attribution are
+- Translation: English Hilali & Khan. The file and its attribution are
   supplied by the project and are not modified.
 - Recitation: Mishary Rashid Alafasy at 128 kbps, streamed from Al Quran Cloud.
   Its [terms](https://alquran.cloud/terms-and-conditions) permit streaming for
@@ -156,7 +156,8 @@ from a fork.
 ## Sources
 
 The supplied translation file includes its original source and attribution.
-English: Saheeh International. Source:
+English: Hilali & Khan, by Muhammad Taqi-ud-Din al-Hilali and Muhammad Muhsin
+Khan. Source:
 [Tanzil translations](https://tanzil.net/trans/). The file remains unchanged;
 the translator's rights and terms continue to apply.
 

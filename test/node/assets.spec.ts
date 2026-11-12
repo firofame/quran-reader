@@ -90,7 +90,7 @@ describe("published assets", () => {
 	it("keeps an adhan and an iqama time for every prayer", async () => {
 		const html = await readPublicFile("index.html");
 		expect(html).toMatch(/adhan and iqama/);
-		expect(html).toMatch(/Browser reminders at the adhan and iqama/);
+		expect(html).toMatch(/Browser reminders at the adhan and 5 minutes before iqama/);
 
 		const app = await readPublicFile("app.js");
 		expect(app).toMatch(/\[data-prayer-adhan\]/);

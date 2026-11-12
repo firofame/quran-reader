@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DAY_BOUNDARY_HOUR, DEFAULT_PRAYER_TIMES, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, formatCountdown, getDayKey, getNextPrayerMoment, getPrayerSchedule, getRukuIndex, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DAY_BOUNDARY_HOUR, DEFAULT_PRAYER_TIMES, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, formatCountdown, getDayKey, getNextPrayerMoment, getNextPrayerReminder, getPrayerSchedule, getRukuIndex, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -645,7 +645,7 @@ function schedulePrayerReminder() {
   if (!settings.remindersEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
   const prayers = getPrayerSchedule(state.readingData);
   const now = new Date();
-  const next = getNextPrayerMoment(prayers, now);
+  const next = getNextPrayerReminder(prayers, now);
   if (!next) return;
   reminderTimer = setTimeout(() => {
     const currentPrayers = getPrayerSchedule(state.readingData);
@@ -655,8 +655,9 @@ function schedulePrayerReminder() {
     const message = next.kind === "adhan"
       ? `${next.name} adhan at ${next.adhan}. Next up: ${chapter.name}, ruku ${currentRuku?.localNumber ?? 1}. One ruku, whenever you’re ready.`
       : `${next.name} iqama at ${next.iqama}. Time to head to the masjid.`;
-    // The iqama nudge is about reaching the masjid, so it always fires. The
-    // adhan nudge waits for the prayer window when the reader already read.
+    // The iqama nudge is about reaching the masjid, so it fires 5 minutes
+    // before the iqama to give time for wudu and travel. The adhan nudge
+    // waits for the prayer window when the reader already read.
     if (next.kind === "iqama" || !(slot?.read ?? false)) {
       const notification = new Notification(message);
       notification.onclick = () => { window.focus(); notification.close(); };

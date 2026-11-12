@@ -254,8 +254,8 @@ select option { background: var(--paper); color: var(--text); }
 .app-navigation button:hover { background: var(--hover); color: var(--text); }
 .app-navigation button[aria-current="page"] { background: var(--green-soft); color: var(--green); }
 
-.overall-progress { display: flex; flex-direction: column; gap: 4px; width: 148px; color: var(--muted); font-size: 9px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.overall-progress progress { width: 100%; height: 3px; border: 0; appearance: none; background: var(--line); color: var(--green); border-radius: 2px; }
+.overall-progress { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.overall-progress progress { flex: 1; height: 3px; border: 0; appearance: none; background: var(--line); color: var(--green); border-radius: 2px; }
 .overall-progress progress::-webkit-progress-bar { background: var(--line); border-radius: 2px; }
 .overall-progress progress::-webkit-progress-value { background: var(--green); border-radius: 2px; }
 .overall-progress progress::-moz-progress-bar { background: var(--green); }
@@ -311,7 +311,6 @@ select option { background: var(--paper); color: var(--text); }
   .verse { column-gap: 12px; }
   .chapter-pagination { margin-left: 24px; margin-right: 24px; }
   .app-navigation button { padding: 0 6px; font-size: 10px; }
-  .overall-progress { width: 120px; }
 }
 
 /* ─── Responsive: mobile ───────────────────────────────────────── */
@@ -333,7 +332,6 @@ select option { background: var(--paper); color: var(--text); }
   .notice { left: 50%; bottom: 18px; }
   .app-navigation { order: 3; width: 100%; overflow-x: auto; justify-content: flex-start; }
   .app-navigation button { flex: 0 0 auto; min-height: 30px; padding: 0 8px; }
-  .overall-progress { width: 118px; }
   .daily-panel { padding: 8px 16px; }
 }
 
@@ -371,8 +369,7 @@ select option { background: var(--paper); color: var(--text); }
 }
 
 @media (max-width: 500px) {
-  .overall-progress { width: 98px; }
-  .overall-progress-label { font-size: 7px; }
+  .overall-progress { font-size: 9px; }
   .topbar-right { gap: 6px; }
   .daily-panel-main { gap: 8px; }
   .daily-panel-copy { gap: 4px 10px; }

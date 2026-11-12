@@ -114,6 +114,23 @@ describe("published assets", () => {
 		expect(ruku).toBeLessThan(countdown);
 	});
 
+	it("shows overall reading progress below the daily ruku details instead of the topbar", async () => {
+		const html = await readPublicFile("index.html");
+		const topbar = html.slice(html.indexOf('<header class="topbar">'), html.indexOf("</header>"));
+		expect(topbar).not.toMatch(/id="overall-progress"/);
+		expect(topbar).not.toMatch(/overall-progress-bar/);
+
+		const readerPage = html.slice(html.indexOf('id="reader-page"'), html.indexOf('id="settings-page"'));
+		expect(readerPage).toMatch(/id="overall-progress"/);
+		expect(readerPage).toMatch(/id="overall-progress-label"/);
+		expect(readerPage).toMatch(/id="overall-progress-bar"/);
+
+		const dailyDetails = readerPage.indexOf('class="daily-panel-main"');
+		const overallProgress = readerPage.indexOf('id="overall-progress"');
+		expect(dailyDetails).toBeGreaterThan(-1);
+		expect(dailyDetails).toBeLessThan(overallProgress);
+	});
+
 	it("keeps the chapter heading and the ruku indicator lean", async () => {
 		const app = await readPublicFile("app.js");
 		const html = await readPublicFile("index.html");

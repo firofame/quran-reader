@@ -84,7 +84,6 @@ describe("published assets", () => {
 		expect(html).not.toMatch(/Reading anchors/);
 		expect(html).not.toMatch(/add-anchor/);
 		expect(html).toMatch(/id="prayer-editor"/);
-		expect(html).toMatch(/id="prayer-chips"/);
 		expect(html).toMatch(/Daily prayers/);
 	});
 
@@ -99,11 +98,20 @@ describe("published assets", () => {
 		expect(app).toMatch(/prayerIqama/);
 	});
 
-	it("counts down to the next prayer moment in the daily panel", async () => {
+	it("counts down to the next prayer moment between the daily progress and the ruku", async () => {
 		const html = await readPublicFile("index.html");
 		const readerPage = html.slice(html.indexOf('id="reader-page"'), html.indexOf('id="settings-page"'));
+		// The prayer chips are gone.
+		expect(readerPage).not.toMatch(/id="prayer-chips"/);
+		expect(readerPage).not.toMatch(/prayer-chip/);
+		// The countdown sits between today's progress and the ruku progress.
 		expect(readerPage).toMatch(/id="prayer-countdown"/);
 		expect(readerPage).toMatch(/prayer-countdown-time/);
+		const today = readerPage.indexOf('id="today-progress"');
+		const countdown = readerPage.indexOf('id="prayer-countdown"');
+		const ruku = readerPage.indexOf('id="ruku-progress-wrap"');
+		expect(today).toBeLessThan(countdown);
+		expect(countdown).toBeLessThan(ruku);
 	});
 
 	it("keeps the reader free of anchor markup", async () => {

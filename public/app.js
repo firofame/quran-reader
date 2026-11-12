@@ -388,9 +388,10 @@ function createVerse(verse) {
   reference.className = "verse-reference";
   const number = document.createElement("a");
   number.className = "verse-number";
-  number.textContent = `${verse.chapter}:${verse.verse}`;
+  const totalVerses = chapters[verse.chapter - 1]?.verses ?? verse.verse;
+  number.textContent = `Ayah: ${verse.verse} / ${totalVerses}`;
   number.href = `#${verse.chapter}:${verse.verse}`;
-  number.setAttribute("aria-label", `Link to verse ${verse.chapter}:${verse.verse}`);
+  number.setAttribute("aria-label", `Link to ayah ${verse.verse} of ${totalVerses} in chapter ${verse.chapter}`);
   const actions = document.createElement("div");
   actions.className = "verse-audio-action";
   const listen = document.createElement("button");

@@ -147,6 +147,11 @@ describe("published assets", () => {
 		expect(html).not.toMatch(/surah-progress/);
 	});
 
+	it("formats verse reference as Ayah: verse / totalVerses", async () => {
+		const app = await readPublicFile("app.js");
+		expect(app).toMatch(/number\.textContent = `Ayah: \${verse\.verse} \/ \${totalVerses}`/);
+	});
+
 	it("keeps the reader footer attribution markup out of the reader", async () => {
 		const app = await readPublicFile("app.js");
 		const html = await readPublicFile("index.html");

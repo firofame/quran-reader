@@ -132,32 +132,68 @@ describe("reading history", () => {
 		expect(Object.hasOwn(migrated.settings, "resumeAtNextUnread")).toBe(false);
 	});
 
-	it("lists the five daily prayers and keeps their saved times", () => {
+	it("lists the five daily prayers with their adhan and iqama times", () => {
 		expect(PRAYERS.map(prayer => prayer.name)).toEqual(["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]);
+		expect(DEFAULT_PRAYER_TIMES).toEqual({
+			fajr: { adhan: "04:58", iqama: "05:43" },
+			dhuhr: { adhan: "12:11", iqama: "13:15" },
+			asr: { adhan: "15:32", iqama: "17:00" },
+			maghrib: { adhan: "18:03", iqama: "18:06" },
+			isha: { adhan: "19:23", iqama: "20:30" },
+		});
+	});
 
+	it("keeps the saved adhan and iqama times", () => {
 		const migrated = normalizeReadingData(
 			{
-				version: 10,
+				version: 11,
 				settings: {
-					prayerTimes: { fajr: "04:45", dhuhr: "13:05", asr: "not-a-time", maghrib: "18:20", isha: "19:45" },
+					prayerTimes: {
+						fajr: { adhan: "04:45", iqama: "05:30" },
+						dhuhr: { adhan: "13:05", iqama: "not-a-time" },
+						asr: { adhan: "not-a-time", iqama: "17:10" },
+						maghrib: { adhan: "18:20", iqama: "18:23" },
+						isha: { adhan: "19:45", iqama: "20:50" },
+					},
 				},
 			},
 			chapters,
 		);
-		expect(migrated.settings.prayerTimes.fajr).toBe("04:45");
-		expect(migrated.settings.prayerTimes.dhuhr).toBe("13:05");
-		expect(migrated.settings.prayerTimes.maghrib).toBe("18:20");
-		expect(migrated.settings.prayerTimes.isha).toBe("19:45");
+		expect(migrated.settings.prayerTimes.fajr).toEqual({ adhan: "04:45", iqama: "05:30" });
+		expect(migrated.settings.prayerTimes.maghrib).toEqual({ adhan: "18:20", iqama: "18:23" });
+		expect(migrated.settings.prayerTimes.isha).toEqual({ adhan: "19:45", iqama: "20:50" });
 		// An unusable time falls back to the default of that prayer.
-		expect(migrated.settings.prayerTimes.asr).toBe(DEFAULT_PRAYER_TIMES.asr);
+		expect(migrated.settings.prayerTimes.dhuhr).toEqual({ adhan: "13:05", iqama: DEFAULT_PRAYER_TIMES.dhuhr.iqama });
+		expect(migrated.settings.prayerTimes.asr).toEqual({ adhan: DEFAULT_PRAYER_TIMES.asr.adhan, iqama: "17:10" });
 	});
 
-	it("orders the prayers by their times for the day", () => {
+	it("moves the prayer times of the first prayer list to the current defaults", () => {
+		const untouched = normalizeReadingData(
+			{ version: 10, settings: { prayerTimes: { fajr: "05:00", dhuhr: "12:30", asr: "15:30", maghrib: "18:00", isha: "19:30" } } },
+			chapters,
+		);
+		expect(untouched.settings.prayerTimes).toEqual(DEFAULT_PRAYER_TIMES);
+
+		const changed = normalizeReadingData(
+			{ version: 10, settings: { prayerTimes: { fajr: "05:20", dhuhr: "12:30", asr: "15:30", maghrib: "18:00", isha: "19:30" } } },
+			chapters,
+		);
+		// A time the reader had set is kept, the untouched ones follow the defaults.
+		expect(changed.settings.prayerTimes.fajr.adhan).toBe("05:20");
+		expect(changed.settings.prayerTimes.fajr.iqama).toBe(DEFAULT_PRAYER_TIMES.fajr.iqama);
+		expect(changed.settings.prayerTimes.dhuhr).toEqual(DEFAULT_PRAYER_TIMES.dhuhr);
+	});
+
+	it("orders the prayers by their adhan times for the day", () => {
 		const reading = createDefaultReadingData();
 		const schedule = getPrayerSchedule(reading);
 		expect(schedule.map(prayer => prayer.id)).toEqual(["fajr", "dhuhr", "asr", "maghrib", "isha"]);
+		expect(schedule[0]).toEqual({ id: "fajr", name: "Fajr", adhan: "04:58", iqama: "05:43" });
 
-		const moved = { ...reading, settings: { ...reading.settings, prayerTimes: { ...reading.settings.prayerTimes, fajr: "21:00" } } };
+		const moved = {
+			...reading,
+			settings: { ...reading.settings, prayerTimes: { ...reading.settings.prayerTimes, fajr: { adhan: "21:00", iqama: "21:05" } } },
+		};
 		expect(getPrayerSchedule(moved).map(prayer => prayer.id)).toEqual(["dhuhr", "asr", "maghrib", "isha", "fajr"]);
 	});
 

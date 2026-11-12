@@ -88,6 +88,17 @@ describe("published assets", () => {
 		expect(html).toMatch(/Daily prayers/);
 	});
 
+	it("keeps an adhan and an iqama time for every prayer", async () => {
+		const html = await readPublicFile("index.html");
+		expect(html).toMatch(/adhan and iqama/);
+		expect(html).toMatch(/Browser reminders at the adhan and iqama/);
+
+		const app = await readPublicFile("app.js");
+		expect(app).toMatch(/\[data-prayer-adhan\]/);
+		expect(app).toMatch(/prayerAdhan/);
+		expect(app).toMatch(/prayerIqama/);
+	});
+
 	it("keeps the reader free of anchor markup", async () => {
 		const app = await readPublicFile("app.js");
 		const html = await readPublicFile("index.html");

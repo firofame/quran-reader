@@ -6,7 +6,7 @@
  * the reading request that turns an ayah translation into speech.
  */
 
-import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+import type { ElevenLabsClient as ElevenLabsClientType } from "@elevenlabs/elevenlabs-js";
 
 /** The premade voice that reads the translation: George, a warm narrator. */
 const READER_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
@@ -53,10 +53,13 @@ function speechResponse(audio: Uint8Array): Response {
 /**
  * Reads text aloud with Eleven v4 Turbo and returns the audio.
  *
- * The key is read from the Worker binding, so it never reaches the browser.
+ * The key comes from the Worker binding, so it never reaches the browser.
+ * The SDK is loaded on the first reading: it is a large package, and the
+ * Worker has a small startup budget.
  */
 export async function readAloud(text: string, apiKey: string): Promise<Uint8Array> {
-	const client = new ElevenLabsClient({ apiKey });
+	const { ElevenLabsClient } = await import("@elevenlabs/elevenlabs-js");
+	const client: ElevenLabsClientType = new ElevenLabsClient({ apiKey });
 	const audio = await client.textToSpeech.convert(READER_VOICE_ID, {
 		text,
 		modelId: READER_MODEL_ID,

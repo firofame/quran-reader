@@ -156,6 +156,10 @@ party. It sends the text of one ayah to ElevenLabs with the key from the
 key never leaves the Worker, the browser never holds it, and the recorded
 readings are kept in the isolate so a second reading of the same ayah is free.
 
+The ElevenLabs SDK is a large package, so the Worker loads it on the first
+reading instead of at startup. Cloudflare gives a Worker one second to parse
+and run its global scope, and the SDK needs about as much on its own.
+
 The reader modules keep their responsibilities: `reader.js` contains pure Quran
 data, parsing, and navigation logic; `reader-state.js` owns validated
 state transitions; `preferences-store.js` isolates browser persistence; and

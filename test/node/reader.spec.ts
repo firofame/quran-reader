@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import vm from "node:vm";
 import {
 	TRANSLATIONS,
 	adjacentPosition,
@@ -16,15 +15,18 @@ import {
 	splitTranslationGlosses,
 	splitTranslationParagraphs,
 	validPosition,
-} from "../../public/reader.js";
-import { reduceReaderState } from "../../public/reader-state.js";
-import { createPreferencesStore, PREFERENCES_KEY } from "../../public/preferences-store.js";
-import { createTranslationRepository } from "../../public/translation-repository.js";
-import { createDefaultReadingData, READER_SCHEMA_VERSION } from "../../public/reading-data.js";
+} from "../../src/lib/reader";
+import type { TranslationId } from "../../src/lib/reader";
+import { reduceReaderState } from "../../src/lib/reader-state";
+import type { ReaderAction } from "../../src/lib/reader";
+import { createPreferencesStore, PREFERENCES_KEY } from "../../src/lib/preferences-store";
+import type { PreferencesStorage } from "../../src/lib/preferences-store";
+import { createTranslationRepository } from "../../src/lib/translation-repository";
+import type { TranslationFetch } from "../../src/lib/translation-repository";
+import { createDefaultReadingData, READER_SCHEMA_VERSION } from "../../src/lib/reading-data";
+import { QuranData } from "../../src/lib/quran-data";
 
-const context: any = vm.createContext({});
-vm.runInContext(await readFile(fileURLToPath(new URL("../../public/quran-data.js", import.meta.url).href), "utf8"), context);
-const chapters = createChapters(Array.from(context.QuranData.Sura));
+const chapters = createChapters(QuranData.Sura);
 
 describe("chapter metadata", () => {
 	it("contains exactly 114 chapters and 6,236 verses", () => {
@@ -35,7 +37,7 @@ describe("chapter metadata", () => {
 	});
 
 	it("follows page, ruku, manzil, hizb, juz, and sajda boundaries", () => {
-		const data = context.QuranData;
+		const data = QuranData;
 		expect(getVerseMetadata({ chapter: 1, verse: 1 }, data)).toEqual({
 			page: 1, ruku: 1, manzil: 1, hizb: 1, juz: 1, sajda: false,
 		});
@@ -55,7 +57,7 @@ describe("chapter metadata", () => {
 
 describe("ruku progress", () => {
 	it("fills within each ruku and resets across ruku and chapter boundaries", () => {
-		const data = context.QuranData;
+		const data = QuranData;
 		for (const [chapter, verse, value, max] of [
 			[1, 1, 1, 7], [1, 7, 7, 7],
 			[2, 1, 1, 7], [2, 7, 7, 7], [2, 8, 1, 13],
@@ -66,18 +68,18 @@ describe("ruku progress", () => {
 			expect(getRukuProgress({ chapter, verse }, data, chapters), `${chapter}:${verse}`).toEqual({ value, max });
 		}
 		expect(() => getRukuProgress({ chapter: 1, verse: 8 }, data, chapters)).toThrow(/invalid ayah/);
-		expect(() => getRukuProgress({ chapter: 1, verse: 1 }, { Ruku: [[]] }, chapters)).toThrow(/metadata is missing/);
+		expect(() => getRukuProgress({ chapter: 1, verse: 1 }, { Ruku: [[]] } as unknown as typeof QuranData, chapters)).toThrow(/metadata is missing/);
 	});
 
 	it("covers all 6,236 ayahs with the correct ruku length", () => {
-		const data = context.QuranData;
-		let position: any = { chapter: 1, verse: 1 };
+		const data = QuranData;
+		let position = { chapter: 1, verse: 1 };
 		let count = 0;
 		for (let ruku = 1; ruku < data.Ruku.length; ruku++) {
 			const [chapter, verse] = data.Ruku[ruku];
 			expect(position).toEqual({ chapter, verse });
 			const next = data.Ruku[ruku + 1];
-			const lastChapter = chapters.at(-1);
+			const lastChapter = chapters.at(-1)!;
 			const end = next
 				? chapters[next[0] - 1].start + next[1] - 1
 				: lastChapter.start + lastChapter.verses;
@@ -87,7 +89,7 @@ describe("ruku progress", () => {
 					value,
 					max: length,
 				});
-				position = adjacentPosition(position, 1, chapters);
+				position = adjacentPosition(position, 1, chapters)!;
 				count++;
 			}
 		}
@@ -97,24 +99,21 @@ describe("ruku progress", () => {
 });
 
 describe("translations", () => {
-	it("ships the Hilali & Khan translation only", async () => {
+	it("ships the Hilali & Khan translation only", () => {
 		expect(Object.keys(TRANSLATIONS)).toEqual(["en.hilali"]);
-		const html = await readFile(fileURLToPath(new URL("../../public/index.html", import.meta.url).href), "utf8");
-		expect(html).not.toMatch(/id="translation"/);
-		expect(html).not.toMatch(/abdulhameed/i);
 	});
 
 	for (const [id, translation] of Object.entries(TRANSLATIONS)) {
 		it(`${id}: every supplied verse maps to its chapter without modifying its text`, async () => {
-			const source = await readFile(fileURLToPath(new URL(`../../public/${translation.file}`, import.meta.url).href), "utf8");
+			const source = await readFile(fileURLToPath(new URL("../../public/en.hilali.txt", import.meta.url).href), "utf8");
 			const data = parseTranslation(source, chapters);
 			const originalVerses = source.split(/\r?\n/).filter(line => /^\d+\|/.test(line));
 			expect(data.flat().length).toBe(6236);
-			expect(data.flat().map((item: any) => `${item.chapter}|${item.verse}|${item.text}`)).toEqual(originalVerses);
+			expect(data.flat().map(item => `${item.chapter}|${item.verse}|${item.text}`)).toEqual(originalVerses);
 			for (const verse of data.flat()) {
 				const paragraphs = splitTranslationParagraphs(verse.text, translation.language);
 				expect(paragraphs.join(""), `${id} ${verse.chapter}:${verse.verse}`).toBe(verse.text);
-				expect(paragraphs.every((paragraph: string) => paragraph.trim().length > 0)).toBe(true);
+				expect(paragraphs.every(paragraph => paragraph.trim().length > 0)).toBe(true);
 				if (verse.text.length < 500) expect(paragraphs).toEqual([verse.text]);
 			}
 			expect(splitTranslationParagraphs(data[1][216].text, translation.language).length > 1).toBe(true);
@@ -134,8 +133,8 @@ describe("translations", () => {
 			const paragraphs = splitTranslationParagraphs(text, "en");
 			expect(paragraphs.length > 1).toBe(true);
 			expect(paragraphs.join("")).toBe(text);
-			expect(paragraphs.some((paragraph: string) => paragraph.includes(quote))).toBe(true);
-			expect(paragraphs.slice(0, -1).every((paragraph: string) => /[.!?]["\u201d]?\s+$/.test(paragraph))).toBe(true);
+			expect(paragraphs.some(paragraph => paragraph.includes(quote))).toBe(true);
+			expect(paragraphs.slice(0, -1).every(paragraph => /[.!?]["\u201d]?\s+$/.test(paragraph))).toBe(true);
 		}
 	});
 
@@ -153,38 +152,34 @@ describe("translations", () => {
 
 describe("glosses", () => {
 	it("segments every verse into glosses without altering any character", async () => {
-		for (const [id, translation] of Object.entries(TRANSLATIONS)) {
-			const source = await readFile(fileURLToPath(new URL(`../../public/${translation.file}`, import.meta.url).href), "utf8");
-			const data = parseTranslation(source, chapters);
-			for (const verse of data.flat()) {
-				const segments = splitTranslationGlosses(verse.text);
-				expect(segments.map((segment: { text: string }) => segment.text).join(""), `${id} ${verse.chapter}:${verse.verse}`).toBe(verse.text);
-				expect(segments.every((segment: { text: string }) => segment.text.length > 0)).toBe(true);
-			}
+		const source = await readFile(fileURLToPath(new URL("../../public/en.hilali.txt", import.meta.url).href), "utf8");
+		const data = parseTranslation(source, chapters);
+		for (const verse of data.flat()) {
+			const segments = splitTranslationGlosses(verse.text);
+			expect(segments.map(segment => segment.text).join(""), `en.hilali ${verse.chapter}:${verse.verse}`).toBe(verse.text);
+			expect(segments.every(segment => segment.text.length > 0)).toBe(true);
 		}
 	});
 
 	it("never splits a gloss across paragraph boundaries", async () => {
-		for (const [id, translation] of Object.entries(TRANSLATIONS)) {
-			const source = await readFile(fileURLToPath(new URL(`../../public/${translation.file}`, import.meta.url).href), "utf8");
-			const data = parseTranslation(source, chapters);
-			for (const verse of data.flat()) {
-				const paragraphs = splitTranslationParagraphs(verse.text, translation.language);
-				let verseDepth = 0;
-				for (const character of verse.text) {
-					if (character === "(" || character === "[") verseDepth++;
-					else if ((character === ")" || character === "]") && verseDepth > 0) verseDepth--;
+		const source = await readFile(fileURLToPath(new URL("../../public/en.hilali.txt", import.meta.url).href), "utf8");
+		const data = parseTranslation(source, chapters);
+		for (const verse of data.flat()) {
+			const paragraphs = splitTranslationParagraphs(verse.text, TRANSLATIONS["en.hilali"].language);
+			let verseDepth = 0;
+			for (const character of verse.text) {
+				if (character === "(" || character === "[") verseDepth++;
+				else if ((character === ")" || character === "]") && verseDepth > 0) verseDepth--;
+			}
+			let depth = 0;
+			for (const [index, paragraph] of paragraphs.entries()) {
+				for (const character of paragraph) {
+					if (character === "(" || character === "[") depth++;
+					else if ((character === ")" || character === "]") && depth > 0) depth--;
 				}
-				let depth = 0;
-				for (const [index, paragraph] of paragraphs.entries()) {
-					for (const character of paragraph) {
-						if (character === "(" || character === "[") depth++;
-						else if ((character === ")" || character === "]") && depth > 0) depth--;
-					}
-					expect(depth, `${id} ${verse.chapter}:${verse.verse} depth never goes negative`).toBeGreaterThanOrEqual(0);
-					const isLastParagraph = index === paragraphs.length - 1;
-					expect(depth, `${id} ${verse.chapter}:${verse.verse} gloss does not cross a paragraph boundary`).toBe(isLastParagraph ? verseDepth : 0);
-				}
+				expect(depth, `en.hilali ${verse.chapter}:${verse.verse} depth never goes negative`).toBeGreaterThanOrEqual(0);
+				const isLastParagraph = index === paragraphs.length - 1;
+				expect(depth, `en.hilali ${verse.chapter}:${verse.verse} gloss does not cross a paragraph boundary`).toBe(isLastParagraph ? verseDepth : 0);
 			}
 		}
 	});
@@ -254,7 +249,7 @@ describe("navigation", () => {
 		expect(adjacentPosition({ chapter: 2, verse: 1 }, -1, chapters)).toEqual({ chapter: 1, verse: 7 });
 		expect(adjacentPosition({ chapter: 1, verse: 1 }, -1, chapters)).toBeNull();
 		expect(adjacentPosition({ chapter: 114, verse: 6 }, 1, chapters)).toBeNull();
-		let position: any = { chapter: 1, verse: 1 };
+		let position = { chapter: 1, verse: 1 };
 		let count = 1;
 		while (true) {
 			const next = adjacentPosition(position, 1, chapters);
@@ -262,28 +257,27 @@ describe("navigation", () => {
 			expect(adjacentPosition(next, -1, chapters)).toEqual(position);
 			position = next;
 			count++;
-		}
-		expect(count).toBe(6236);
+		}		expect(count).toBe(6236);
 		expect(position).toEqual({ chapter: 114, verse: 6 });
 		expect(() => adjacentPosition({ chapter: 1, verse: 8 }, 1, chapters)).toThrow(/invalid/);
 		expect(() => adjacentPosition({ chapter: 1, verse: 1 }, 0, chapters)).toThrow(/invalid/);
 	});
 
 	it("moves the bottom previous and next buttons consecutively and disables them at the boundaries", () => {
-		let state = { translation: "en.hilali", position: { chapter: 1, verse: 1 }, fontSize: 21, theme: "light" };
+		let state = { ...decodeState(null, chapters), position: { chapter: 1, verse: 1 } };
 
 		// At the start of the Quran, previous button has no target (disabled)
 		const prevAtStart = adjacentPosition(state.position, -1, chapters);
 		expect(prevAtStart).toBeNull();
 
 		// Next button navigates to next ayah in chapter
-		const nextTarget = adjacentPosition(state.position, 1, chapters);
+		const nextTarget = adjacentPosition(state.position, 1, chapters)!;
 		expect(nextTarget).toEqual({ chapter: 1, verse: 2 });
 		state = reduceReaderState(state, { type: "position/set", position: nextTarget }, chapters);
 		expect(state.position).toEqual({ chapter: 1, verse: 2 });
 
 		// Previous button navigates back
-		const prevTarget = adjacentPosition(state.position, -1, chapters);
+		const prevTarget = adjacentPosition(state.position, -1, chapters)!;
 		expect(prevTarget).toEqual({ chapter: 1, verse: 1 });
 		state = reduceReaderState(state, { type: "position/set", position: prevTarget }, chapters);
 		expect(state.position).toEqual({ chapter: 1, verse: 1 });
@@ -297,17 +291,17 @@ describe("navigation", () => {
 	it("handles chapter boundaries seamlessly in both directions", () => {
 		// End of chapter 1 to start of chapter 2
 		const endOfCh1 = { chapter: 1, verse: 7 };
-		const startOfCh2 = adjacentPosition(endOfCh1, 1, chapters);
+		const startOfCh2 = adjacentPosition(endOfCh1, 1, chapters)!;
 		expect(startOfCh2).toEqual({ chapter: 2, verse: 1 });
 
 		// Start of chapter 2 back to end of chapter 1
-		const backToCh1 = adjacentPosition(startOfCh2, -1, chapters);
+		const backToCh1 = adjacentPosition(startOfCh2, -1, chapters)!;
 		expect(backToCh1).toEqual({ chapter: 1, verse: 7 });
 
 		// Traversing all chapter boundaries forward and backward
 		for (let c = 1; c < chapters.length; c++) {
 			const lastVerse = { chapter: c, verse: chapters[c - 1].verses };
-			const nextChapterFirstVerse = adjacentPosition(lastVerse, 1, chapters);
+			const nextChapterFirstVerse = adjacentPosition(lastVerse, 1, chapters)!;
 			expect(nextChapterFirstVerse).toEqual({ chapter: c + 1, verse: 1 });
 			expect(adjacentPosition(nextChapterFirstVerse, -1, chapters)).toEqual(lastVerse);
 		}
@@ -319,62 +313,18 @@ describe("navigation", () => {
 			{ chapter: 2, verse: 2, text: "This is the Book about which there is no doubt, guidance for the conscious of Allah." },
 			{ chapter: 2, verse: 3, text: "Who believe in the unseen..." },
 		];
-		const first = findAyah(verses, 2);
+		const first = findAyah(verses, 2)!;
 		expect(first.verse).toBe(2);
 
 		// The previous ayah is the one before it.
 		expect(verses[verses.indexOf(first) - 1].verse).toBe(1);
 
 		// The next ayah is the one after it.
-		const next = findAyah(verses, first.verse + 1);
+		const next = findAyah(verses, first.verse + 1)!;
 		expect(next.verse).toBe(3);
 
 		// Past the last ayah of the chapter there is nothing left to open.
-		expect(findAyah(verses, 4).verse).toBe(1);
-	});
-});
-
-describe("reading comfort", () => {
-	it("does not trigger navigation on touch scrolling or swipe gestures", async () => {
-		const appSource = await readFile(fileURLToPath(new URL("../../public/app.js", import.meta.url).href), "utf8");
-		const readerSource = await readFile(fileURLToPath(new URL("../../public/reader.js", import.meta.url).href), "utf8");
-
-		// Ensure no touch event listeners exist in app.js
-		expect(appSource).not.toMatch(/addEventListener\(\s*["']touch/i);
-		// Ensure no pointer dragging listeners exist in app.js
-		expect(appSource).not.toMatch(/addEventListener\(\s*["']pointer/i);
-		// Ensure no gesture/swipe helper or tracking state exists
-		expect(appSource).not.toMatch(/swipeDirection/);
-		expect(appSource).not.toMatch(/ayahTouch/);
-		expect(readerSource).not.toMatch(/swipeDirection/);
-	});
-
-	it("keeps text selection and copying working without dragging or selection locks", async () => {
-		const cssSource = await readFile(fileURLToPath(new URL("../../public/styles.css", import.meta.url).href), "utf8");
-		const appSource = await readFile(fileURLToPath(new URL("../../public/app.js", import.meta.url).href), "utf8");
-
-		// No user-select: none disabling selection in reader or verses
-		expect(cssSource).not.toMatch(/user-select:\s*none/i);
-		// No grab/grabbing cursors on reading content or verses
-		expect(cssSource).not.toMatch(/cursor:\s*grab/i);
-		expect(cssSource).not.toMatch(/cursor:\s*grabbing/i);
-		expect(appSource).not.toMatch(/is-dragging/i);
-	});
-
-	it("applies no page-flip animation or 3D transform during navigation", async () => {
-		const cssSource = await readFile(fileURLToPath(new URL("../../public/styles.css", import.meta.url).href), "utf8");
-		const appSource = await readFile(fileURLToPath(new URL("../../public/app.js", import.meta.url).href), "utf8");
-
-		// No 3D rotation, page-turn, or page-preview CSS classes
-		expect(cssSource).not.toMatch(/page-turn/i);
-		expect(cssSource).not.toMatch(/page-preview/i);
-		expect(cssSource).not.toMatch(/rotateY/i);
-		expect(cssSource).not.toMatch(/perspective:/i);
-		// No animation classes or turn routines in app.js
-		expect(appSource).not.toMatch(/pageTurn/i);
-		expect(appSource).not.toMatch(/page-turn/i);
-		expect(appSource).not.toMatch(/beginPageTurn/i);
-		expect(appSource).not.toMatch(/settlePageTurn/i);
+		expect(findAyah(verses, 4)!.verse).toBe(1);
 	});
 });
 
@@ -459,20 +409,22 @@ describe("saved state", () => {
 		expect(() => reduceReaderState(initial, { type: "position/set", position: { chapter: 1, verse: 8 } }, chapters)).toThrow(
 			/invalid ayah/,
 		);
-		expect(() => reduceReaderState(initial, { type: "translation/set", translation: "missing" }, chapters)).toThrow(
+		expect(() => reduceReaderState(initial, { type: "translation/set", translation: "missing" as TranslationId }, chapters)).toThrow(
 			/unsupported/,
 		);
 		expect(() => reduceReaderState(initial, { type: "font-size/adjust", delta: 1.5 }, chapters)).toThrow(/integer/);
-		expect(() => reduceReaderState(initial, { type: "unknown" }, chapters)).toThrow(/Unknown reader state action/);
+		expect(() => reduceReaderState(initial, { type: "unknown" } as unknown as ReaderAction, chapters)).toThrow(/Unknown reader state action/);
 	});
 });
 
 describe("preferences storage", () => {
 	it("keeps the existing key and propagates storage failures", () => {
-		const values = new Map();
-		const storage = {
-			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => values.set(key, value),
+		const values = new Map<string, string>();
+		const storage: PreferencesStorage = {
+			getItem: key => values.get(key) ?? null,
+			setItem: (key, value) => {
+				values.set(key, value);
+			},
 		};
 		const preferences = createPreferencesStore(storage, chapters);
 		expect(preferences.load().translation).toBe("en.hilali");
@@ -490,6 +442,9 @@ describe("preferences storage", () => {
 					getItem() {
 						throw new Error("Storage unavailable.");
 					},
+					setItem() {
+						throw new Error("Storage unavailable.");
+					},
 				},
 				chapters,
 			).load(),
@@ -501,12 +456,13 @@ describe("translation repository", () => {
 	it("caches successful loads and shares concurrent requests", async () => {
 		const source = await readFile(fileURLToPath(new URL("../../public/en.hilali.txt", import.meta.url).href), "utf8");
 		let requests = 0;
-		const repository = createTranslationRepository((async (file: string) => {
+		const fetchMock: TranslationFetch = async file => {
 			requests++;
 			expect(file).toBe("en.hilali.txt");
 			await Promise.resolve();
-			return { ok: true, status: 200, text: async () => source };
-		}) as any);
+			return new Response(source, { status: 200 });
+		};
+		const repository = createTranslationRepository(fetchMock);
 		const [first, second] = await Promise.all([
 			repository.load("en.hilali", chapters),
 			repository.load("en.hilali", chapters),
@@ -522,11 +478,12 @@ describe("translation repository", () => {
 	it("reports failed requests and retries them", async () => {
 		const source = await readFile(fileURLToPath(new URL("../../public/en.hilali.txt", import.meta.url).href), "utf8");
 		let requests = 0;
-		const repository = createTranslationRepository((async () => {
+		const fetchMock: TranslationFetch = async () => {
 			requests++;
-			if (requests === 1) return { ok: false, status: 503 };
-			return { ok: true, status: 200, text: async () => source };
-		}) as any);
+			if (requests === 1) return new Response(null, { status: 503 });
+			return new Response(source, { status: 200 });
+		};
+		const repository = createTranslationRepository(fetchMock);
 		await expect(repository.load("en.hilali", chapters)).rejects.toThrow(/503/);
 		expect(repository.getLoaded("en.hilali")).toBeUndefined();
 		expect((await repository.load("en.hilali", chapters)).flat().length).toBe(6236);

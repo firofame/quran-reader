@@ -5,7 +5,7 @@ export default defineConfig({
 	test: {
 		projects: [
 			{
-				// Worker and static asset tests run inside the Workers runtime.
+				// Worker tests run inside the Workers runtime.
 				plugins: [
 					cloudflareTest({ wrangler: { configPath: "./wrangler.jsonc" } }),
 				],
@@ -15,7 +15,8 @@ export default defineConfig({
 				},
 			},
 			{
-				// The reader modules are plain browser JavaScript, so they are tested in Node.
+				// The reader modules are fully typed, so they are tested in Node
+				// with the same strict types as the app.
 				test: {
 					name: "node",
 					include: ["test/node/**/*.spec.ts"],

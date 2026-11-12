@@ -36,9 +36,17 @@ jspm_packages/
 
 .DS_Store
 
+# Vite build output
+
+dist/
+
 # wrangler project
 
 .dev.vars*
 !.dev.vars.example
 .env*
 .wrangler/
+
+# ZCode local state
+
+.zcode/

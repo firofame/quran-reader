@@ -6,18 +6,15 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "quran",
 	"account_id": "d2c3c656cbf2f4e32a133ab2fa3dcd5a",
-	"main": "src/index.ts",
+	"main": "worker/index.ts",
 	"compatibility_date": "2026-11-10",
 	"compatibility_flags": ["global_fetch_strictly_public"],
 	/**
-	 * The reader is a static site served by Workers Static Assets.
-	 * https://developers.cloudflare.com/workers/static-assets/
+	 * The Vite build serves the reader as a single-page application.
+	 * https://developers.cloudflare.com/workers/vite-plugin/
 	 */
 	"assets": {
-		// The path to the directory containing the `index.html` file to be served at `/`
-		"directory": "./public",
-		"html_handling": "auto-trailing-slash",
-		"not_found_handling": "none"
+		"not_found_handling": "single-page-application"
 	},
 	/**
 	 * The sync feature has been removed. These migrations keep the deployment

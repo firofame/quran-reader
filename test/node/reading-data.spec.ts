@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import vm from "node:vm";
-import { createChapters, parseTranslation } from "../../public/reader.js";
+import { createChapters, parseTranslation } from "../../src/lib/reader";
 import {
 	createDefaultReadingData,
 	DEFAULT_PRAYER_TIMES,
@@ -18,33 +17,32 @@ import {
 	getTodayStats,
 	IQAMA_REMINDER_OFFSET_MINUTES,
 	normalizeReadingData,
+	pendingEarlierRukus,
 	PRAYERS,
 	READER_SCHEMA_VERSION,
 	recordRukuCompletion,
 	recordRukusAsRead,
 	recordVerseVisit,
 	resolveStartupPosition,
-} from "../../public/reading-data.js";
+} from "../../src/lib/reading-data";
+import { QuranData } from "../../src/lib/quran-data";
 
-const context: any = vm.createContext({});
-vm.runInContext(await readFile(fileURLToPath(new URL("../../public/quran-data.js", import.meta.url).href), "utf8"), context);
-const data = context.QuranData;
-const chapters = createChapters(Array.from(data.Sura));
+const data = QuranData;
+const chapters = createChapters(data.Sura);
 const rukus = getRukuIndex(data, chapters);
 
 describe("Tanzil metadata", () => {
 	it("uses the 556 ruku convention with 40 rukus in Al-Baqarah", () => {
 		const counts = Array(114).fill(0);
 		for (const ruku of rukus) counts[ruku.chapter - 1]++;
-		const bundledCounts = Array.from(data.Sura).slice(1, 115).map((row: any) => row[3]);
+		const bundledCounts = data.Sura.slice(1, 115).map(row => row[3]);
 		expect(rukus.length).toBe(556);
 		expect(counts.reduce((total, count) => total + count, 0)).toBe(556);
 		expect(counts).toEqual(bundledCounts);
 		expect(counts[1]).toBe(40);
 		expect(rukus[0].start).toEqual({ chapter: 1, verse: 1 });
-		expect(rukus.at(-1).end).toEqual({ chapter: 114, verse: 6 });
+		expect(rukus.at(-1)!.end).toEqual({ chapter: 114, verse: 6 });
 	});
-
 });
 
 describe("reading history", () => {
@@ -56,7 +54,6 @@ describe("reading history", () => {
 
 		let reading = createDefaultReadingData();
 		reading = { ...reading, settings: { ...reading.settings, dailyTarget: 3 } };
-		const rukus = getRukuIndex(data, chapters);
 		reading = recordRukuCompletion(reading, rukus[0], new Date(2026, 10, 10, 5));
 		const stats = getTodayStats(reading, new Date(2026, 10, 10, 5));
 		expect({ target: stats.target, completed: stats.completed, reached: stats.reached }).toEqual({
@@ -76,7 +73,7 @@ describe("reading history", () => {
 		expect(reading.totals.readingDays).toBe(1);
 		expect(reading.activityByDay["2026-11-10"].active).toBe(true);
 
-		const ruku = findRuku({ chapter: 1, verse: 1 }, rukus);
+		const ruku = findRuku({ chapter: 1, verse: 1 }, rukus)!;
 		reading = recordRukuCompletion(reading, ruku, new Date(2026, 10, 10, 8, 3));
 		reading = recordRukuCompletion(reading, ruku, new Date(2026, 10, 10, 9));
 		expect(reading.completedRukuIds).toEqual([1]);
@@ -109,7 +106,7 @@ describe("reading history", () => {
 			chapters,
 		);
 		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
-		expect(migrated.settings.dayModes).toBeUndefined();
+		expect(Object.hasOwn(migrated.settings, "dayModes")).toBe(false);
 		expect(migrated.sessions.map(session => session.rukuId)).toEqual([1, 2, 3]);
 		expect(migrated.sessions.every(session => !Object.hasOwn(session, "mode"))).toBe(true);
 		expect(Object.hasOwn(migrated.activityByDay["2026-11-10"], "modeCounts")).toBe(false);
@@ -132,10 +129,10 @@ describe("reading history", () => {
 		expect(migrated.version).toBe(READER_SCHEMA_VERSION);
 		expect(migrated.completedRukuIds).toEqual([1]);
 		expect(migrated.settings.dailyTarget).toBe(5);
-		expect(migrated.settings.dayBoundaryHour).toBeUndefined();
-		expect(migrated.settings.anchors).toBeUndefined();
-		expect(migrated.settings.prayerTimes).toEqual(DEFAULT_PRAYER_TIMES);
+		expect(Object.hasOwn(migrated.settings, "dayBoundaryHour")).toBe(false);
+		expect(Object.hasOwn(migrated.settings, "anchors")).toBe(false);
 		expect(Object.hasOwn(migrated.settings, "resumeAtNextUnread")).toBe(false);
+		expect(migrated.settings.prayerTimes).toEqual(DEFAULT_PRAYER_TIMES);
 	});
 
 	it("lists the five daily prayers with their adhan and iqama times", () => {
@@ -361,6 +358,14 @@ describe("backfill", () => {
 
 		expect(updated.completedRukuIds).toEqual([]);
 		expect(updated.totals.rukuRead).toBe(0);
+	});
+
+	it("counts the rukus that are not recorded as read yet", () => {
+		const reading = createDefaultReadingData();
+		const caughtUp = recordRukusAsRead(reading, 33, rukus);
+		expect(pendingEarlierRukus(reading, 33, rukus)).toBe(32);
+		expect(pendingEarlierRukus(caughtUp, 33, rukus)).toBe(0);
+		expect(pendingEarlierRukus(reading, null, rukus)).toBe(0);
 	});
 });
 

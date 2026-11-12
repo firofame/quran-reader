@@ -10,7 +10,6 @@
   --line: #e2e1d8;
   --green: #2e6e4e;
   --green-soft: #e6efe8;
-  --spoken: #d9ead9;
   --gold: #b59a5e;
   --hover: #eeede6;
   --reading-size: 21px;
@@ -42,7 +41,6 @@
   --line: #2a332a;
   --green: #6bba8a;
   --green-soft: #1e2d22;
-  --spoken: #2f4a37;
   --gold: #d4b870;
   --hover: #1f2720;
   --shadow-card: 0 1px 3px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.3);
@@ -184,13 +182,10 @@ select option { background: var(--paper); color: var(--text); }
 .verse-body { min-width: 0; }
 .verse-body > p { margin: 0; color: var(--text); font-family: var(--reading-serif); font-size: var(--reading-size); font-weight: 400; line-height: 1.7; letter-spacing: .005em; text-align: start; overflow-wrap: anywhere; }
 .verse-body > p + p { margin-block-start: 28px; }
-.word { border-radius: 3px; }
-.word.speaking { background: var(--spoken); box-shadow: 0 0 0 2px var(--spoken); }
 .verse-audio-action { display: flex; align-items: center; gap: 2px; }
 .verse-audio-action button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; color: var(--muted); }
 .verse-audio-action button:hover:not(:disabled) { color: var(--green); background: var(--green-soft); }
 .verse-audio-action button svg { width: 13px; height: 13px; }
-.verse-audio-action button[data-speak-verse] svg { width: 15px; height: 15px; }
 
 /* Focused mode */
 #reading-content.focused { display: flex; flex-direction: column; padding-top: 0; scroll-margin-top: calc(var(--topbar-height) + 12px); }

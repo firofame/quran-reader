@@ -41,5 +41,4 @@ jspm_packages/
 .dev.vars*
 !.dev.vars.example
 .env*
-!.env.example
 .wrangler/

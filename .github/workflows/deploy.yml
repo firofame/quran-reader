@@ -40,6 +40,9 @@ jobs:
           npm run check
           npm test
 
+      - name: Build the reader bundle
+        run: npm run build
+
       - name: Verify maintainer authorization
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -87,6 +90,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build the reader bundle
+        run: npm run build
 
       - name: Find the current Worker name
         id: worker

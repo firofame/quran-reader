@@ -1,8 +1,9 @@
 /**
  * Quran Reader — Cloudflare Worker.
  *
- * The reader itself is served from `public/` as Workers Static Assets. This
- * script answers the health check and the JSON fallback for unknown paths.
+ * The reader itself is built by Vite and served as Workers Static Assets
+ * through the Cloudflare Vite plugin. This script answers the health check
+ * and the JSON fallback for unknown paths.
  */
 
 export default {

@@ -284,11 +284,12 @@ select option { background: var(--paper); color: var(--text); }
 .card-heading-row h2 { margin-bottom: 4px; }
 .card-heading-row p { margin: 0; color: var(--muted); font-size: 10px; }
 
-.prayer-editor { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.prayer-editor-row { display: flex; align-items: center; }
-.prayer-editor-field { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 12px; color: var(--text); font-size: 11px; }
-.prayer-editor-name { font-weight: 500; }
-.prayer-editor-row input { min-height: 36px; min-width: 0; width: 135px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--text); }
+.prayer-editor { display: flex; flex-direction: column; gap: 8px; margin: 18px 0 16px; }
+.prayer-editor-head, .prayer-editor-row { display: grid; grid-template-columns: 1fr 142px 142px; align-items: center; gap: 8px; }
+.prayer-editor-head { color: var(--muted); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+.prayer-editor-head span:not(:first-child) { text-align: center; }
+.prayer-editor-name { color: var(--text); font-size: 11px; font-weight: 500; }
+.prayer-editor-row input { min-height: 36px; min-width: 0; width: 100%; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--text); }
 
 .muted-copy { color: var(--muted); font-size: 10px; line-height: 1.6; }
 
@@ -368,7 +369,7 @@ select option { background: var(--paper); color: var(--text); }
   .target-reached-label { flex-basis: 100%; }
   .ruku-progress-label { font-size: 8px; }
   .settings-grid { grid-template-columns: 1fr; }
-  .prayer-editor-row input { width: 110px; }
+  .prayer-editor-head, .prayer-editor-row { grid-template-columns: 1fr 118px 118px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

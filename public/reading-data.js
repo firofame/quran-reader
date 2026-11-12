@@ -1,4 +1,4 @@
-export const READER_SCHEMA_VERSION = 10;
+export const READER_SCHEMA_VERSION = 11;
 export const DEFAULT_RUKU_COUNT = 556;
 export const DEFAULT_DAILY_TARGET = 5;
 export const DAY_BOUNDARY_HOUR = 0;
@@ -12,8 +12,17 @@ export const PRAYERS = [
   { id: "isha", name: "Isha" },
 ];
 
-/** The times the prayers start with, until the reader sets their own. */
+/** The adhan and iqama times of the prayers, until the reader sets their own. */
 export const DEFAULT_PRAYER_TIMES = {
+  fajr: { adhan: "04:58", iqama: "05:43" },
+  dhuhr: { adhan: "12:11", iqama: "13:15" },
+  asr: { adhan: "15:32", iqama: "17:00" },
+  maghrib: { adhan: "18:03", iqama: "18:06" },
+  isha: { adhan: "19:23", iqama: "20:30" },
+};
+
+/** The placeholder prayer times of the first version of the prayer list. */
+const RETIRED_PRAYER_TIMES = {
   fajr: "05:00",
   dhuhr: "12:30",
   asr: "15:30",
@@ -40,11 +49,15 @@ export function createDefaultReadingData() {
     sessions: [],
     settings: {
       dailyTarget: DEFAULT_DAILY_TARGET,
-      prayerTimes: { ...DEFAULT_PRAYER_TIMES },
+      prayerTimes: createDefaultPrayerTimes(),
       remindersEnabled: false,
       shortcutsSeen: false,
     },
   };
+}
+
+function createDefaultPrayerTimes() {
+  return Object.fromEntries(PRAYERS.map(prayer => [prayer.id, { ...DEFAULT_PRAYER_TIMES[prayer.id] }]));
 }
 
 function isObject(value) {
@@ -91,16 +104,30 @@ function cleanActivity(row, chapters, rukuCount) {
 
 /**
  * Keeps the saved prayer times and falls back to the default time of every
- * prayer whose saved time is missing or not a valid time of day.
+ * prayer whose saved time is missing or not a valid time of day. Times saved
+ * by the first version of the prayer list are replaced by the current
+ * defaults, unless the reader had changed them.
  */
 function cleanPrayerTimes(value) {
-  const times = { ...DEFAULT_PRAYER_TIMES };
-  if (!isObject(value)) return times;
+  const times = {};
   for (const prayer of PRAYERS) {
-    const time = value[prayer.id];
-    if (typeof time === "string" && TIME_KEY.test(time)) times[prayer.id] = time;
+    const defaults = DEFAULT_PRAYER_TIMES[prayer.id];
+    const saved = isObject(value) ? value[prayer.id] : null;
+    if (isObject(saved)) {
+      times[prayer.id] = {
+        adhan: validTime(saved.adhan) ? saved.adhan : defaults.adhan,
+        iqama: validTime(saved.iqama) ? saved.iqama : defaults.iqama,
+      };
+      continue;
+    }
+    const adhan = validTime(saved) && saved !== RETIRED_PRAYER_TIMES[prayer.id] ? saved : defaults.adhan;
+    times[prayer.id] = { adhan, iqama: defaults.iqama };
   }
   return times;
+}
+
+function validTime(value) {
+  return typeof value === "string" && TIME_KEY.test(value);
 }
 
 export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COUNT) {
@@ -149,13 +176,20 @@ export function normalizeReadingData(raw, chapters, rukuCount = DEFAULT_RUKU_COU
 
 /**
  * Lists the five prayers in the order they occur in the day, each with the
- * time the reader has set for it.
+ * adhan and iqama times the reader has set for it.
  */
 export function getPrayerSchedule(readingData) {
   const times = readingData?.settings?.prayerTimes ?? {};
   return PRAYERS
-    .map(prayer => ({ ...prayer, time: times[prayer.id] ?? DEFAULT_PRAYER_TIMES[prayer.id] }))
-    .sort((left, right) => left.time.localeCompare(right.time));
+    .map(prayer => {
+      const saved = times[prayer.id] ?? {};
+      return {
+        ...prayer,
+        adhan: saved.adhan ?? DEFAULT_PRAYER_TIMES[prayer.id].adhan,
+        iqama: saved.iqama ?? DEFAULT_PRAYER_TIMES[prayer.id].iqama,
+      };
+    })
+    .sort((left, right) => left.adhan.localeCompare(right.adhan));
 }
 
 export function getDayKey(date = new Date()) {

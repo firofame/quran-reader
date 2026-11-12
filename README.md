@@ -54,10 +54,11 @@ without a Cloudflare account.
 - Adjust text size and switch between light and dark themes in Settings. A small
   play/pause icon beside each ayah reference plays its Arabic recitation.
 - Settings lists the five daily prayers, Fajr, Dhuhr, Asr, Maghrib, and Isha.
-  Their times can be adjusted to match your location and season; the prayers
-  themselves are fixed and cannot be added or removed. The reader shows a chip
-  for each prayer and marks it as done when a reading session happened during
-  it.
+  Each prayer keeps its adhan and iqama times, which can be adjusted to match
+  your location and season; the prayers themselves are fixed and cannot be
+  added or removed. The reader shows a chip for each prayer, marks it as done
+  when a reading session happened during it, and can remind you at both the
+  adhan and the iqama.
 - Read in a centered column no wider than 680px, set in Georgia at 21px with
   1.7 line height, regular weight, and subtle letter spacing. The warm paper tone
   reduces glare; phones up to 430px use 20px text. Text-size controls still apply.

@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DAY_BOUNDARY_HOUR, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, getDayKey, getPrayerSchedule, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DAY_BOUNDARY_HOUR, DEFAULT_PRAYER_TIMES, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, getDayKey, getPrayerSchedule, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -479,13 +479,14 @@ function renderProgressSummary() {
   const chips = $("prayer-chips");
   chips.replaceChildren();
   const prayers = getPrayerSchedule(readingData);
-  for (const prayer of prayers) {
+  const windows = prayerWindows(prayers, readingData);
+  for (const slot of windows) {
     const button = document.createElement("button");
-    const done = prayerWasUsedToday(prayer, prayers, readingData);
+    const done = slot.read;
     button.type = "button";
     button.className = `prayer-chip${done ? " is-done" : ""}`;
-    button.textContent = `${prayer.name} · ${done ? "done" : prayer.time}`;
-    button.title = done ? `A reading session happened during ${prayer.name}` : `${prayer.name} at ${prayer.time}`;
+    button.textContent = done ? `${slot.name} · done` : `${slot.name} · ${slot.adhan} → ${slot.iqama}`;
+    button.title = `${slot.name}: adhan ${slot.adhan}, iqama ${slot.iqama}`;
     button.addEventListener("click", () => {
       if (activePage !== "reader") showPage("reader");
       $("reading-content").scrollIntoView({ block: "center", behavior: "smooth" });
@@ -494,30 +495,36 @@ function renderProgressSummary() {
   }
 }
 
-/** Reports whether a reading session happened between this prayer and the next one. */
-function prayerWasUsedToday(prayer, prayers, readingData) {
-  const now = new Date();
+/**
+ * Places every prayer of the current reading day on the clock, from its adhan
+ * to the adhan of the next prayer, and records whether the reader read during
+ * it.
+ */
+function prayerWindows(prayers, readingData, date = new Date()) {
   const boundary = DAY_BOUNDARY_HOUR;
-  const today = getDayKey(now);
-  const current = prayers.findIndex(item => item.id === prayer.id);
-  if (current < 0 || !prayers.length) return false;
-  const next = prayers[(current + 1) % prayers.length];
+  const today = getDayKey(date);
   const [year, month, day] = today.split("-").map(Number);
   const dayStart = new Date(year, month - 1, day, boundary).getTime();
-  const dayEndDate = new Date(year, month - 1, day + 1, boundary);
-  const dayEnd = dayEndDate.getTime();
-  const occurrenceInLogicalDay = time => {
+  const dayEnd = new Date(year, month - 1, day + 1, boundary).getTime();
+  const occurrence = time => {
     const [hour, minute] = time.split(":").map(Number);
-    const date = new Date(year, month - 1, day, hour, minute);
-    if (hour < boundary) date.setDate(date.getDate() + 1);
-    return date.getTime();
+    const value = new Date(year, month - 1, day, hour, minute);
+    if (hour < boundary) value.setDate(value.getDate() + 1);
+    return value.getTime();
   };
-  const start = occurrenceInLogicalDay(prayer.time);
-  let end = occurrenceInLogicalDay(next.time);
-  if (end <= start) end += 24 * 60 * 60 * 1000;
-  end = Math.min(end, dayEnd);
-  const starts = readingData.activityByDay[today]?.sessionStarts ?? [];
-  return start >= dayStart && starts.some(timestamp => timestamp >= start && timestamp < end);
+  const sessions = readingData.activityByDay[today]?.sessionStarts ?? [];
+  return prayers.map((prayer, index) => {
+    const next = prayers[(index + 1) % prayers.length];
+    const start = occurrence(prayer.adhan);
+    let end = occurrence(next.adhan);
+    if (end <= start) end += 24 * 60 * 60 * 1000;
+    return {
+      ...prayer,
+      start,
+      end: Math.min(end, dayEnd),
+      read: start >= dayStart && sessions.some(timestamp => timestamp >= start && timestamp < end),
+    };
+  });
 }
 
 function showPage(page) {
@@ -555,29 +562,39 @@ function renderSettings() {
 }
 
 /**
- * Lists the five daily prayers with their times. The prayers are fixed, so
- * only the time of each one can be changed.
+ * Lists the five daily prayers with their adhan and iqama times. The prayers
+ * are fixed, so only the times of each one can be changed.
  */
 function renderPrayerEditor() {
   const container = $("prayer-editor");
   if (!container) return;
   const times = state.readingData.settings.prayerTimes;
   container.replaceChildren();
+  const head = document.createElement("div");
+  head.className = "prayer-editor-head";
+  for (const label of ["Prayer", "Adhan", "Iqama"]) {
+    const cell = document.createElement("span");
+    cell.textContent = label;
+    head.append(cell);
+  }
+  container.append(head);
   for (const prayer of PRAYERS) {
+    const saved = times[prayer.id] ?? DEFAULT_PRAYER_TIMES[prayer.id];
     const row = document.createElement("div");
     row.className = "prayer-editor-row";
     row.dataset.prayerId = prayer.id;
-    const label = document.createElement("label");
-    label.className = "prayer-editor-field";
     const name = document.createElement("span");
     name.className = "prayer-editor-name";
     name.textContent = prayer.name;
-    const time = document.createElement("input");
-    time.type = "time";
-    time.value = times[prayer.id] ?? "";
-    time.dataset.prayerTime = "";
-    label.append(name, time);
-    row.append(label);
+    row.append(name);
+    for (const [field, attribute] of [["adhan", "prayerAdhan"], ["iqama", "prayerIqama"]]) {
+      const time = document.createElement("input");
+      time.type = "time";
+      time.value = saved[field] ?? "";
+      time.setAttribute("aria-label", `${prayer.name} ${field} time`);
+      time.dataset[attribute] = "";
+      row.append(time);
+    }
     container.append(row);
   }
 }
@@ -615,11 +632,27 @@ function initializeSettingsControls() {
     const row = event.target.closest("[data-prayer-id]");
     if (!row) return;
     const prayerId = row.dataset.prayerId;
-    const time = row.querySelector("[data-prayer-time]").value;
+    const field = event.target.matches("[data-prayer-adhan]") ? "adhan" : "iqama";
+    const time = event.target.value;
     if (!time) return;
-    updateSetting("prayerTimes", { ...state.readingData.settings.prayerTimes, [prayerId]: time });
+    const current = state.readingData.settings.prayerTimes[prayerId] ?? DEFAULT_PRAYER_TIMES[prayerId];
+    updateSetting("prayerTimes", {
+      ...state.readingData.settings.prayerTimes,
+      [prayerId]: { ...current, [field]: time },
+    });
     schedulePrayerReminder();
   });
+}
+
+/** The adhan and iqama moments of every prayer, with the moment they pass. */
+function prayerEvents(prayers, date = new Date()) {
+  return prayers.flatMap(prayer => ["adhan", "iqama"].map(kind => {
+    const time = kind === "adhan" ? prayer.adhan : prayer.iqama;
+    const [hour, minute] = time.split(":").map(Number);
+    const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
+    if (moment <= date) moment.setDate(moment.getDate() + 1);
+    return { ...prayer, kind, time, fireAt: moment.getTime() };
+  }));
 }
 
 function schedulePrayerReminder() {
@@ -628,18 +661,20 @@ function schedulePrayerReminder() {
   if (!settings.remindersEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
   const prayers = getPrayerSchedule(state.readingData);
   const now = new Date();
-  const next = prayers.map(prayer => {
-    const [hour, minute] = prayer.time.split(":").map(Number);
-    const time = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
-    if (time <= now) time.setDate(time.getDate() + 1);
-    return { ...prayer, fireAt: time.getTime() };
-  }).sort((a, b) => a.fireAt - b.fireAt)[0];
+  const next = prayerEvents(prayers, now).sort((a, b) => a.fireAt - b.fireAt)[0];
+  if (!next) return;
   reminderTimer = setTimeout(() => {
     const currentPrayers = getPrayerSchedule(state.readingData);
-    if (!prayerWasUsedToday(next, currentPrayers, state.readingData)) {
-      const currentRuku = findRuku(state.position, rukus);
-      const chapter = chapters[state.position.chapter - 1];
-      const notification = new Notification(`Next up: ${chapter.name}, ruku ${currentRuku?.localNumber ?? 1}. One ruku, whenever you’re ready.`);
+    const slot = prayerWindows(currentPrayers, state.readingData).find(item => item.id === next.id);
+    const currentRuku = findRuku(state.position, rukus);
+    const chapter = chapters[state.position.chapter - 1];
+    const message = next.kind === "adhan"
+      ? `${next.name} adhan at ${next.adhan}. Next up: ${chapter.name}, ruku ${currentRuku?.localNumber ?? 1}. One ruku, whenever you’re ready.`
+      : `${next.name} iqama at ${next.iqama}. Time to head to the masjid.`;
+    // The iqama nudge is about reaching the masjid, so it always fires. The
+    // adhan nudge waits for the prayer window when the reader already read.
+    if (next.kind === "iqama" || !(slot?.read ?? false)) {
+      const notification = new Notification(message);
       notification.onclick = () => { window.focus(); notification.close(); };
     }
     schedulePrayerReminder();

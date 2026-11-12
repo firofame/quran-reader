@@ -37,6 +37,9 @@ let reminderTimer;
 let countdownTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
+let activeSpeechButton = null;
+let speechRequestId = 0;
+let speechObjectUrl = null;
 let currentAyah = null;
 
 function notify(message, persistent = false) {
@@ -144,6 +147,7 @@ function playVerseAudio(position, button) {
   const ayahNumber = chapter.start + position.verse;
   const source = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${ayahNumber}.mp3`;
   stopVerseAudio();
+  stopTranslationAudio();
   const request = ++audioRequestId;
   activeAudioButton = button;
   setAudioButtonState(button, "loading");
@@ -191,6 +195,105 @@ function toggleVerseAudio(position, button) {
     finishVersePlayback(request);
     notify("The recitation could not be opened. Check your connection and try again.");
   });
+}
+
+const speechIcon = '<path d="M4 9.5h3.5L12 6v12L7.5 14.5H4z" fill="currentColor" stroke="none"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/>';
+const speechStopIcon = '<path d="M7 6h4v12H7zM13 6h4v12h-4z"/>';
+
+function setSpeechButtonState(button, status) {
+  const [chapter, verse] = button.dataset.speakVerse.split(":");
+  const labels = {
+    speak: `Read verse ${chapter}:${verse} aloud`,
+    stop: `Stop reading verse ${chapter}:${verse}`,
+    loading: `Preparing the reading for verse ${chapter}:${verse}`,
+  };
+  const path = status === "stop" ? speechStopIcon : speechIcon;
+  button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+  button.setAttribute("aria-label", labels[status]);
+  button.title = labels[status];
+  button.disabled = status === "loading";
+}
+
+/** Stops the reading of a translation and frees the audio it was using. */
+function stopTranslationAudio() {
+  speechRequestId++;
+  const audio = $("translation-audio");
+  if (audio) {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+  }
+  if (speechObjectUrl) {
+    URL.revokeObjectURL(speechObjectUrl);
+    speechObjectUrl = null;
+  }
+  if (activeSpeechButton?.isConnected) {
+    setSpeechButtonState(activeSpeechButton, "speak");
+  }
+  activeSpeechButton = null;
+}
+
+/** The translation of the ayah on screen, as the single passage to read. */
+function spokenTranslation(position) {
+  if (!currentAyah || currentAyah.chapter !== position.chapter || currentAyah.verse !== position.verse) return "";
+  return currentAyah.text.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Asks the Worker to read the translation of an ayah, then plays it.
+ *
+ * The ElevenLabs key stays in the Worker, so the browser only ever receives
+ * the audio.
+ */
+async function readVerseAloud(position, button) {
+  const audio = $("translation-audio");
+  const text = spokenTranslation(position);
+  if (!text) {
+    notify("This ayah is not ready to be read aloud yet.");
+    return;
+  }
+  stopVerseAudio();
+  stopTranslationAudio();
+  const request = ++speechRequestId;
+  activeSpeechButton = button;
+  setSpeechButtonState(button, "loading");
+  try {
+    const response = await fetch("/api/speech", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (request !== speechRequestId) return;
+    if (!response.ok) throw new Error(`The reading failed (HTTP ${response.status}).`);
+    const recording = await response.blob();
+    if (request !== speechRequestId) return;
+    speechObjectUrl = URL.createObjectURL(recording);
+    audio.src = speechObjectUrl;
+    audio.currentTime = 0;
+    audio.onended = () => { if (request === speechRequestId) stopTranslationAudio(); };
+    audio.onerror = () => {
+      if (request !== speechRequestId) return;
+      stopTranslationAudio();
+      notify("The reading could not be played.");
+    };
+    await audio.play();
+    if (request !== speechRequestId) return;
+    setSpeechButtonState(button, "stop");
+  } catch (error) {
+    if (request !== speechRequestId) return;
+    console.warn("Unable to read the translation aloud:", error);
+    stopTranslationAudio();
+    notify("The translation could not be read aloud. Please try again.");
+  }
+}
+
+function toggleVerseReading(position, button) {
+  const audio = $("translation-audio");
+  if (activeSpeechButton === button && audio && !audio.paused) {
+    stopTranslationAudio();
+    return;
+  }
+  readVerseAloud(position, button);
 }
 
 function updateDocumentChrome() {
@@ -410,7 +513,11 @@ function createVerse(verse) {
   listen.type = "button";
   listen.dataset.listenVerse = `${verse.chapter}:${verse.verse}`;
   setAudioButtonState(listen, "play");
-  actions.append(listen);
+  const speak = document.createElement("button");
+  speak.type = "button";
+  speak.dataset.speakVerse = `${verse.chapter}:${verse.verse}`;
+  setSpeechButtonState(speak, "speak");
+  actions.append(listen, speak);
   reference.append(number, actions);
   const textContainer = document.createElement("div");
   textContainer.className = "verse-body";
@@ -711,7 +818,10 @@ async function loadReading({ scroll = false } = {}) {
 }
 
 function savePosition(position) {
-  if (position.chapter !== state.position.chapter || position.verse !== state.position.verse) stopVerseAudio();
+  if (position.chapter !== state.position.chapter || position.verse !== state.position.verse) {
+    stopVerseAudio();
+    stopTranslationAudio();
+  }
   state = reduceReaderState(state, { type: "position/set", position }, chapters);
   history.replaceState(null, "", `#${position.chapter}:${position.verse}`);
   persist();
@@ -775,6 +885,11 @@ function initializeFeatureInteractions() {
     if (listen) {
       const [chapter, verse] = listen.dataset.listenVerse.split(":").map(Number);
       toggleVerseAudio({ chapter, verse }, listen);
+    }
+    const speak = event.target.closest("[data-speak-verse]");
+    if (speak) {
+      const [chapter, verse] = speak.dataset.speakVerse.split(":").map(Number);
+      toggleVerseReading({ chapter, verse }, speak);
     }
   });
 

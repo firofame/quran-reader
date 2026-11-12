@@ -142,4 +142,16 @@ describe("published assets", () => {
 			expect.arrayContaining(["icon-192.png", "icon-512.png"]),
 		);
 	});
+
+	it("reads the translation aloud through the Worker", async () => {
+		const app = await readPublicFile("app.js");
+		const html = await readPublicFile("index.html");
+		// The browser asks the Worker for the audio, so the ElevenLabs key
+		// never reaches the reader.
+		expect(app).toMatch(/fetch\("\/api\/speech"/);
+		expect(app).toMatch(/dataset\.speakVerse/);
+		// The reading has an element of its own, apart from the recitation.
+		expect(html).toMatch(/id="translation-audio"/);
+		expect(html).toMatch(/id="verse-audio"/);
+	});
 });

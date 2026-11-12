@@ -112,6 +112,7 @@ describe("published assets", () => {
 		const ruku = readerPage.indexOf('id="ruku-progress"');
 		expect(today).toBeLessThan(countdown);
 		expect(countdown).toBeLessThan(ruku);
+		expect(html).toMatch(/Today: <span id="today-completed">0<\/span> \/ <span id="today-target">5<\/span> Ruku completed/);
 	});
 
 	it("keeps overall ruku progress markup and progress bars out of the reader", async () => {

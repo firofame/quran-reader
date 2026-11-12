@@ -5,11 +5,14 @@ import vm from "node:vm";
 import { createChapters, parseTranslation } from "../../public/reader.js";
 import {
 	createDefaultReadingData,
+	DEFAULT_PRAYER_TIMES,
 	findRuku,
 	getDayKey,
+	getPrayerSchedule,
 	getRukuIndex,
 	getTodayStats,
 	normalizeReadingData,
+	PRAYERS,
 	READER_SCHEMA_VERSION,
 	recordRukuCompletion,
 	recordRukusAsRead,
@@ -124,8 +127,38 @@ describe("reading history", () => {
 		expect(migrated.completedRukuIds).toEqual([1]);
 		expect(migrated.settings.dailyTarget).toBe(5);
 		expect(migrated.settings.dayBoundaryHour).toBeUndefined();
-		expect(migrated.settings.anchors[0].name).toBe("After Fajr");
+		expect(migrated.settings.anchors).toBeUndefined();
+		expect(migrated.settings.prayerTimes).toEqual(DEFAULT_PRAYER_TIMES);
 		expect(Object.hasOwn(migrated.settings, "resumeAtNextUnread")).toBe(false);
+	});
+
+	it("lists the five daily prayers and keeps their saved times", () => {
+		expect(PRAYERS.map(prayer => prayer.name)).toEqual(["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]);
+
+		const migrated = normalizeReadingData(
+			{
+				version: 10,
+				settings: {
+					prayerTimes: { fajr: "04:45", dhuhr: "13:05", asr: "not-a-time", maghrib: "18:20", isha: "19:45" },
+				},
+			},
+			chapters,
+		);
+		expect(migrated.settings.prayerTimes.fajr).toBe("04:45");
+		expect(migrated.settings.prayerTimes.dhuhr).toBe("13:05");
+		expect(migrated.settings.prayerTimes.maghrib).toBe("18:20");
+		expect(migrated.settings.prayerTimes.isha).toBe("19:45");
+		// An unusable time falls back to the default of that prayer.
+		expect(migrated.settings.prayerTimes.asr).toBe(DEFAULT_PRAYER_TIMES.asr);
+	});
+
+	it("orders the prayers by their times for the day", () => {
+		const reading = createDefaultReadingData();
+		const schedule = getPrayerSchedule(reading);
+		expect(schedule.map(prayer => prayer.id)).toEqual(["fajr", "dhuhr", "asr", "maghrib", "isha"]);
+
+		const moved = { ...reading, settings: { ...reading.settings, prayerTimes: { ...reading.settings.prayerTimes, fajr: "21:00" } } };
+		expect(getPrayerSchedule(moved).map(prayer => prayer.id)).toEqual(["dhuhr", "asr", "maghrib", "isha", "fajr"]);
 	});
 
 	it("migrates version 2 activity without dropping overall verse progress", () => {

@@ -11,7 +11,8 @@ translation.
   sajdas.
 - Resume the saved ayah and see overall and daily ruku progress. Reading
   progress, settings, and recent activity stay in this browser by default.
-- Daily progress review, manual reading anchors, and optional browser reminders.
+- Daily progress review, the five daily prayers with adjustable times, and
+  optional browser reminders.
 - One-ayah Arabic recitation is available from the play icon beside each ayah.
   Playback starts only after a direct click.
 - Installable PWA with an offline cache for the reader and the translation.
@@ -52,6 +53,11 @@ without a Cloudflare account.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes in Settings. A small
   play/pause icon beside each ayah reference plays its Arabic recitation.
+- Settings lists the five daily prayers, Fajr, Dhuhr, Asr, Maghrib, and Isha.
+  Their times can be adjusted to match your location and season; the prayers
+  themselves are fixed and cannot be added or removed. The reader shows a chip
+  for each prayer and marks it as done when a reading session happened during
+  it.
 - Read in a centered column no wider than 680px, set in Georgia at 21px with
   1.7 line height, regular weight, and subtle letter spacing. The warm paper tone
   reduces glare; phones up to 430px use 20px text. Text-size controls still apply.

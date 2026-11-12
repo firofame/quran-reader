@@ -76,6 +76,26 @@ describe("published assets", () => {
 		expect(settingsPage).toMatch(/id="mark-read-btn"/);
 	});
 
+	it("offers the five daily prayers instead of manual reading anchors", async () => {
+		const html = await readPublicFile("index.html");
+		// The prayers are fixed, so nothing can be added or removed by hand.
+		expect(html).not.toMatch(/id="add-anchor"/);
+		expect(html).not.toMatch(/id="anchor-editor"/);
+		expect(html).not.toMatch(/Reading anchors/);
+		expect(html).not.toMatch(/add-anchor/);
+		expect(html).toMatch(/id="prayer-editor"/);
+		expect(html).toMatch(/id="prayer-chips"/);
+		expect(html).toMatch(/Daily prayers/);
+	});
+
+	it("keeps the reader free of anchor markup", async () => {
+		const app = await readPublicFile("app.js");
+		const html = await readPublicFile("index.html");
+		for (const source of [app, html]) {
+			expect(source).not.toMatch(/anchor/i);
+		}
+	});
+
 	it("keeps the manifest and the icons in sync", async () => {
 		const manifest = JSON.parse(await readPublicFile("manifest.webmanifest"));
 		expect(manifest.start_url).toBe("./");

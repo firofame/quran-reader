@@ -1,4 +1,4 @@
-import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, splitTranslationParagraphs, findAyah, adjacentPosition, matchesChapter, decodeState, validPosition } from "./reader.js";
+import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseHash, splitTranslationParagraphs, splitTranslationGlosses, findAyah, adjacentPosition, matchesChapter, decodeState, validPosition } from "./reader.js";
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
@@ -419,7 +419,16 @@ function createVerse(verse) {
     const text = document.createElement("p");
     text.lang = language;
     text.dir = "auto";
-    text.textContent = paragraph;
+    for (const segment of splitTranslationGlosses(paragraph)) {
+      if (segment.gloss) {
+        const gloss = document.createElement("span");
+        gloss.className = "verse-gloss";
+        gloss.textContent = segment.text;
+        text.append(gloss);
+      } else {
+        text.append(segment.text);
+      }
+    }
     textContainer.append(text);
   }
   article.append(reference, textContainer);

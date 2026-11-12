@@ -87,19 +87,48 @@ export function parseTranslation(text, chapters) {
   return result;
 }
 
+export function splitTranslationGlosses(text) {
+  const segments = [];
+  let glossStart = -1;
+  let plainStart = 0;
+  let depth = 0;
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index];
+    if (character === "(" || character === "[") {
+      if (depth === 0) {
+        if (index > plainStart) segments.push({ text: text.slice(plainStart, index), gloss: false });
+        glossStart = index;
+      }
+      depth++;
+    } else if ((character === ")" || character === "]") && depth > 0) {
+      depth--;
+      if (depth === 0) {
+        segments.push({ text: text.slice(glossStart, index + 1), gloss: true });
+        plainStart = index + 1;
+      }
+    }
+  }
+  if (depth > 0) segments.push({ text: text.slice(glossStart), gloss: true });
+  else if (plainStart < text.length) segments.push({ text: text.slice(plainStart), gloss: false });
+  return segments;
+}
+
 export function splitTranslationParagraphs(text, language) {
   if (text.length < 500) return [text];
   const paragraphs = [];
   let paragraph = "";
   let quoted = false;
+  let depth = 0;
   for (const { segment } of new Intl.Segmenter(language, { granularity: "sentence" }).segment(text)) {
-    if (paragraph && paragraph.length + segment.length > 300 && !quoted) {
+    if (paragraph && paragraph.length + segment.length > 300 && !quoted && depth === 0) {
       paragraphs.push(paragraph);
       paragraph = "";
     }
     paragraph += segment;
     for (const character of segment) {
       if ('"\u201c\u201d'.includes(character)) quoted = !quoted;
+      if (character === "(" || character === "[") depth++;
+      else if ((character === ")" || character === "]") && depth > 0) depth--;
     }
   }
   if (paragraph) paragraphs.push(paragraph);

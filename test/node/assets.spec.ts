@@ -146,6 +146,16 @@ describe("published assets", () => {
 		expect(html).not.toMatch(/surah-progress/);
 	});
 
+	it("keeps the reader footer attribution markup out of the reader", async () => {
+		const app = await readPublicFile("app.js");
+		const html = await readPublicFile("index.html");
+		expect(html).not.toMatch(/class="reader-footer"/);
+		expect(html).not.toMatch(/id="attribution"/);
+		expect(html).not.toMatch(/metadata-credit/);
+		expect(html).not.toMatch(/A translation of the meanings of the Quran/);
+		expect(app).not.toMatch(/attribution/);
+	});
+
 	it("keeps the reader free of anchor markup", async () => {
 		const app = await readPublicFile("app.js");
 		const html = await readPublicFile("index.html");

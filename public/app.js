@@ -282,15 +282,6 @@ function renderHeading() {
   if (currentAyah && currentAyah.chapter !== chapter.id) currentAyah = null;
   $("chapter-heading").innerHTML = `<div class="chapter-heading-title"><h1>${chapter.id}. ${chapter.name}</h1><span class="sr-only">${chapter.meaning} · ${chapter.verses} ayahs · ${chapter.origin}</span></div><div class="chapter-heading-meta"><p class="chapter-meta-line"><span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div>`;
   renderReadingMetadata(currentAyah);
-  const translation = TRANSLATIONS[state.translation];
-  const attribution = $("attribution");
-  attribution.replaceChildren(document.createTextNode(`${translation.name} · `));
-  const source = document.createElement("a");
-  source.href = "https://tanzil.net/trans/";
-  source.target = "_blank";
-  source.rel = "noreferrer";
-  source.textContent = "Translation source: Tanzil";
-  attribution.append(source);
 }
 
 function renderVerses() {

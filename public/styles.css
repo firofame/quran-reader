@@ -215,13 +215,6 @@ select option { background: var(--paper); color: var(--text); }
 .pagination-button.next strong { font-weight: 600; }
 .pagination-button:hover:not(:disabled) strong { text-decoration: underline; text-underline-offset: 4px; }
 
-/* ─── Footer ───────────────────────────────────────────────────── */
-.reader-footer { text-align: center; margin-top: var(--reader-gutter); padding: 16px 24px 28px; color: var(--muted); }
-.reader-footer p { font-size: 9px; line-height: 1.8; margin: 7px 0 0; }
-.reader-footer a { text-decoration-color: var(--line); text-underline-offset: 3px; }
-.reader-footer a:hover { color: var(--green); }
-.reader-footer .metadata-credit { font-size: 8px; opacity: .85; }
-
 /* ─── Reading history ──────────────────────────────────────────── */
 .reading-history-block { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .reading-history-block p { flex: 1 1 220px; margin: 0; }
@@ -352,7 +345,6 @@ select option { background: var(--paper); color: var(--text); }
   .reader-font-control { margin-inline: 16px; }
   .pagination-button { gap: 7px; }
   .pagination-button strong { font-size: 15px; }
-  .reader-footer { padding: 18px 20px 24px; }
 }
 
 @media (max-width: 500px) {

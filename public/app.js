@@ -196,17 +196,10 @@ function toggleVerseAudio(position, button) {
 function updateDocumentChrome() {
   const currentRuku = findRuku(state.position, rukus);
   const today = getTodayStats(state.readingData);
-  const progress = state.readingData.completedRukuIds.length;
-  const percent = progress === 0 || progress === rukus.length
-    ? Math.round(progress / rukus.length * 100)
-    : Number((progress / rukus.length * 100).toFixed(1));
   const dayLabel = today.reached
     ? `${today.target}/${today.target}${today.bonus ? ` +${today.bonus}` : ""} today`
     : `${today.completed}/${today.target} today`;
   document.title = `${currentRuku ? `Ruku ${currentRuku.id}` : `Ayah ${state.position.chapter}:${state.position.verse}`} · ${dayLabel} — The Quran`;
-  $("overall-progress-label").textContent = `${progress} / ${rukus.length} rukus · ${percent}%`;
-  $("overall-progress-bar").max = rukus.length;
-  $("overall-progress-bar").value = progress;
   renderMarkReadBlock();
 
   try {
@@ -289,15 +282,6 @@ function renderHeading() {
   if (currentAyah && currentAyah.chapter !== chapter.id) currentAyah = null;
   $("chapter-heading").innerHTML = `<div class="chapter-heading-title"><h1>${chapter.id}. ${chapter.name}</h1><span class="sr-only">${chapter.meaning} · ${chapter.verses} ayahs · ${chapter.origin}</span></div><div class="chapter-heading-meta"><p class="chapter-meta-line"><span id="reading-metadata" class="reading-metadata" role="group" aria-label="Current ayah metadata" hidden></span></p></div>`;
   renderReadingMetadata(currentAyah);
-  const translation = TRANSLATIONS[state.translation];
-  const attribution = $("attribution");
-  attribution.replaceChildren(document.createTextNode(`${translation.name} · `));
-  const source = document.createElement("a");
-  source.href = "https://tanzil.net/trans/";
-  source.target = "_blank";
-  source.rel = "noreferrer";
-  source.textContent = "Translation source: Tanzil";
-  attribution.append(source);
 }
 
 function renderVerses() {
@@ -313,14 +297,17 @@ function renderVerses() {
   $("reading-content").setAttribute("aria-live", "polite");
   $("ayah-status").hidden = !ayah;
   $("ayah-status").textContent = `AYAH ${state.position.verse} OF ${chapter.verses}`;
-  $("ruku-progress-wrap").hidden = !ayah;
-  if (ayah && currentRuku) {
-    const progress = getRukuProgress(ayah, globalThis.QuranData, chapters);
-    const percent = progress.max ? Math.min(100, Math.max(0, progress.value / progress.max * 100)) : 0;
-    $("ruku-progress").setAttribute("aria-valuemax", String(progress.max));
-    $("ruku-progress").setAttribute("aria-valuenow", String(progress.value));
-    $("ruku-progress").setAttribute("aria-valuetext", `Ayah ${progress.value} of ${progress.max} in this ruku`);
-    $("ruku-ring-value").style.strokeDashoffset = String(100 - percent);
+  const rukuProgress = $("ruku-progress");
+  if (rukuProgress) {
+    rukuProgress.hidden = !ayah;
+    if (ayah && currentRuku) {
+      const progress = getRukuProgress(ayah, globalThis.QuranData, chapters);
+      rukuProgress.max = progress.max;
+      rukuProgress.value = progress.value;
+      rukuProgress.setAttribute("aria-valuemax", String(progress.max));
+      rukuProgress.setAttribute("aria-valuenow", String(progress.value));
+      rukuProgress.setAttribute("aria-valuetext", `Ayah ${progress.value} of ${progress.max} in this ruku`);
+    }
   }
   const fragment = document.createDocumentFragment();
   if (!filtered.length) {
@@ -401,9 +388,10 @@ function createVerse(verse) {
   reference.className = "verse-reference";
   const number = document.createElement("a");
   number.className = "verse-number";
-  number.textContent = `${verse.chapter}:${verse.verse}`;
+  const totalVerses = chapters[verse.chapter - 1]?.verses ?? verse.verse;
+  number.textContent = `Ayah: ${verse.verse} / ${totalVerses}`;
   number.href = `#${verse.chapter}:${verse.verse}`;
-  number.setAttribute("aria-label", `Link to verse ${verse.chapter}:${verse.verse}`);
+  number.setAttribute("aria-label", `Link to ayah ${verse.verse} of ${totalVerses} in chapter ${verse.chapter}`);
   const actions = document.createElement("div");
   actions.className = "verse-audio-action";
   const listen = document.createElement("button");
@@ -456,19 +444,6 @@ function renderPagination(ayah) {
       : direction === -1 ? "The beginning" : "The final ayah";
     button.innerHTML = `${icon(direction === -1 ? "left" : "right")}<strong>${title}</strong>`;
     nav.append(button);
-    if (direction === -1) {
-      const position = document.createElement("span");
-      position.className = "ayah-nav-position";
-      position.textContent = `${state.position.verse} / ${chapters[state.position.chapter - 1].verses}`;
-      const progress = document.createElement("progress");
-      progress.className = "surah-progress";
-      progress.max = chapters[state.position.chapter - 1].verses;
-      progress.value = state.position.verse;
-      progress.setAttribute("aria-label", "Surah reading progress");
-      progress.setAttribute("aria-valuetext", `Ayah ${state.position.verse} of ${progress.max} in this surah`);
-      position.append(progress);
-      nav.append(position);
-    }
   }
   if (focusedDirection) {
     nav.querySelector(`[data-direction="${focusedDirection}"]:not(:disabled)`)?.focus({ preventScroll: true });
@@ -698,7 +673,8 @@ async function loadReading({ scroll = false } = {}) {
   $("ayah-navigation").hidden = true;
   $("ayah-status").hidden = true;
   $("navigation-hint").hidden = true;
-  $("ruku-progress-wrap").hidden = true;
+  const rukuProgress = $("ruku-progress");
+  if (rukuProgress) rukuProgress.hidden = true;
   $("reading-content").setAttribute("aria-busy", "true");
   $("reading-content").hidden = false;
   $("reading-content").innerHTML = '<div class="loading-state"><span class="loading-dot"></span>Opening the words…</div>';

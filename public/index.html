@@ -39,10 +39,6 @@
           <button type="button" data-page="settings">Settings</button>
         </nav>
         <div class="topbar-right">
-          <div id="overall-progress" class="overall-progress" aria-label="Overall reading progress">
-            <span id="overall-progress-label">0 / 556 rukus</span>
-            <progress id="overall-progress-bar" max="556" value="0" aria-label="Rukus completed"></progress>
-          </div>
           <button id="theme-toggle" class="icon-button theme-toggle" aria-label="Switch to dark theme" data-icon="moon"></button>
         </div>
       </header>
@@ -55,17 +51,8 @@
           <section id="daily-panel" class="daily-panel" aria-label="Reading progress">
             <div class="daily-panel-main">
               <div class="daily-panel-copy">
-                <span id="today-progress" class="today-progress">Today: <span id="today-completed">0</span> / <span id="today-target">5</span><span id="today-bonus" class="today-bonus"></span></span>
+                <span id="today-progress" class="today-progress">Today: <span id="today-completed">0</span> / <span id="today-target">5</span> Ruku completed<span id="today-bonus" class="today-bonus"></span></span>
                 <span id="target-reached-label" class="target-reached-label" hidden>Target reached</span>
-                <div id="ruku-progress-wrap" class="ruku-progress-wrap" hidden>
-                  <span class="ruku-progress-label">Ruku</span>
-                  <div id="ruku-progress" class="ruku-ring" role="progressbar" aria-label="Ruku reading progress" aria-valuemin="0" aria-valuemax="7" aria-valuenow="1">
-                    <svg class="ruku-ring-svg" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
-                      <circle class="ruku-ring-track" cx="18" cy="18" r="15"></circle>
-                      <circle id="ruku-ring-value" class="ruku-ring-value" cx="18" cy="18" r="15" pathLength="100"></circle>
-                    </svg>
-                  </div>
-                </div>
               </div>
               <div id="prayer-countdown" class="prayer-countdown" hidden>
                 <span class="prayer-countdown-name"></span>
@@ -73,6 +60,7 @@
                 <span class="prayer-countdown-time"></span>
               </div>
             </div>
+            <progress id="ruku-progress" class="ruku-progress" max="7" value="1" aria-label="Ruku reading progress"></progress>
           </section>
           <div id="ayah-status" class="sr-only" role="status" hidden></div>
           <div id="reading-content" class="focused" aria-busy="true" aria-live="polite"></div>
@@ -87,11 +75,6 @@
           <nav id="ayah-navigation" class="chapter-pagination" aria-label="Ayah navigation"></nav>
           <p id="navigation-hint" class="navigation-hint">Use <kbd>←</kbd> <kbd>→</kbd> to continue. <span id="shortcut-hint">Space next · <kbd>Esc</kbd> menu</span></p>
         </section>
-        <footer class="reader-footer">
-          <p>A translation of the meanings of the Quran.</p>
-          <p id="attribution"></p>
-          <p class="metadata-credit">Chapter metadata © Tanzil, <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a>.</p>
-        </footer>
         </div>
         <section id="settings-page" class="secondary-page" hidden>
           <header class="page-heading"><span class="eyebrow">MAKE IT YOURS</span><h1>Settings</h1><p>Choose a pace and a reading setup that feels sustainable.</p></header>

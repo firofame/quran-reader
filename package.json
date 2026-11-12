@@ -5,13 +5,13 @@
   "type": "module",
   "description": "A quiet, local-first Quran translation reader.",
   "scripts": {
-    "dev": "wrangler dev --env-file=.env.local",
-    "start": "wrangler dev --env-file=.env.local",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json",
-    "check:syntax": "node --check public/app.js && node --check public/reader.js && node --check public/reader-state.js && node --check public/reading-data.js && node --check public/service-worker.js && node --check public/preferences-store.js && node --check public/speech.js && node --check public/translation-repository.js && node --check public/quran-data.js && node --check scripts/deployment.js",
+    "check:syntax": "node --check public/app.js && node --check public/reader.js && node --check public/reader-state.js && node --check public/reading-data.js && node --check public/service-worker.js && node --check public/preferences-store.js && node --check public/translation-repository.js && node --check public/quran-data.js && node --check scripts/deployment.js",
     "check": "npm run check:syntax && npm run typecheck",
     "cf-typegen": "wrangler types"
   },
@@ -24,8 +24,5 @@
     "typescript": "^5.5.2",
     "vitest": "~5.0.3",
     "wrangler": "^4.160.0"
-  },
-  "dependencies": {
-    "@elevenlabs/elevenlabs-js": "^2.77.0"
   }
 }

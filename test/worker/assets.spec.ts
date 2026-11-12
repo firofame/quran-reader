@@ -19,4 +19,14 @@ describe("routing", () => {
 		expect(response.status).toBe(404);
 		expect((await readJson(response)).error).toBe("Not found");
 	});
+
+	it("no longer answers a request for a reading", async () => {
+		const response = await SELF.fetch(new Request("https://quran.example.com/api/speech", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ text: "In the name of Allah, the Entirely Merciful." }),
+		}));
+		expect(response.status).toBe(404);
+		expect((await readJson(response)).error).toBe("Not found");
+	});
 });

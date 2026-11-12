@@ -13,7 +13,6 @@ const READER_FILES = [
 	"reader-state.js",
 	"reading-data.js",
 	"preferences-store.js",
-	"speech.js",
 	"translation-repository.js",
 	"quran-data.js",
 	"service-worker.js",
@@ -144,22 +143,25 @@ describe("published assets", () => {
 		);
 	});
 
-	it("reads the translation aloud through the Worker", async () => {
+	it("keeps the reading aloud feature out of the reader", async () => {
 		const app = await readPublicFile("app.js");
 		const html = await readPublicFile("index.html");
-		// The browser asks the Worker for the audio, so the ElevenLabs key
-		// never reaches the reader.
-		expect(app).toMatch(/fetch\("\/api\/speech"/);
-		expect(app).toMatch(/dataset\.speakVerse/);
-		// The translation is read with the Web Audio API, so it plays while
-		// it downloads and needs no element of its own.
-		expect(app).toMatch(/new AudioContext\(\)/);
-		expect(html).toMatch(/id="verse-audio"/);
+		// The reader is read with the eyes: there is no request for an audio
+		// reading and no control that asks for one.
+		expect(app).not.toMatch(/api\/speech/);
+		expect(app).not.toMatch(/data-speak-verse/);
+		expect(app).not.toMatch(/new AudioContext\(\)/);
 		expect(html).not.toMatch(/id="translation-audio"/);
+		// The recitation of the ayah itself is untouched.
+		expect(html).toMatch(/id="verse-audio"/);
 	});
 
 	it("keeps the modules the reader needs in the offline cache", async () => {
 		const worker = await readPublicFile("service-worker.js");
-		expect(worker).toMatch(/\.\/speech\.js/);
+		for (const file of ["app.js", "reader.js", "reader-state.js", "reading-data.js", "translation-repository.js"]) {
+			expect(worker, file).toContain(`"./${file}"`);
+		}
+		// The reading aloud module is gone, so it is no longer cached.
+		expect(worker).not.toMatch(/\.\/speech\.js/);
 	});
 });

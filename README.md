@@ -15,10 +15,6 @@ translation.
   optional browser reminders.
 - One-ayah Arabic recitation is available from the play icon beside each ayah.
   Playback starts only after a direct click.
-- The English translation can be read aloud with Eleven v4 Turbo from the
-  speaker icon beside each ayah. The Worker keeps the key and returns only the
-  audio, which arrives as it is made. The word being read is highlighted as it
-  is spoken.
 - Installable PWA with an offline cache for the reader and the translation.
 
 ---
@@ -34,41 +30,6 @@ npm run dev
 
 Wrangler serves the reader at `http://localhost:8787`. The Worker runs locally
 without a Cloudflare account.
-
-### Reading aloud
-
-The speaker icon beside an ayah reads its English translation with
-[ElevenLabs](https://elevenlabs.io). The Worker holds the key, so the browser
-only ever receives audio.
-
-The reading is streamed. The Worker asks ElevenLabs for the audio with the
-timing of every character, and sends each piece to the browser as it lands, so
-the reading starts before the whole ayah has been made. The browser plays it
-with the Web Audio API and follows the words, which are highlighted as they are
-spoken. The audio is raw PCM rather than MP3, because playing MP3 as it
-downloads needs Media Source Extensions, which iOS Safari does not support.
-
-A reading is kept in the browser, and another is kept by the Worker, so an ayah
-that is read again costs neither a request nor a call to ElevenLabs.
-
-Sign in and store a key for the project:
-
-```sh
-npx -y @elevenlabs/cli@latest onboard init
-```
-
-The key is written to `.env.local`, which Wrangler loads for local runs and
-which stays out of version control. `.env.example` shows the same variable for
-anyone who would rather paste a key in by hand.
-
-Production keeps the key as a Worker secret, so it has to be uploaded once:
-
-```sh
-npx wrangler secret put ELEVENLABS_API_KEY
-```
-
-Without a key the reader still works; the speaker icon reports that reading
-aloud is not configured.
 
 | Command | What it does |
 | --- | --- |
@@ -92,12 +53,6 @@ aloud is not configured.
 - Jump to an ayah, or use its verse number as a direct link, such as `#2:255`.
 - Adjust text size and switch between light and dark themes in Settings. A small
   play/pause icon beside each ayah reference plays its Arabic recitation.
-- A speaker icon beside the same reference reads the English translation aloud
-  with Eleven v4 Turbo. The request goes to the Worker, which keeps the
-  ElevenLabs key to itself and returns only the audio and the timing of its
-  words. The audio is played as it arrives, and the word being read is
-  highlighted. The recitation stops while the translation is being read, so the
-  two never talk over each other.
 - Settings lists the five daily prayers, Fajr, Dhuhr, Asr, Maghrib, and Isha.
   Each prayer keeps its adhan and iqama times, which can be adjusted to match
   your location and season; the prayers themselves are fixed and cannot be
@@ -127,10 +82,7 @@ aloud is not configured.
 
 Translations are loaded from the supplied local file and retained in memory
 while the page is open. The app makes no cloud requests for your reading data.
-The one exception is the reading aloud, which asks the Worker for audio. That
-audio is kept in the browser as well, so an ayah that is read again is played
-from the browser and makes no request at all. Translation wording is
-unchanged; paragraph breaks are added only for display.
+Translation wording is unchanged; paragraph breaks are added only for display.
 Optional sentence-by-sentence reading is not implemented: complete ayahs remain
 visible.
 
@@ -145,9 +97,6 @@ visible.
 - Recitation: Mishary Rashid Alafasy at 128 kbps, streamed from Al Quran Cloud.
   Its [terms](https://alquran.cloud/terms-and-conditions) permit streaming for
   personal and educational use. Playback ends after that ayah's recitation.
-- Reading aloud: ElevenLabs `eleven_v4_turbo` with the premade George voice,
-  asked for through the ElevenLabs API. The translation wording is read as it
-  stands; the app does not alter it for speech.
 
 The app does not bundle word-by-word meanings because no suitable, clearly
 attributable source under terms that fit this offline-first reader has been
@@ -155,25 +104,15 @@ selected. The app does not generate religious content.
 
 The first service-worker visit needs a connection to cache the static app and
 text. Once installed and cached, reading works offline. Recitation streaming
-and reading aloud require a connection.
+requires a connection.
 
 ## Architecture
 
 The project is a single Cloudflare Worker. [`public/`](public) holds the reader
 itself — plain HTML, CSS, and browser JavaScript modules with no build step —
 and is served as Workers Static Assets. [`src/index.ts`](src/index.ts) answers
-`/health`, the JSON fallback for unknown paths, and `POST /api/speech`, which
-reads a translation aloud and returns the audio.
-
-The reading request is the only part of the Worker that talks to a third
-party. It sends the text of one ayah to ElevenLabs with the key from the
-`ELEVENLABS_API_KEY` binding and hands the recording back to the reader. The
-key never leaves the Worker, the browser never holds it, and the recorded
-readings are kept in the isolate so a second reading of the same ayah is free.
-
-The ElevenLabs SDK is a large package, so the Worker loads it on the first
-reading instead of at startup. Cloudflare gives a Worker one second to parse
-and run its global scope, and the SDK needs about as much on its own.
+`/health` and the JSON fallback for unknown paths. The Worker holds no secrets
+and makes no outbound requests.
 
 The reader modules keep their responsibilities: `reader.js` contains pure Quran
 data, parsing, and navigation logic; `reader-state.js` owns validated
@@ -209,10 +148,6 @@ and then verifies the production identity and health.
 Production reuses the existing `quran` Worker, so the reader stays on the same
 hostname. The retired sync Durable Object and its stored data are deleted by the
 `v2` migration the next time the Worker is deployed.
-
-The `ELEVENLABS_API_KEY` secret stays on the Worker across deploys, so it only
-has to be uploaded once with `npx wrangler secret put ELEVENLABS_API_KEY`.
-Preview Workers have no secret, so reading aloud stays switched off there.
 
 Pull requests get an isolated preview Worker, and the reader is never published
 from a fork.

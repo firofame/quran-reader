@@ -98,20 +98,32 @@ describe("published assets", () => {
 		expect(app).toMatch(/prayerIqama/);
 	});
 
-	it("counts down to the next prayer moment between the daily progress and the ruku", async () => {
+	it("counts down to the next prayer moment after the daily progress and the ruku", async () => {
 		const html = await readPublicFile("index.html");
 		const readerPage = html.slice(html.indexOf('id="reader-page"'), html.indexOf('id="settings-page"'));
 		// The prayer chips are gone.
 		expect(readerPage).not.toMatch(/id="prayer-chips"/);
 		expect(readerPage).not.toMatch(/prayer-chip/);
-		// The countdown sits between today's progress and the ruku progress.
+		// The countdown sits after today's progress and the ruku indicator.
 		expect(readerPage).toMatch(/id="prayer-countdown"/);
 		expect(readerPage).toMatch(/prayer-countdown-time/);
 		const today = readerPage.indexOf('id="today-progress"');
-		const countdown = readerPage.indexOf('id="prayer-countdown"');
 		const ruku = readerPage.indexOf('id="ruku-progress-wrap"');
-		expect(today).toBeLessThan(countdown);
-		expect(countdown).toBeLessThan(ruku);
+		const countdown = readerPage.indexOf('id="prayer-countdown"');
+		expect(today).toBeLessThan(ruku);
+		expect(ruku).toBeLessThan(countdown);
+	});
+
+	it("keeps the chapter heading and the ruku indicator lean", async () => {
+		const app = await readPublicFile("app.js");
+		const html = await readPublicFile("index.html");
+		// The heading shows the chapter title and the ayah metadata only.
+		// The chapter meaning and verse count stay available to screen readers.
+		expect(app).toMatch(/class="sr-only">\$\{chapter\.meaning\} · \$\{chapter\.verses\} ayahs/);
+		expect(app).not.toMatch(/ruku \$\{localRuku\} of/);
+		// The ruku indicator keeps a short label beside today's progress.
+		expect(html).toMatch(/class="ruku-progress-label">Ruku</);
+		expect(app).not.toMatch(/Verse \$\{progress\.value\}/);
 	});
 
 	it("keeps the reader free of anchor markup", async () => {

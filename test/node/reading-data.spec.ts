@@ -7,7 +7,10 @@ import {
 	createDefaultReadingData,
 	DEFAULT_PRAYER_TIMES,
 	findRuku,
+	formatCountdown,
 	getDayKey,
+	getNextPrayerMoment,
+	getPrayerMoments,
 	getPrayerSchedule,
 	getRukuIndex,
 	getTodayStats,
@@ -195,6 +198,43 @@ describe("reading history", () => {
 			settings: { ...reading.settings, prayerTimes: { ...reading.settings.prayerTimes, fajr: { adhan: "21:00", iqama: "21:05" } } },
 		};
 		expect(getPrayerSchedule(moved).map(prayer => prayer.id)).toEqual(["dhuhr", "asr", "maghrib", "isha", "fajr"]);
+	});
+
+	it("counts down to the next adhan or iqama", () => {
+		const prayers = getPrayerSchedule(createDefaultReadingData());
+		const beforeFajr = new Date(2026, 10, 12, 4, 0);
+		const next = getNextPrayerMoment(prayers, beforeFajr);
+		expect(next?.kind).toBe("adhan");
+		expect(next?.name).toBe("Fajr");
+		expect(new Date(next!.at).getHours()).toBe(4);
+		expect(new Date(next!.at).getMinutes()).toBe(58);
+
+		// Between the adhan and the iqama the countdown waits for the iqama.
+		const between = getNextPrayerMoment(prayers, new Date(2026, 10, 12, 5, 0));
+		expect(between?.kind).toBe("iqama");
+		expect(between?.name).toBe("Fajr");
+		expect(new Date(between!.at).getHours()).toBe(5);
+		expect(new Date(between!.at).getMinutes()).toBe(43);
+
+		// A moment that has passed waits for the next day.
+		const passed = getNextPrayerMoment(prayers, new Date(2026, 10, 12, 23, 0));
+		expect(passed?.kind).toBe("adhan");
+		expect(new Date(passed!.at).getDate()).toBe(13);
+	});
+
+	it("lists an adhan and an iqama moment for every prayer", () => {
+		const prayers = getPrayerSchedule(createDefaultReadingData());
+		const moments = getPrayerMoments(prayers, new Date(2026, 10, 12, 0, 0));
+		expect(moments).toHaveLength(10);
+		expect(moments.filter(moment => moment.kind === "adhan")).toHaveLength(5);
+		expect(moments.filter(moment => moment.kind === "iqama")).toHaveLength(5);
+	});
+
+	it("formats a countdown as minutes, seconds, and hours", () => {
+		expect(formatCountdown(38 * 60 * 1000 + 12 * 1000)).toBe("38:12");
+		expect(formatCountdown(3 * 60 * 1000 + 5 * 1000)).toBe("03:05");
+		expect(formatCountdown(2 * 60 * 60 * 1000 + 15 * 60 * 1000)).toBe("2:15:00");
+		expect(formatCountdown(-1000)).toBe("00:00");
 	});
 
 	it("migrates version 2 activity without dropping overall verse progress", () => {

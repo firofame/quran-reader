@@ -2,7 +2,7 @@ import { TRANSLATIONS, createChapters, getVerseMetadata, getRukuProgress, parseH
 import { reduceReaderState } from "./reader-state.js";
 import { createPreferencesStore } from "./preferences-store.js";
 import { createTranslationRepository } from "./translation-repository.js";
-import { DAY_BOUNDARY_HOUR, DEFAULT_PRAYER_TIMES, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, getDayKey, getPrayerSchedule, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
+import { DAY_BOUNDARY_HOUR, DEFAULT_PRAYER_TIMES, DEFAULT_RUKU_COUNT, PRAYERS, findRuku, formatCountdown, getDayKey, getNextPrayerMoment, getPrayerSchedule, getRukuIndex, getSurahRukuProgress, getTodayStats, isRukuEnd, recordRukuCompletion, recordRukusAsRead, recordVerseVisit, resolveStartupPosition } from "./reading-data.js";
 
 const icons = {
   book: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
@@ -34,6 +34,7 @@ let storageFailed = false;
 let loading = false;
 let activePage = "reader";
 let reminderTimer;
+let countdownTimer;
 let activeAudioButton = null;
 let audioRequestId = 0;
 let currentAyah = null;
@@ -644,15 +645,32 @@ function initializeSettingsControls() {
   });
 }
 
-/** The adhan and iqama moments of every prayer, with the moment they pass. */
-function prayerEvents(prayers, date = new Date()) {
-  return prayers.flatMap(prayer => ["adhan", "iqama"].map(kind => {
-    const time = kind === "adhan" ? prayer.adhan : prayer.iqama;
-    const [hour, minute] = time.split(":").map(Number);
-    const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
-    if (moment <= date) moment.setDate(moment.getDate() + 1);
-    return { ...prayer, kind, time, fireAt: moment.getTime() };
-  }));
+/** Keeps the countdown to the next prayer moment up to date. */
+function startPrayerCountdown() {
+  clearInterval(countdownTimer);
+  renderPrayerCountdown();
+  countdownTimer = setInterval(renderPrayerCountdown, 1000);
+}
+
+/**
+ * Counts down to the next adhan or iqama, so the time left until the iqama
+ * is always in sight.
+ */
+function renderPrayerCountdown() {
+  const container = $("prayer-countdown");
+  if (!container) return;
+  const next = getNextPrayerMoment(getPrayerSchedule(state.readingData), new Date());
+  if (!next) {
+    container.hidden = true;
+    return;
+  }
+  const label = container.querySelector(".prayer-countdown-label");
+  const time = container.querySelector(".prayer-countdown-time");
+  const text = `${next.name} · ${next.kind} in`;
+  const remaining = formatCountdown(next.at - Date.now());
+  if (label.textContent !== text) label.textContent = text;
+  if (time.textContent !== remaining) time.textContent = remaining;
+  container.hidden = false;
 }
 
 function schedulePrayerReminder() {
@@ -661,7 +679,7 @@ function schedulePrayerReminder() {
   if (!settings.remindersEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
   const prayers = getPrayerSchedule(state.readingData);
   const now = new Date();
-  const next = prayerEvents(prayers, now).sort((a, b) => a.fireAt - b.fireAt)[0];
+  const next = getNextPrayerMoment(prayers, now);
   if (!next) return;
   reminderTimer = setTimeout(() => {
     const currentPrayers = getPrayerSchedule(state.readingData);
@@ -678,7 +696,7 @@ function schedulePrayerReminder() {
       notification.onclick = () => { window.focus(); notification.close(); };
     }
     schedulePrayerReminder();
-  }, Math.min(2147483647, Math.max(0, next.fireAt - now.getTime())));
+  }, Math.min(2147483647, Math.max(0, next.at - now.getTime())));
 }
 
 async function loadReading({ scroll = false } = {}) {
@@ -790,7 +808,10 @@ function initializeFeatureInteractions() {
     notify(`Marked ${pending} earlier ${plural} as read.`);
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") schedulePrayerReminder();
+    if (document.visibilityState === "visible") {
+      schedulePrayerReminder();
+      renderPrayerCountdown();
+    }
   });
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" })
@@ -893,3 +914,4 @@ renderProgressSummary();
 renderAllPages();
 loadReading();
 schedulePrayerReminder();
+startPrayerCountdown();

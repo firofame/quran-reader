@@ -33,7 +33,7 @@
 
 - One reading screen shows one complete translated ayah at a time. Chapter navigation is in the left drawer, with a small play/pause control beside each ayah reference. Text size and the catch-up action live in Settings. There is no translation picker, because Saheeh International is the only translation.
 - Previous/Continue buttons and left/right arrows navigate ayahs, including across chapter boundaries. Direct verse links use `#chapter:verse`. The last ayah of a ruku turns the next action into "Finish ruku". Space and `Escape` cover the rest of the reading shortcuts.
-- Current metadata includes page, ruku, manzil, hizb, juz, and sajda. A small ring in the daily panel tracks the current ayah within its ruku.
+- Current metadata includes page, ruku, manzil, hizb, juz, and sajda. A small ring in the daily panel tracks the current ayah within its ruku. The daily panel also counts down to the next adhan or iqama moment.
 - The reader also has a Settings view for reading preferences and the five daily prayers. The manual reading anchors have been replaced by the fixed prayers, Fajr, Dhuhr, Asr, Maghrib, and Isha; each prayer keeps its adhan and iqama times, and only those times can be adjusted.
 - Browser reminders request notification permission only when enabled and only schedule while the page is open. They fire at the adhan and at the iqama of every prayer. The app is an installable PWA; the service worker caches its local reading assets for offline use.
 - One-verse recitation is available from the play icon beside each ayah. It streams Alafasy 128 kbps from Al Quran Cloud after a direct user action. See the provider's current [terms](https://alquran.cloud/terms-and-conditions).

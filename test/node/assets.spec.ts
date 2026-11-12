@@ -99,6 +99,13 @@ describe("published assets", () => {
 		expect(app).toMatch(/prayerIqama/);
 	});
 
+	it("counts down to the next prayer moment in the daily panel", async () => {
+		const html = await readPublicFile("index.html");
+		const readerPage = html.slice(html.indexOf('id="reader-page"'), html.indexOf('id="settings-page"'));
+		expect(readerPage).toMatch(/id="prayer-countdown"/);
+		expect(readerPage).toMatch(/prayer-countdown-time/);
+	});
+
 	it("keeps the reader free of anchor markup", async () => {
 		const app = await readPublicFile("app.js");
 		const html = await readPublicFile("index.html");

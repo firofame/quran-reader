@@ -192,6 +192,37 @@ export function getPrayerSchedule(readingData) {
     .sort((left, right) => left.adhan.localeCompare(right.adhan));
 }
 
+/**
+ * The adhan and iqama moments of every prayer, each with the moment it next
+ * passes.
+ */
+export function getPrayerMoments(prayers, date = new Date()) {
+  return prayers.flatMap(prayer => ["adhan", "iqama"].map(kind => {
+    const time = kind === "adhan" ? prayer.adhan : prayer.iqama;
+    const [hour, minute] = time.split(":").map(Number);
+    const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
+    if (moment <= date) moment.setDate(moment.getDate() + 1);
+    return { ...prayer, kind, time, at: moment.getTime() };
+  }));
+}
+
+/** The next adhan or iqama moment of the day. */
+export function getNextPrayerMoment(prayers, date = new Date()) {
+  return getPrayerMoments(prayers, date).sort((left, right) => left.at - right.at)[0] ?? null;
+}
+
+/**
+ * Formats a remaining duration as a countdown, such as "38:12" or "2:15:00".
+ */
+export function formatCountdown(milliseconds) {
+  const total = Math.max(0, Math.floor(milliseconds / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const pad = value => String(value).padStart(2, "0");
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+}
+
 export function getDayKey(date = new Date()) {
   const adjusted = new Date(date.getTime() - DAY_BOUNDARY_HOUR * 60 * 60 * 1000);
   return `${adjusted.getFullYear()}-${String(adjusted.getMonth() + 1).padStart(2, "0")}-${String(adjusted.getDate()).padStart(2, "0")}`;

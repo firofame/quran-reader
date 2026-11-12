@@ -170,6 +170,8 @@ select option { background: var(--paper); color: var(--text); }
 .prayer-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .prayer-chip { min-height: 28px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); font-size: 9px; font-weight: 500; transition: border-color .15s, background .15s; }
 .prayer-chip.is-done { border-color: var(--green); color: var(--green); background: var(--green-soft); }
+.prayer-countdown { display: flex; align-items: baseline; gap: 7px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.prayer-countdown-time { color: var(--green); font-weight: 600; letter-spacing: .02em; }
 
 .chapter-ruku-progress { color: var(--green) !important; }
 

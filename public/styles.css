@@ -163,14 +163,13 @@ select option { background: var(--paper); color: var(--text); }
 .daily-panel { display: flex; flex-direction: column; gap: 8px; padding: 6px 28px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 90%, var(--green-soft)); }
 .daily-panel-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 26px; }
 .daily-panel-copy { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.today-progress { color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.today-progress { color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .today-bonus { font-weight: 400; }
 .target-reached-label { color: var(--green); font-weight: 500; font-size: 10px; }
 
-.prayer-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.prayer-chip { min-height: 28px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); font-size: 9px; font-weight: 500; transition: border-color .15s, background .15s; }
-.prayer-chip.is-done { border-color: var(--green); color: var(--green); background: var(--green-soft); }
-.prayer-countdown { display: flex; align-items: baseline; gap: 7px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.prayer-countdown { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px; margin-inline: auto; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.prayer-countdown span { white-space: nowrap; }
+.prayer-countdown-name::after { content: " ·"; }
 .prayer-countdown-time { color: var(--green); font-weight: 600; letter-spacing: .02em; }
 
 .chapter-ruku-progress { color: var(--green) !important; }
@@ -348,6 +347,8 @@ select option { background: var(--paper); color: var(--text); }
   /* The prayer name gets its own row so the times keep their room. */
   .prayer-editor-head, .prayer-editor-row { grid-template-columns: 1fr 1fr; }
   .prayer-editor-head span:first-child, .prayer-editor-name { grid-column: 1 / -1; }
+  /* The countdown keeps its room by leaving out the prayer name. */
+  .prayer-countdown-name { display: none; }
 }
 
 @media (max-width: 430px) {
@@ -376,6 +377,7 @@ select option { background: var(--paper); color: var(--text); }
   .topbar-right { gap: 6px; }
   .daily-panel-main { gap: 8px; }
   .daily-panel-copy { gap: 4px 10px; }
+  .prayer-countdown { font-size: 9px; gap: 5px; }
   .target-reached-label { flex-basis: 100%; }
   .ruku-progress-label { font-size: 8px; }
   .settings-grid { grid-template-columns: 1fr; }

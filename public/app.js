@@ -476,24 +476,6 @@ function renderProgressSummary() {
   $("target-reached-label").hidden = !today.reached;
   $("target-reached-label").textContent = today.bonus ? `Target reached · +${today.bonus} bonus` : "Target reached";
   updateDocumentChrome();
-
-  const chips = $("prayer-chips");
-  chips.replaceChildren();
-  const prayers = getPrayerSchedule(readingData);
-  const windows = prayerWindows(prayers, readingData);
-  for (const slot of windows) {
-    const button = document.createElement("button");
-    const done = slot.read;
-    button.type = "button";
-    button.className = `prayer-chip${done ? " is-done" : ""}`;
-    button.textContent = done ? `${slot.name} · done` : `${slot.name} · ${slot.adhan} → ${slot.iqama}`;
-    button.title = `${slot.name}: adhan ${slot.adhan}, iqama ${slot.iqama}`;
-    button.addEventListener("click", () => {
-      if (activePage !== "reader") showPage("reader");
-      $("reading-content").scrollIntoView({ block: "center", behavior: "smooth" });
-    });
-    chips.append(button);
-  }
 }
 
 /**
@@ -664,11 +646,12 @@ function renderPrayerCountdown() {
     container.hidden = true;
     return;
   }
-  const label = container.querySelector(".prayer-countdown-label");
+  const name = container.querySelector(".prayer-countdown-name");
+  const detail = container.querySelector(".prayer-countdown-detail");
   const time = container.querySelector(".prayer-countdown-time");
-  const text = `${next.name} · ${next.kind} in`;
   const remaining = formatCountdown(next.at - Date.now());
-  if (label.textContent !== text) label.textContent = text;
+  if (name.textContent !== next.name) name.textContent = next.name;
+  if (detail.textContent !== `${next.kind} in`) detail.textContent = `${next.kind} in`;
   if (time.textContent !== remaining) time.textContent = remaining;
   container.hidden = false;
 }

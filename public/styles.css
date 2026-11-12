@@ -254,12 +254,6 @@ select option { background: var(--paper); color: var(--text); }
 .app-navigation button:hover { background: var(--hover); color: var(--text); }
 .app-navigation button[aria-current="page"] { background: var(--green-soft); color: var(--green); }
 
-.overall-progress { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.overall-progress progress { flex: 1; height: 3px; border: 0; appearance: none; background: var(--line); color: var(--green); border-radius: 2px; }
-.overall-progress progress::-webkit-progress-bar { background: var(--line); border-radius: 2px; }
-.overall-progress progress::-webkit-progress-value { background: var(--green); border-radius: 2px; }
-.overall-progress progress::-moz-progress-bar { background: var(--green); }
-
 /* ─── Secondary pages ──────────────────────────────────────────── */
 .secondary-page { max-width: 820px; margin: 0 auto; padding: 32px 16px 60px; }
 .page-heading { padding: 8px 4px 24px; }
@@ -369,7 +363,6 @@ select option { background: var(--paper); color: var(--text); }
 }
 
 @media (max-width: 500px) {
-  .overall-progress { font-size: 9px; }
   .topbar-right { gap: 6px; }
   .daily-panel-main { gap: 8px; }
   .daily-panel-copy { gap: 4px 10px; }

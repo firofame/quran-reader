@@ -196,17 +196,10 @@ function toggleVerseAudio(position, button) {
 function updateDocumentChrome() {
   const currentRuku = findRuku(state.position, rukus);
   const today = getTodayStats(state.readingData);
-  const progress = state.readingData.completedRukuIds.length;
-  const percent = progress === 0 || progress === rukus.length
-    ? Math.round(progress / rukus.length * 100)
-    : Number((progress / rukus.length * 100).toFixed(1));
   const dayLabel = today.reached
     ? `${today.target}/${today.target}${today.bonus ? ` +${today.bonus}` : ""} today`
     : `${today.completed}/${today.target} today`;
   document.title = `${currentRuku ? `Ruku ${currentRuku.id}` : `Ayah ${state.position.chapter}:${state.position.verse}`} · ${dayLabel} — The Quran`;
-  $("overall-progress-label").textContent = `${progress} / ${rukus.length} rukus · ${percent}%`;
-  $("overall-progress-bar").max = rukus.length;
-  $("overall-progress-bar").value = progress;
   renderMarkReadBlock();
 
   try {

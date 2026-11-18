@@ -104,7 +104,7 @@ describe("reader layout invariants", () => {
 	it("keeps an adhan and an iqama time for every prayer", async () => {
 		const settings = await readFile(fileURLToPath(new URL("components/SettingsPage.tsx", SRC_DIR).href), "utf8");
 		expect(settings).toMatch(/adhan and iqama/);
-		expect(settings).toMatch(/Browser reminders at the adhan and 5 minutes before iqama/);
+		expect(settings).toMatch(/Browser reminders at the adhan and 1, 2, 3, 4, 5 minutes before iqama/);
 		expect(settings).toMatch(/adhan time/);
 		expect(settings).toMatch(/iqama time/);
 	});

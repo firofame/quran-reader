@@ -36,6 +36,8 @@ export interface PrayerMoment extends ScheduledPrayer {
 	kind: PrayerMomentKind;
 	time: string;
 	at: number;
+	/** Minutes before the iqama for a reminder; 0 for an adhan or iqama moment. */
+	minutesBefore: number;
 }
 
 export interface PrayerWindow extends ScheduledPrayer {
@@ -46,11 +48,11 @@ export interface PrayerWindow extends ScheduledPrayer {
 
 /** The adhan and iqama times of the prayers, until the reader sets their own. */
 export const DEFAULT_PRAYER_TIMES: Record<PrayerId, PrayerTimes> = {
-	fajr: { adhan: "04:58", iqama: "05:43" },
-	dhuhr: { adhan: "12:11", iqama: "13:15" },
-	asr: { adhan: "15:32", iqama: "17:00" },
+	fajr: { adhan: "05:00", iqama: "05:45" },
+	dhuhr: { adhan: "12:12", iqama: "12:27" },
+	asr: { adhan: "15:34", iqama: "17:00" },
 	maghrib: { adhan: "18:03", iqama: "18:06" },
-	isha: { adhan: "19:23", iqama: "20:30" },
+	isha: { adhan: "19:23", iqama: "19:38" },
 };
 
 /** The placeholder prayer times of the first version of the prayer list. */
@@ -281,7 +283,7 @@ export function getPrayerMoments(prayers: readonly ScheduledPrayer[], date = new
 		const [hour, minute] = time.split(":").map(Number);
 		const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
 		if (moment.getTime() <= date.getTime()) moment.setDate(moment.getDate() + 1);
-		return { ...prayer, kind, time, at: moment.getTime() };
+		return { ...prayer, kind, time, at: moment.getTime(), minutesBefore: 0 };
 	}));
 }
 
@@ -290,26 +292,32 @@ export function getNextPrayerMoment(prayers: readonly ScheduledPrayer[], date = 
 	return getPrayerMoments(prayers, date).sort((left, right) => left.at - right.at)[0] ?? null;
 }
 
-export const IQAMA_REMINDER_OFFSET_MINUTES = 5;
+/** How many minutes before each iqama a reminder fires. */
+export const IQAMA_REMINDER_OFFSETS_MINUTES = [1, 2, 3, 4, 5] as const;
 
 /**
- * The reminder moments of every prayer: at the adhan, and five minutes before
- * the iqama to allow time for wudu and reaching the masjid.
+ * The reminder moments of every prayer: at the adhan, and once for each offset
+ * before the iqama to allow time for wudu and reaching the masjid.
  */
-export function getPrayerReminderMoments(prayers: readonly ScheduledPrayer[], date = new Date(), offsetMinutes = IQAMA_REMINDER_OFFSET_MINUTES): PrayerMoment[] {
-	return prayers.flatMap(prayer => (["adhan", "iqama"] as const).map(kind => {
-		const time = kind === "adhan" ? prayer.adhan : prayer.iqama;
-		const [hour, minute] = time.split(":").map(Number);
+export function getPrayerReminderMoments(prayers: readonly ScheduledPrayer[], date = new Date(), offsetsMinutes: readonly number[] = IQAMA_REMINDER_OFFSETS_MINUTES): PrayerMoment[] {
+	const adhanMoments = prayers.map(prayer => {
+		const [hour, minute] = prayer.adhan.split(":").map(Number);
 		const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
-		if (kind === "iqama") moment.setMinutes(moment.getMinutes() - offsetMinutes);
 		while (moment.getTime() <= date.getTime()) moment.setDate(moment.getDate() + 1);
-		return { ...prayer, kind, time, at: moment.getTime() };
+		return { ...prayer, kind: "adhan" as const, time: prayer.adhan, at: moment.getTime(), minutesBefore: 0 };
+	});
+	const iqamaMoments = prayers.flatMap(prayer => offsetsMinutes.map(minutesBefore => {
+		const [hour, minute] = prayer.iqama.split(":").map(Number);
+		const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute - minutesBefore);
+		while (moment.getTime() <= date.getTime()) moment.setDate(moment.getDate() + 1);
+		return { ...prayer, kind: "iqama" as const, time: prayer.iqama, at: moment.getTime(), minutesBefore };
 	}));
+	return [...adhanMoments, ...iqamaMoments];
 }
 
 /** The next prayer reminder moment of the day. */
-export function getNextPrayerReminder(prayers: readonly ScheduledPrayer[], date = new Date(), offsetMinutes = IQAMA_REMINDER_OFFSET_MINUTES): PrayerMoment | null {
-	return getPrayerReminderMoments(prayers, date, offsetMinutes).sort((left, right) => left.at - right.at)[0] ?? null;
+export function getNextPrayerReminder(prayers: readonly ScheduledPrayer[], date = new Date(), offsetsMinutes: readonly number[] = IQAMA_REMINDER_OFFSETS_MINUTES): PrayerMoment | null {
+	return getPrayerReminderMoments(prayers, date, offsetsMinutes).sort((left, right) => left.at - right.at)[0] ?? null;
 }
 
 /**

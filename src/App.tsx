@@ -330,8 +330,8 @@ export function App() {
 		: null;
 
 	/**
-	 * Schedules the next browser reminder: at the adhan, and five minutes
-	 * before the iqama. Reminders fire while the tab is open.
+	 * Schedules the next browser reminder: at the adhan, and one, two, three,
+	 * four, and five minutes before the iqama. Reminders fire while the tab is open.
 	 */
 	const schedulePrayerReminder = useCallback(() => {
 		window.clearTimeout(reminderTimerRef.current);
@@ -348,10 +348,10 @@ export function App() {
 			const chapter = chapters[latest.position.chapter - 1];
 			const message = next.kind === "adhan"
 				? `${next.name} adhan at ${next.adhan}. Next up: ${chapter.name}, ruku ${currentRuku?.localNumber ?? 1}. One ruku, whenever you’re ready.`
-				: `${next.name} iqama at ${next.iqama}. Time to head to the masjid.`;
-			// The iqama nudge is about reaching the masjid, so it fires 5 minutes
-			// before the iqama to give time for wudu and travel. The adhan nudge
-			// waits for the prayer window when the reader already read.
+				: `${next.name} iqama in ${next.minutesBefore} ${next.minutesBefore === 1 ? "minute" : "minutes"} at ${next.iqama}. Time to head to the masjid.`;
+			// The iqama nudges are about reaching the masjid, so they fire in the
+			// five minutes before it to allow time for wudu and travel. The adhan
+			// nudge waits for the prayer window when the reader already read.
 			if (next.kind === "iqama" || !(slot?.read ?? false)) {
 				const notification = new Notification(message);
 				notification.onclick = () => {

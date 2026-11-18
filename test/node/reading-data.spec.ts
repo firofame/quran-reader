@@ -170,6 +170,31 @@ describe("reading history", () => {
 		expect(migrated.settings.prayerTimes.asr).toEqual({ adhan: DEFAULT_PRAYER_TIMES.asr.adhan, iqama: "17:10" });
 	});
 
+	it("moves saved old default times to the current defaults without touching custom times", () => {
+		const migrated = normalizeReadingData(
+			{
+				version: 11,
+				settings: {
+					prayerTimes: {
+						fajr: { adhan: "04:58", iqama: "05:43" },
+						dhuhr: { adhan: "12:11", iqama: "12:45" },
+						asr: { adhan: "16:10", iqama: "17:00" },
+						maghrib: { adhan: "18:03", iqama: "18:06" },
+						isha: { adhan: "19:23", iqama: "20:30" },
+					},
+				},
+			},
+			chapters,
+		);
+		// Times the reader never changed follow the current schedule.
+		expect(migrated.settings.prayerTimes.fajr).toEqual(DEFAULT_PRAYER_TIMES.fajr);
+		expect(migrated.settings.prayerTimes.maghrib).toEqual(DEFAULT_PRAYER_TIMES.maghrib);
+		expect(migrated.settings.prayerTimes.isha).toEqual(DEFAULT_PRAYER_TIMES.isha);
+		// Custom times are kept field by field.
+		expect(migrated.settings.prayerTimes.dhuhr).toEqual({ adhan: "12:12", iqama: "12:45" });
+		expect(migrated.settings.prayerTimes.asr).toEqual({ adhan: "16:10", iqama: "17:00" });
+	});
+
 	it("moves the prayer times of the first prayer list to the current defaults", () => {
 		const untouched = normalizeReadingData(
 			{ version: 10, settings: { prayerTimes: { fajr: "05:00", dhuhr: "12:30", asr: "15:30", maghrib: "18:00", isha: "19:30" } } },

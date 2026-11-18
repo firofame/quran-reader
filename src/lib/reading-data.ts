@@ -55,6 +55,18 @@ export const DEFAULT_PRAYER_TIMES: Record<PrayerId, PrayerTimes> = {
 	isha: { adhan: "19:23", iqama: "19:38" },
 };
 
+/**
+ * The defaults shipped before the current schedule. A saved time still equal
+ * to one of these was never customised and follows the current defaults.
+ */
+const PREVIOUS_PRAYER_TIMES: Record<PrayerId, PrayerTimes> = {
+	fajr: { adhan: "04:58", iqama: "05:43" },
+	dhuhr: { adhan: "12:11", iqama: "13:15" },
+	asr: { adhan: "15:32", iqama: "17:00" },
+	maghrib: { adhan: "18:03", iqama: "18:06" },
+	isha: { adhan: "19:23", iqama: "20:30" },
+};
+
 /** The placeholder prayer times of the first version of the prayer list. */
 const RETIRED_PRAYER_TIMES: Record<PrayerId, string> = {
 	fajr: "05:00",
@@ -189,19 +201,22 @@ function validTime(value: unknown): value is string {
 
 /**
  * Keeps the saved prayer times and falls back to the default time of every
- * prayer whose saved time is missing or not a valid time of day. Times saved
- * by the first version of the prayer list are replaced by the current
- * defaults, unless the reader had changed them.
+ * prayer whose saved time is missing or not a valid time of day. Times still
+ * matching an older set of defaults, including those of the first version of
+ * the prayer list, follow the current defaults unless the reader changed them.
  */
 function cleanPrayerTimes(value: unknown): Record<PrayerId, PrayerTimes> {
 	const times = {} as Record<PrayerId, PrayerTimes>;
 	for (const prayer of PRAYERS) {
 		const defaults = DEFAULT_PRAYER_TIMES[prayer.id];
+		const previous = PREVIOUS_PRAYER_TIMES[prayer.id];
 		const saved = isObject(value) ? value[prayer.id] : null;
 		if (isObject(saved)) {
+			const adhan = validTime(saved.adhan) ? saved.adhan : defaults.adhan;
+			const iqama = validTime(saved.iqama) ? saved.iqama : defaults.iqama;
 			times[prayer.id] = {
-				adhan: validTime(saved.adhan) ? saved.adhan : defaults.adhan,
-				iqama: validTime(saved.iqama) ? saved.iqama : defaults.iqama,
+				adhan: adhan === previous.adhan ? defaults.adhan : adhan,
+				iqama: iqama === previous.iqama ? defaults.iqama : iqama,
 			};
 			continue;
 		}

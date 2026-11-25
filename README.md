@@ -152,8 +152,7 @@ Production reuses the existing `quran` Worker, so the reader stays on the same
 hostname. The retired sync Durable Object and its stored data are deleted by the
 `v2` migration the next time the Worker is deployed.
 
-Pull requests get an isolated preview Worker, and the reader is never published
-from a fork.
+Pull requests are validated only, and the reader is never published from a fork.
 
 
 ## Sources

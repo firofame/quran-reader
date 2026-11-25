@@ -128,11 +128,6 @@ async function main(command) {
   }
 
   const api = createCloudflareApi({ accountId: env.ACCOUNT_ID, token: env.CLOUDFLARE_API_TOKEN });
-  if (command === "find") {
-    const worker = await findWorker(api);
-    await appendFile(env.GITHUB_OUTPUT, `name=${worker.name}\n`);
-    return;
-  }
   const statePath = resolve(env.RUNNER_TEMP, "deployment-state.json");
   if (command === "prepare") {
     await authorize();

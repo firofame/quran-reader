@@ -70,7 +70,7 @@ export function SettingsPage({ readingData, position, onMarkEarlierRukus, onPray
 						checked={settings.remindersEnabled}
 						onChange={event => onRemindersChange(event.target.checked)}
 					/>
-					Browser reminders at the adhan and 1, 2, 3, 4, 5 minutes before iqama
+					Browser reminders 5 minutes before the iqama, and for one ruku after the prayer
 				</label>
 				<p className="muted-copy">Browser reminders only fire while the browser is running.</p>
 			</section>

@@ -10,7 +10,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png', 'en.hilali.txt'],
+      includeAssets: ['favicon.svg', 'favicon-due.svg', 'icon-192.png', 'icon-512.png', 'en.hilali.txt'],
       manifest: {
         name: 'The Quran — A Space for Reflection',
         short_name: 'Quran Reader',

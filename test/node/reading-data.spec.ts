@@ -15,7 +15,7 @@ import {
 	getPrayerSchedule,
 	getRukuIndex,
 	getTodayStats,
-	IQAMA_REMINDER_OFFSETS_MINUTES,
+	getRukuDue,
 	normalizeReadingData,
 	pendingEarlierRukus,
 	PRAYERS,
@@ -255,55 +255,52 @@ describe("reading history", () => {
 		expect(moments.filter(moment => moment.kind === "iqama")).toHaveLength(5);
 	});
 
-	it("schedules prayer reminders at the adhan and 1-5 minutes before the iqama", () => {
-		expect(IQAMA_REMINDER_OFFSETS_MINUTES).toEqual([1, 2, 3, 4, 5]);
+	it("reminds once before the iqama and once after the prayer", () => {
 		const prayers = getPrayerSchedule(createDefaultReadingData());
-
-		// Before Fajr adhan, the next reminder is at the adhan (05:00).
-		const beforeFajr = new Date(2026, 10, 12, 4, 0);
-		const adhanReminder = getNextPrayerReminder(prayers, beforeFajr);
-		expect(adhanReminder?.kind).toBe("adhan");
-		expect(adhanReminder?.name).toBe("Fajr");
-		expect(adhanReminder?.minutesBefore).toBe(0);
-		expect(new Date(adhanReminder!.at).getHours()).toBe(5);
-		expect(new Date(adhanReminder!.at).getMinutes()).toBe(0);
-
-		// After the adhan, the iqama reminders arrive at 05:40, 05:41, 05:42,
-		// 05:43 and 05:44: five, four, three, two and one minutes before 05:45.
-		const fajrIqamaReminders = getPrayerReminderMoments(prayers, new Date(2026, 10, 12, 0, 0))
-			.filter(moment => moment.id === "fajr" && moment.kind === "iqama")
-			.sort((left, right) => left.at - right.at);
-		expect(fajrIqamaReminders.map(moment => moment.minutesBefore)).toEqual([5, 4, 3, 2, 1]);
-		expect(fajrIqamaReminders.map(moment => new Date(moment.at).getMinutes())).toEqual([40, 41, 42, 43, 44]);
-
-		// Once a reminder has passed, the next one moves forward through the
-		// five offsets, then on to the next prayer's adhan.
-		for (const [index, minutesBefore] of [5, 4, 3, 2, 1].entries()) {
-			const next = getNextPrayerReminder(prayers, new Date(fajrIqamaReminders[index].at + 1000));
-			if (minutesBefore === 1) {
-				expect(next?.kind).toBe("adhan");
-				expect(next?.name).toBe("Dhuhr");
-			} else {
-				expect(next?.kind).toBe("iqama");
-				expect(next?.name).toBe("Fajr");
-				expect(next?.minutesBefore).toBe(minutesBefore - 1);
-			}
-		}
+		expect(getPrayerReminderMoments(prayers, new Date(2026, 10, 12, 0, 0))).toHaveLength(10);
+		const masjid = getNextPrayerReminder(prayers, new Date(2026, 10, 12, 4, 0));
+		expect(masjid).toMatchObject({ id: "fajr", kind: "iqama", minutesBefore: 5, at: new Date(2026, 10, 12, 5, 40).getTime() });
+		const ruku = getNextPrayerReminder(prayers, new Date(masjid!.at));
+		expect(ruku).toMatchObject({ id: "fajr", kind: "ruku", at: new Date(2026, 10, 12, 6, 0).getTime() });
+		expect(getNextPrayerReminder(prayers, new Date(ruku!.at))).toMatchObject({ id: "dhuhr", kind: "iqama" });
 	});
 
-	it("lists an adhan and five iqama reminder moments for every prayer", () => {
-		const prayers = getPrayerSchedule(createDefaultReadingData());
-		const moments = getPrayerReminderMoments(prayers, new Date(2026, 10, 12, 0, 0));
-		expect(moments).toHaveLength(30);
-		expect(moments.filter(moment => moment.kind === "adhan")).toHaveLength(5);
-		expect(moments.filter(moment => moment.kind === "iqama")).toHaveLength(25);
-		const fajrAdhan = moments.find(m => m.id === "fajr" && m.kind === "adhan");
-		expect(fajrAdhan?.minutesBefore).toBe(0);
-		expect(new Date(fajrAdhan!.at).getHours()).toBe(5);
-		expect(new Date(fajrAdhan!.at).getMinutes()).toBe(0);
-		const fajrIqama = moments.find(m => m.id === "fajr" && m.kind === "iqama" && m.minutesBefore === 5);
-		expect(new Date(fajrIqama!.at).getHours()).toBe(5);
-		expect(new Date(fajrIqama!.at).getMinutes()).toBe(40);
+	it("keeps an after-prayer reminder that crosses midnight", () => {
+		const prayers = [{ id: "isha" as const, name: "Isha", adhan: "23:30", iqama: "23:50" }];
+		const next = getNextPrayerReminder(prayers, new Date(2026, 10, 13, 0, 1));
+		expect(next).toMatchObject({ kind: "ruku", at: new Date(2026, 10, 13, 0, 5).getTime() });
+	});
+
+	it("marks only the latest prayer's ruku as due", () => {
+		const reading = createDefaultReadingData();
+		expect(getRukuDue(reading, new Date(2026, 10, 12, 12, 41))?.id).toBe("fajr");
+		expect(getRukuDue(reading, new Date(2026, 10, 12, 12, 42))?.id).toBe("dhuhr");
+		// Isha stays due past midnight, until Fajr takes its place.
+		expect(getRukuDue(reading, new Date(2026, 10, 13, 5, 59))?.id).toBe("isha");
+		expect(getRukuDue(reading, new Date(2026, 10, 13, 6, 0))?.id).toBe("fajr");
+	});
+
+	it("settles a due ruku with one finished since the prayer's adhan", () => {
+		const now = new Date(2026, 10, 12, 13, 0);
+		const finishedAt = (hour: number, minute: number) => ({
+			...createDefaultReadingData(),
+			sessions: [{ date: "2026-11-12", rukuId: 1, completedAt: new Date(2026, 10, 12, hour, minute).getTime() }],
+		});
+		expect(getRukuDue(finishedAt(12, 11), now)?.id).toBe("dhuhr");
+		expect(getRukuDue(finishedAt(12, 20), now)).toBeNull();
+		expect(getRukuDue(finishedAt(12, 50), now)).toBeNull();
+		expect(getRukuDue(finishedAt(12, 50), new Date(2026, 10, 12, 17, 15))?.id).toBe("asr");
+	});
+
+	it("handles an iqama after midnight", () => {
+		const base = createDefaultReadingData();
+		const reading = {
+			...base,
+			settings: { ...base.settings, prayerTimes: { ...base.settings.prayerTimes, isha: { adhan: "23:40", iqama: "00:10" } } },
+			sessions: [{ date: "2026-11-12", rukuId: 1, completedAt: new Date(2026, 10, 12, 23, 45).getTime() }],
+		};
+		expect(getRukuDue(reading, new Date(2026, 10, 13, 0, 30))).toBeNull();
+		expect(getRukuDue({ ...reading, sessions: [] }, new Date(2026, 10, 13, 0, 30))?.id).toBe("isha");
 	});
 
 	it("formats a countdown as minutes, seconds, and hours", () => {

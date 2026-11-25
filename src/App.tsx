@@ -14,6 +14,7 @@ import {
 	getNextPrayerMoment,
 	getNextPrayerReminder,
 	getPrayerSchedule,
+	getRukuDue,
 	getTodayStats,
 	isRukuEnd,
 	pendingEarlierRukus,
@@ -27,7 +28,6 @@ import { adjacentPosition, decodeState, parseHash } from "./lib/reader";
 import type { Position, ReaderState } from "./lib/reader";
 import { createReaderReducer } from "./lib/reader-state";
 import { createPreferencesStore } from "./lib/preferences-store";
-import { prayerWindows } from "./lib/prayer-windows";
 import { createTranslationRepository } from "./lib/translation-repository";
 import { chapters, rukus } from "./lib/quran";
 
@@ -67,6 +67,12 @@ function initializeReader(): Initialization {
 		notice = { message: "That verse link isn't valid. Your last reading position has been opened.", persistent: false };
 	}
 	return { state, notice };
+}
+
+/** Shortens an ayah to fit a notification, ending on a whole word. */
+function openingLine(text: string): string {
+	if (text.length <= 140) return text;
+	return `${text.slice(0, 140).replace(/\s+\S*$/, "")}…`;
 }
 
 export function App() {
@@ -329,9 +335,15 @@ export function App() {
 		? { name: nextMoment.name, kind: nextMoment.kind, remaining: formatCountdown(nextMoment.at - now.getTime()) }
 		: null;
 
+	// A pinned tab shows only its icon, so a dot there marks a waiting ruku.
+	const rukuIsDue = getRukuDue(state.readingData, now) !== null;
+	useEffect(() => {
+		document.querySelector('link[rel="icon"]')?.setAttribute("href", rukuIsDue ? "/favicon-due.svg" : "/favicon.svg");
+	}, [rukuIsDue]);
+
 	/**
-	 * Schedules the next browser reminder: at the adhan, and one, two, three,
-	 * four, and five minutes before the iqama. Reminders fire while the tab is open.
+	 * Schedules the next browser reminder: five minutes before the iqama, and
+	 * after the prayer for its ruku. Reminders fire while the tab is open.
 	 */
 	const schedulePrayerReminder = useCallback(() => {
 		window.clearTimeout(reminderTimerRef.current);
@@ -343,21 +355,23 @@ export function App() {
 		if (!next) return;
 		reminderTimerRef.current = window.setTimeout(() => {
 			const latest = latestRef.current.state;
-			const slot = prayerWindows(getPrayerSchedule(latest.readingData), latest.readingData).find(item => item.id === next.id);
-			const currentRuku = findRuku(latest.position, rukus);
-			const chapter = chapters[latest.position.chapter - 1];
-			const message = next.kind === "adhan"
-				? `${next.name} adhan at ${next.adhan}. Next up: ${chapter.name}, ruku ${currentRuku?.localNumber ?? 1}. One ruku, whenever you’re ready.`
-				: `${next.name} iqama in ${next.minutesBefore} ${next.minutesBefore === 1 ? "minute" : "minutes"} at ${next.iqama}. Time to head to the masjid.`;
-			// The iqama nudges are about reaching the masjid, so they fire in the
-			// five minutes before it to allow time for wudu and travel. The adhan
-			// nudge waits for the prayer window when the reader already read.
-			if (next.kind === "iqama" || !(slot?.read ?? false)) {
-				const notification = new Notification(message);
+			const show = (title: string, body?: string) => {
+				const notification = new Notification(title, { body });
 				notification.onclick = () => {
 					window.focus();
 					notification.close();
 				};
+			};
+			if (next.kind === "iqama") {
+				show(`${next.name} iqama in ${next.minutesBefore} minutes at ${next.iqama}. Time to head to the masjid.`);
+			} else {
+				// A timer can fire a moment early, so the due time is the floor.
+				const due = getRukuDue(latest.readingData, new Date(Math.max(Date.now(), next.at)));
+				if (due) {
+					const { chapter, verse } = latest.position;
+					const text = translationRepository.getLoaded(latest.translation)?.[chapter - 1]?.[verse - 1]?.text;
+					show(`After ${due.name}, one ruku`, text ? openingLine(text) : `Continue from ${chapter}:${verse}.`);
+				}
 			}
 			scheduleRef.current?.();
 		}, Math.min(2147483647, Math.max(0, next.at - reminderNow.getTime())));

@@ -56,8 +56,10 @@ without a Cloudflare account.
 - Settings lists the five daily prayers, Fajr, Dhuhr, Asr, Maghrib, and Isha.
   Each prayer keeps its adhan and iqama times, which can be adjusted to match
   your location and season; the prayers themselves are fixed and cannot be
-  added or removed. The reader can remind you at the adhan and 1, 2, 3, 4, and 5
-  minutes before the iqama.
+  added or removed. The reader can remind you 5 minutes before
+  the iqama, and once 15 minutes after it to read one ruku.
+- A gold dot on the tab icon shows that the latest prayer's ruku is waiting. It
+  clears when you finish a ruku, and missed prayers do not pile up.
 - The daily panel counts down to the next prayer moment, so the time left
   until the iqama is always in sight.
 - Read in a centered column no wider than 680px, set in Georgia at 21px with

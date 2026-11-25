@@ -30,20 +30,14 @@ export interface PrayerTimes {
 /** A prayer with the adhan and iqama times the reader has set for it. */
 export interface ScheduledPrayer extends Prayer, PrayerTimes {}
 
-export type PrayerMomentKind = "adhan" | "iqama";
+export type PrayerMomentKind = "adhan" | "iqama" | "ruku";
 
 export interface PrayerMoment extends ScheduledPrayer {
 	kind: PrayerMomentKind;
 	time: string;
 	at: number;
-	/** Minutes before the iqama for a reminder; 0 for an adhan or iqama moment. */
+	/** Minutes before the iqama for a reminder; 0 for every other moment. */
 	minutesBefore: number;
-}
-
-export interface PrayerWindow extends ScheduledPrayer {
-	start: number;
-	end: number;
-	read: boolean;
 }
 
 /** The adhan and iqama times of the prayers, until the reader sets their own. */
@@ -307,32 +301,59 @@ export function getNextPrayerMoment(prayers: readonly ScheduledPrayer[], date = 
 	return getPrayerMoments(prayers, date).sort((left, right) => left.at - right.at)[0] ?? null;
 }
 
-/** How many minutes before each iqama a reminder fires. */
-export const IQAMA_REMINDER_OFFSETS_MINUTES = [1, 2, 3, 4, 5] as const;
+/** How many minutes before each iqama the masjid reminder fires. */
+export const IQAMA_REMINDER_MINUTES = 5;
+
+/** How many minutes after each iqama the prayer's ruku becomes due. */
+export const RUKU_DUE_MINUTES = 15;
 
 /**
- * The reminder moments of every prayer: at the adhan, and once for each offset
- * before the iqama to allow time for wudu and reaching the masjid.
+ * The reminder moments of every prayer: before the iqama to allow time for
+ * wudu and reaching the masjid, and after the prayer for its ruku.
  */
-export function getPrayerReminderMoments(prayers: readonly ScheduledPrayer[], date = new Date(), offsetsMinutes: readonly number[] = IQAMA_REMINDER_OFFSETS_MINUTES): PrayerMoment[] {
-	const adhanMoments = prayers.map(prayer => {
-		const [hour, minute] = prayer.adhan.split(":").map(Number);
-		const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
-		while (moment.getTime() <= date.getTime()) moment.setDate(moment.getDate() + 1);
-		return { ...prayer, kind: "adhan" as const, time: prayer.adhan, at: moment.getTime(), minutesBefore: 0 };
-	});
-	const iqamaMoments = prayers.flatMap(prayer => offsetsMinutes.map(minutesBefore => {
+export function getPrayerReminderMoments(prayers: readonly ScheduledPrayer[], date = new Date()): PrayerMoment[] {
+	const momentOf = (prayer: ScheduledPrayer, offset: number) => {
 		const [hour, minute] = prayer.iqama.split(":").map(Number);
-		const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute - minutesBefore);
+		// Starting a day back covers an offset that crosses midnight.
+		const moment = new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1, hour, minute + offset);
 		while (moment.getTime() <= date.getTime()) moment.setDate(moment.getDate() + 1);
-		return { ...prayer, kind: "iqama" as const, time: prayer.iqama, at: moment.getTime(), minutesBefore };
-	}));
-	return [...adhanMoments, ...iqamaMoments];
+		return moment.getTime();
+	};
+	return prayers.flatMap(prayer => [
+		{ ...prayer, kind: "iqama" as const, time: prayer.iqama, at: momentOf(prayer, -IQAMA_REMINDER_MINUTES), minutesBefore: IQAMA_REMINDER_MINUTES },
+		{ ...prayer, kind: "ruku" as const, time: prayer.iqama, at: momentOf(prayer, RUKU_DUE_MINUTES), minutesBefore: 0 },
+	]);
 }
 
 /** The next prayer reminder moment of the day. */
-export function getNextPrayerReminder(prayers: readonly ScheduledPrayer[], date = new Date(), offsetsMinutes: readonly number[] = IQAMA_REMINDER_OFFSETS_MINUTES): PrayerMoment | null {
-	return getPrayerReminderMoments(prayers, date, offsetsMinutes).sort((left, right) => left.at - right.at)[0] ?? null;
+export function getNextPrayerReminder(prayers: readonly ScheduledPrayer[], date = new Date()): PrayerMoment | null {
+	return getPrayerReminderMoments(prayers, date).sort((left, right) => left.at - right.at)[0] ?? null;
+}
+
+/**
+ * The prayer whose ruku is waiting to be read, if any. Only the latest prayer
+ * counts, so missed ones never pile up. A ruku finished at any time since that
+ * prayer's adhan settles it, including one read while waiting for the iqama.
+ */
+export function getRukuDue(readingData: ReadingData, date = new Date()): ScheduledPrayer | null {
+	let latest: { prayer: ScheduledPrayer; adhanAt: number; dueAt: number } | null = null;
+	for (const prayer of getPrayerSchedule(readingData)) {
+		const [adhanHour, adhanMinute] = prayer.adhan.split(":").map(Number);
+		const [iqamaHour, iqamaMinute] = prayer.iqama.split(":").map(Number);
+		// An iqama earlier on the clock than its adhan falls after midnight.
+		const adhanDayOffset = prayer.adhan > prayer.iqama ? -1 : 0;
+		// Yesterday's Isha stays due until the Fajr ruku takes its place.
+		for (const dayOffset of [0, -1]) {
+			const day = date.getDate() + dayOffset;
+			const dueAt = new Date(date.getFullYear(), date.getMonth(), day, iqamaHour, iqamaMinute + RUKU_DUE_MINUTES).getTime();
+			if (dueAt > date.getTime() || (latest && dueAt <= latest.dueAt)) continue;
+			const adhanAt = new Date(date.getFullYear(), date.getMonth(), day + adhanDayOffset, adhanHour, adhanMinute).getTime();
+			latest = { prayer, adhanAt, dueAt };
+		}
+	}
+	if (!latest) return null;
+	const { prayer, adhanAt } = latest;
+	return readingData.sessions.some(session => session.completedAt >= adhanAt) ? null : prayer;
 }
 
 /**

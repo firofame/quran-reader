@@ -7,7 +7,7 @@ const SRC_DIR = new URL("../../src/", import.meta.url);
 const ROOT = new URL("../..", import.meta.url);
 
 /** The static files that ship with the built reader. */
-const PUBLIC_FILES = ["favicon.svg", "icon-192.png", "icon-512.png", "en.hilali.txt"];
+const PUBLIC_FILES = ["favicon.svg", "favicon-due.svg", "icon-192.png", "icon-512.png", "en.hilali.txt"];
 
 /** Collects every UI source file so the invariants can scan them at once. */
 async function collectSources(): Promise<string> {
@@ -104,7 +104,7 @@ describe("reader layout invariants", () => {
 	it("keeps an adhan and an iqama time for every prayer", async () => {
 		const settings = await readFile(fileURLToPath(new URL("components/SettingsPage.tsx", SRC_DIR).href), "utf8");
 		expect(settings).toMatch(/adhan and iqama/);
-		expect(settings).toMatch(/Browser reminders at the adhan and 1, 2, 3, 4, 5 minutes before iqama/);
+		expect(settings).toMatch(/Browser reminders 5 minutes before the iqama, and for one ruku after the prayer/);
 		expect(settings).toMatch(/adhan time/);
 		expect(settings).toMatch(/iqama time/);
 	});

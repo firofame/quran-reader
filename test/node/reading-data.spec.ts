@@ -138,11 +138,11 @@ describe("reading history", () => {
 	it("lists the five daily prayers with their adhan and iqama times", () => {
 		expect(PRAYERS.map(prayer => prayer.name)).toEqual(["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]);
 		expect(DEFAULT_PRAYER_TIMES).toEqual({
-			fajr: { adhan: "05:00", iqama: "05:45" },
-			dhuhr: { adhan: "12:12", iqama: "12:27" },
-			asr: { adhan: "15:34", iqama: "17:00" },
-			maghrib: { adhan: "18:03", iqama: "18:06" },
-			isha: { adhan: "19:23", iqama: "19:38" },
+			fajr: { adhan: "05:02", iqama: "05:47" },
+			dhuhr: { adhan: "12:13", iqama: "13:15" },
+			asr: { adhan: "15:35", iqama: "17:00" },
+			maghrib: { adhan: "18:04", iqama: "18:07" },
+			isha: { adhan: "19:24", iqama: "19:39" },
 		});
 	});
 
@@ -191,8 +191,27 @@ describe("reading history", () => {
 		expect(migrated.settings.prayerTimes.maghrib).toEqual(DEFAULT_PRAYER_TIMES.maghrib);
 		expect(migrated.settings.prayerTimes.isha).toEqual(DEFAULT_PRAYER_TIMES.isha);
 		// Custom times are kept field by field.
-		expect(migrated.settings.prayerTimes.dhuhr).toEqual({ adhan: "12:12", iqama: "12:45" });
+		expect(migrated.settings.prayerTimes.dhuhr).toEqual({ adhan: "12:13", iqama: "12:45" });
 		expect(migrated.settings.prayerTimes.asr).toEqual({ adhan: "16:10", iqama: "17:00" });
+	});
+
+	it("moves the saved times of the last schedule to the current defaults", () => {
+		const migrated = normalizeReadingData(
+			{
+				version: 11,
+				settings: {
+					prayerTimes: {
+						fajr: { adhan: "05:00", iqama: "05:45" },
+						dhuhr: { adhan: "12:12", iqama: "12:27" },
+						asr: { adhan: "15:34", iqama: "17:00" },
+						maghrib: { adhan: "18:03", iqama: "18:06" },
+						isha: { adhan: "19:23", iqama: "19:38" },
+					},
+				},
+			},
+			chapters,
+		);
+		expect(migrated.settings.prayerTimes).toEqual(DEFAULT_PRAYER_TIMES);
 	});
 
 	it("moves the prayer times of the first prayer list to the current defaults", () => {
@@ -216,7 +235,7 @@ describe("reading history", () => {
 		const reading = createDefaultReadingData();
 		const schedule = getPrayerSchedule(reading);
 		expect(schedule.map(prayer => prayer.id)).toEqual(["fajr", "dhuhr", "asr", "maghrib", "isha"]);
-		expect(schedule[0]).toEqual({ id: "fajr", name: "Fajr", adhan: "05:00", iqama: "05:45" });
+		expect(schedule[0]).toEqual({ id: "fajr", name: "Fajr", adhan: "05:02", iqama: "05:47" });
 
 		const moved = {
 			...reading,
@@ -232,14 +251,14 @@ describe("reading history", () => {
 		expect(next?.kind).toBe("adhan");
 		expect(next?.name).toBe("Fajr");
 		expect(new Date(next!.at).getHours()).toBe(5);
-		expect(new Date(next!.at).getMinutes()).toBe(0);
+		expect(new Date(next!.at).getMinutes()).toBe(2);
 
 		// Between the adhan and the iqama the countdown waits for the iqama.
-		const between = getNextPrayerMoment(prayers, new Date(2026, 10, 12, 5, 0));
+		const between = getNextPrayerMoment(prayers, new Date(2026, 10, 12, 5, 2));
 		expect(between?.kind).toBe("iqama");
 		expect(between?.name).toBe("Fajr");
 		expect(new Date(between!.at).getHours()).toBe(5);
-		expect(new Date(between!.at).getMinutes()).toBe(45);
+		expect(new Date(between!.at).getMinutes()).toBe(47);
 
 		// A moment that has passed waits for the next day.
 		const passed = getNextPrayerMoment(prayers, new Date(2026, 10, 12, 23, 0));
@@ -259,9 +278,9 @@ describe("reading history", () => {
 		const prayers = getPrayerSchedule(createDefaultReadingData());
 		expect(getPrayerReminderMoments(prayers, new Date(2026, 10, 12, 0, 0))).toHaveLength(10);
 		const masjid = getNextPrayerReminder(prayers, new Date(2026, 10, 12, 4, 0));
-		expect(masjid).toMatchObject({ id: "fajr", kind: "iqama", minutesBefore: 5, at: new Date(2026, 10, 12, 5, 40).getTime() });
+		expect(masjid).toMatchObject({ id: "fajr", kind: "iqama", minutesBefore: 5, at: new Date(2026, 10, 12, 5, 42).getTime() });
 		const ruku = getNextPrayerReminder(prayers, new Date(masjid!.at));
-		expect(ruku).toMatchObject({ id: "fajr", kind: "ruku", at: new Date(2026, 10, 12, 6, 0).getTime() });
+		expect(ruku).toMatchObject({ id: "fajr", kind: "ruku", at: new Date(2026, 10, 12, 6, 2).getTime() });
 		expect(getNextPrayerReminder(prayers, new Date(ruku!.at))).toMatchObject({ id: "dhuhr", kind: "iqama" });
 	});
 
@@ -273,20 +292,20 @@ describe("reading history", () => {
 
 	it("marks only the latest prayer's ruku as due", () => {
 		const reading = createDefaultReadingData();
-		expect(getRukuDue(reading, new Date(2026, 10, 12, 12, 41))?.id).toBe("fajr");
-		expect(getRukuDue(reading, new Date(2026, 10, 12, 12, 42))?.id).toBe("dhuhr");
+		expect(getRukuDue(reading, new Date(2026, 10, 12, 13, 29))?.id).toBe("fajr");
+		expect(getRukuDue(reading, new Date(2026, 10, 12, 13, 30))?.id).toBe("dhuhr");
 		// Isha stays due past midnight, until Fajr takes its place.
-		expect(getRukuDue(reading, new Date(2026, 10, 13, 5, 59))?.id).toBe("isha");
-		expect(getRukuDue(reading, new Date(2026, 10, 13, 6, 0))?.id).toBe("fajr");
+		expect(getRukuDue(reading, new Date(2026, 10, 13, 6, 1))?.id).toBe("isha");
+		expect(getRukuDue(reading, new Date(2026, 10, 13, 6, 2))?.id).toBe("fajr");
 	});
 
 	it("settles a due ruku with one finished since the prayer's adhan", () => {
-		const now = new Date(2026, 10, 12, 13, 0);
+		const now = new Date(2026, 10, 12, 14, 0);
 		const finishedAt = (hour: number, minute: number) => ({
 			...createDefaultReadingData(),
 			sessions: [{ date: "2026-11-12", rukuId: 1, completedAt: new Date(2026, 10, 12, hour, minute).getTime() }],
 		});
-		expect(getRukuDue(finishedAt(12, 11), now)?.id).toBe("dhuhr");
+		expect(getRukuDue(finishedAt(12, 12), now)?.id).toBe("dhuhr");
 		expect(getRukuDue(finishedAt(12, 20), now)).toBeNull();
 		expect(getRukuDue(finishedAt(12, 50), now)).toBeNull();
 		expect(getRukuDue(finishedAt(12, 50), new Date(2026, 10, 12, 17, 15))?.id).toBe("asr");

@@ -42,24 +42,33 @@ export interface PrayerMoment extends ScheduledPrayer {
 
 /** The adhan and iqama times of the prayers, until the reader sets their own. */
 export const DEFAULT_PRAYER_TIMES: Record<PrayerId, PrayerTimes> = {
-	fajr: { adhan: "05:00", iqama: "05:45" },
-	dhuhr: { adhan: "12:12", iqama: "12:27" },
-	asr: { adhan: "15:34", iqama: "17:00" },
-	maghrib: { adhan: "18:03", iqama: "18:06" },
-	isha: { adhan: "19:23", iqama: "19:38" },
+	fajr: { adhan: "05:02", iqama: "05:47" },
+	dhuhr: { adhan: "12:13", iqama: "13:15" },
+	asr: { adhan: "15:35", iqama: "17:00" },
+	maghrib: { adhan: "18:04", iqama: "18:07" },
+	isha: { adhan: "19:24", iqama: "19:39" },
 };
 
 /**
- * The defaults shipped before the current schedule. A saved time still equal
- * to one of these was never customised and follows the current defaults.
+ * The defaults shipped before the current schedule, oldest first. A saved
+ * time still equal to one of these was never customised and follows the current defaults.
  */
-const PREVIOUS_PRAYER_TIMES: Record<PrayerId, PrayerTimes> = {
-	fajr: { adhan: "04:58", iqama: "05:43" },
-	dhuhr: { adhan: "12:11", iqama: "13:15" },
-	asr: { adhan: "15:32", iqama: "17:00" },
-	maghrib: { adhan: "18:03", iqama: "18:06" },
-	isha: { adhan: "19:23", iqama: "20:30" },
-};
+const PREVIOUS_PRAYER_TIMES: Record<PrayerId, PrayerTimes>[] = [
+	{
+		fajr: { adhan: "04:58", iqama: "05:43" },
+		dhuhr: { adhan: "12:11", iqama: "13:15" },
+		asr: { adhan: "15:32", iqama: "17:00" },
+		maghrib: { adhan: "18:03", iqama: "18:06" },
+		isha: { adhan: "19:23", iqama: "20:30" },
+	},
+	{
+		fajr: { adhan: "05:00", iqama: "05:45" },
+		dhuhr: { adhan: "12:12", iqama: "12:27" },
+		asr: { adhan: "15:34", iqama: "17:00" },
+		maghrib: { adhan: "18:03", iqama: "18:06" },
+		isha: { adhan: "19:23", iqama: "19:38" },
+	},
+];
 
 /** The placeholder prayer times of the first version of the prayer list. */
 const RETIRED_PRAYER_TIMES: Record<PrayerId, string> = {
@@ -203,14 +212,14 @@ function cleanPrayerTimes(value: unknown): Record<PrayerId, PrayerTimes> {
 	const times = {} as Record<PrayerId, PrayerTimes>;
 	for (const prayer of PRAYERS) {
 		const defaults = DEFAULT_PRAYER_TIMES[prayer.id];
-		const previous = PREVIOUS_PRAYER_TIMES[prayer.id];
+		const previous = PREVIOUS_PRAYER_TIMES.map(times => times[prayer.id]);
 		const saved = isObject(value) ? value[prayer.id] : null;
 		if (isObject(saved)) {
 			const adhan = validTime(saved.adhan) ? saved.adhan : defaults.adhan;
 			const iqama = validTime(saved.iqama) ? saved.iqama : defaults.iqama;
 			times[prayer.id] = {
-				adhan: adhan === previous.adhan ? defaults.adhan : adhan,
-				iqama: iqama === previous.iqama ? defaults.iqama : iqama,
+				adhan: previous.some(time => time.adhan === adhan) ? defaults.adhan : adhan,
+				iqama: previous.some(time => time.iqama === iqama) ? defaults.iqama : iqama,
 			};
 			continue;
 		}

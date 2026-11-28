@@ -2,8 +2,8 @@
 
 /** The premade voice that reads the translation: George, a warm narrator. */
 export const READER_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
-/** Eleven v4 Turbo, the fast model of the v4 family. */
-export const READER_MODEL_ID = "eleven_v4_turbo";
+/** Eleven v4, the highest-quality model: the reading is made once and cached, so Turbo's lower latency buys little here. */
+export const READER_MODEL_ID = "eleven_v4";
 /**
  * Turns the translation into the text the voice reads.
  *

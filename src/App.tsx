@@ -511,7 +511,7 @@ export function App() {
 							onMove={moveAyah}
 							onRetry={() => setLoadAttempt(attempt => attempt + 1)}
 							audioStatus={audioStatus}
-							onToggleAudio={verse => toggleAudio({ chapter: verse.chapter, verse: verse.verse })}
+							onToggleAudio={(verse, source) => toggleAudio({ chapter: verse.chapter, verse: verse.verse }, source)}
 						/>
 					</div>
 					<div hidden={activePage !== "settings"}>

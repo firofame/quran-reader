@@ -140,14 +140,14 @@ describe("reader layout invariants", () => {
 		expect(verseCard).toMatch(/Ayah: \{verse\.verse\} \/ \{totalVerses\}/);
 	});
 
-	it("keeps the reading aloud feature out of the reader", async () => {
+	it("reads the translation aloud through the Worker and the shared audio element", async () => {
 		const sources = await collectSources();
-		// The reader is read with the eyes: there is no request for an audio
-		// reading and no control that asks for one.
-		expect(sources).not.toMatch(/api\/speech/);
-		expect(sources).not.toMatch(/data-speak-verse/);
+		// Each ayah has a control that asks the Worker to read it; the key never reaches the browser.
+		expect(sources).toMatch(/onToggleAudio\(verse, "translation"\)/);
+		expect(sources).not.toMatch(/elevenlabs\.io/);
+		expect(sources).not.toMatch(/ELEVENLABS_API_KEY/);
+		// It plays through the same element as the recitation, so the two never overlap.
 		expect(sources).not.toMatch(/AudioContext/);
-		// The recitation of the ayah itself is untouched.
 		expect(sources).toMatch(/id="verse-audio"/);
 	});
 

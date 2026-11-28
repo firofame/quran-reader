@@ -10,3 +10,15 @@ export function recitationUrl(position: Position, chapters: readonly Chapter[]):
 	const ayahNumber = chapter.start + position.verse;
 	return `${RECITATION_BASE}${ayahNumber}.mp3`;
 }
+
+/**
+ * How fast the translation reading plays. Eleven v4 has no speed setting, so
+ * the reading is slowed in the browser, with the pitch kept, to give each
+ * phrase time to be taken in.
+ */
+export const TRANSLATION_PLAYBACK_RATE = 0.8;
+
+/** The Worker route that reads an ayah's English translation aloud. */
+export function translationSpeechUrl(position: Position): string {
+	return `/api/speech/${position.chapter}/${position.verse}`;
+}

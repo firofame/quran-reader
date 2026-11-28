@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { TRANSLATION_PLAYBACK_RATE, recitationUrl, translationSpeechUrl } from "../lib/audio";
+import { TRANSLATION_PLAYBACK_RATE, recitationUrl, translationErrorMessage, translationSpeechUrl } from "../lib/audio";
 import { chapters } from "../lib/quran";
 import type { Position } from "../lib/reader";
 
@@ -76,7 +76,7 @@ export function useVerseAudio(onError: (message: string) => void) {
 			if (request !== requestRef.current) return;
 			console.warn(`Unable to play the selected ${source}:`, error);
 			finish(request);
-			onError(openError(source));
+			reportError(source, onError);
 		});
 	}, [applyStatus, finish, onError, stop]);
 
@@ -105,17 +105,19 @@ export function useVerseAudio(onError: (message: string) => void) {
 			if (request !== requestRef.current) return;
 			console.warn(`Unable to resume the selected ${source}:`, error);
 			finish(request);
-			onError(openError(source));
+			reportError(source, onError);
 		});
 	}, [applyStatus, finish, onError, play]);
 
 	return { audioRef, status, toggle, stop };
 }
 
-function openError(source: VerseAudioSource): string {
-	return source === "translation"
-		? "The translation could not be read aloud. Check your connection and try again."
-		: "The recitation could not be opened. Check your connection and try again.";
+function reportError(source: VerseAudioSource, onError: (message: string) => void): void {
+	if (source === "translation") {
+		void translationErrorMessage().then(onError);
+		return;
+	}
+	onError("The recitation could not be opened. Check your connection and try again.");
 }
 
 /** The button state for one ayah's recitation or translation reading. */

@@ -6,13 +6,16 @@
  * the reading of a translation aloud, and the JSON fallback for unknown paths.
  */
 
-import { handleSpeech } from "./speech.ts";
+import { handleSpeech, handleSpeechStatus } from "./speech.ts";
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const { pathname } = new URL(request.url);
 		if (pathname === "/health") {
 			return Response.json({ status: "ok", service: "quran" });
+		}
+		if (pathname === "/api/speech/status") {
+			return handleSpeechStatus(env);
 		}
 		if (pathname.startsWith("/api/speech/")) {
 			return handleSpeech(request, env, ctx);

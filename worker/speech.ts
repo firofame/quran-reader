@@ -187,3 +187,36 @@ export async function handleSpeech(request: Request, env: Env, ctx: ExecutionCon
 	}
 	return wantsWords ? wordsResponse(reading.words) : audioResponse(reading.audio.slice());
 }
+
+/**
+ * Answers `GET /api/speech/status`: whether the ElevenLabs account has run out
+ * of credits, and when they come back. The reader asks only after a reading
+ * failed, so it can say why instead of blaming the connection.
+ */
+export async function handleSpeechStatus(env: Env): Promise<Response> {
+	const headers = { "cache-control": "no-store" };
+	if (!env.ELEVENLABS_API_KEY) return Response.json({ configured: false }, { headers });
+	try {
+		const response = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
+			headers: { "xi-api-key": env.ELEVENLABS_API_KEY },
+		});
+		if (!response.ok) throw new Error(`Subscription request failed (${response.status}).`);
+		const subscription = await response.json() as {
+			character_count?: number;
+			character_limit?: number;
+			next_character_count_reset_unix?: number;
+		};
+		const used = subscription.character_count ?? 0;
+		const limit = subscription.character_limit ?? Infinity;
+		const reset = subscription.next_character_count_reset_unix;
+		return Response.json({
+			configured: true,
+			// A reading needs room for a whole ayah, so a few characters left is as good as none.
+			outOfCredits: limit - used < 200,
+			resetsAt: reset ? new Date(reset * 1000).toISOString() : null,
+		}, { headers });
+	} catch (error) {
+		console.error("Unable to check the ElevenLabs credits:", error);
+		return Response.json({ configured: true, outOfCredits: null, resetsAt: null }, { headers });
+	}
+}

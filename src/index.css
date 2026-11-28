@@ -188,6 +188,11 @@ select option { background: var(--paper); color: var(--text); }
 .verse-audio-action button:hover:not(:disabled) { color: var(--green); background: var(--green-soft); }
 .verse-audio-action button svg { width: 13px; height: 13px; }
 
+/* The word being read aloud */
+.word { border-radius: 3px; transition: background-color .12s ease-out, box-shadow .12s ease-out; }
+.word.speaking { background: var(--green-soft); box-shadow: 0 0 0 2px var(--green-soft); color: var(--green); }
+@media (prefers-reduced-motion: reduce) { .word { transition: none; } }
+
 /* Focused mode */
 #reading-content.focused { display: flex; flex-direction: column; padding-top: 0; scroll-margin-top: calc(var(--topbar-height) + 12px); }
 .focused .verse { flex: 1; min-height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px 20px; gap: 20px; }

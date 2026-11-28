@@ -22,3 +22,8 @@ export const TRANSLATION_PLAYBACK_RATE = 0.8;
 export function translationSpeechUrl(position: Position): string {
 	return `/api/speech/${position.chapter}/${position.verse}`;
 }
+
+/** The Worker route that says when each word of the translation reading is spoken. */
+export function translationWordsUrl(position: Position): string {
+	return `${translationSpeechUrl(position)}/words`;
+}

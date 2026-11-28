@@ -25,9 +25,10 @@ interface ReaderProps {
 	onRetry: () => void;
 	audioStatus: VerseAudioStatus | null;
 	onToggleAudio: (verse: Verse, source: VerseAudioSource) => void;
+	spokenWord: number | null;
 }
 
-export function Reader({ position, verses, loading, loadError, today, countdown, shortcutsSeen, fontSize, onFontSizeAdjust, onMove, onRetry, audioStatus, onToggleAudio }: ReaderProps) {
+export function Reader({ position, verses, loading, loadError, today, countdown, shortcutsSeen, fontSize, onFontSizeAdjust, onMove, onRetry, audioStatus, onToggleAudio, spokenWord }: ReaderProps) {
 	const chapter = chapters[position.chapter - 1];
 	const ayah = verses ? findAyah(verses, position.verse) : null;
 	const currentRuku = findRuku(position, rukus);
@@ -79,7 +80,8 @@ export function Reader({ position, verses, loading, loadError, today, countdown,
 					</div>
 				)}
 				{!loading && !loadError && (ayah
-					? <VerseCard verse={ayah} totalVerses={chapter.verses} audioStatus={audioStatus} onToggleAudio={onToggleAudio} />
+					? <VerseCard verse={ayah} totalVerses={chapter.verses} audioStatus={audioStatus} onToggleAudio={onToggleAudio}
+						spokenWord={audioStatus?.source === "translation" && audioStatus.position.chapter === ayah.chapter && audioStatus.position.verse === ayah.verse ? spokenWord : null} />
 					: <div className="empty-state"><h3>No verses found</h3><p>This part of the chapter could not be loaded.</p></div>)}
 			</div>
 			<div className="reader-font-control">

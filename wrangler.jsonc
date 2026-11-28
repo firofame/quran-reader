@@ -15,9 +15,7 @@
 	 */
 	"assets": {
 		"binding": "ASSETS",
-		"not_found_handling": "single-page-application",
-		// The reading aloud route is always answered by the Worker, never by the SPA fallback.
-		"run_worker_first": ["/api/*"]
+		"not_found_handling": "single-page-application"
 	},
 	/**
 	 * Secrets: ELEVENLABS_API_KEY reads the translation aloud. Locally it comes

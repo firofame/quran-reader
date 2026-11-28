@@ -17,3 +17,41 @@ export function pacedText(text: string): string {
 		.replace(/(?<!\.)\.\s+(?=\S)/g, "... ")
 		.replace(/([;:!?])\s+(?=\S)/g, "$1... ");
 }
+
+/** One piece of a reading's timing, as ElevenLabs sends it with each audio chunk. */
+export interface AlignmentChunk {
+	chars: string[];
+	char_start_times_ms: number[];
+	char_durations_ms: number[];
+}
+
+/**
+ * When each word is spoken, as [start, end] seconds from the start of the reading.
+ *
+ * Each chunk's times start again at zero, and the chunks follow on from each
+ * other, so every chunk is moved along by the length of the ones before it.
+ * Words are the runs of characters between spaces, which is how the reader
+ * splits the ayah too: the pacing only adds dots to the end of a word.
+ */
+export function wordTimings(chunks: readonly AlignmentChunk[]): [number, number][] {
+	const words: [number, number][] = [];
+	let offset = 0;
+	let inWord = false;
+	for (const chunk of chunks) {
+		let chunkEnd = 0;
+		chunk.chars.forEach((character, index) => {
+			const start = offset + (chunk.char_start_times_ms[index] ?? 0);
+			const end = start + (chunk.char_durations_ms[index] ?? 0);
+			chunkEnd = Math.max(chunkEnd, end - offset);
+			if (/\s/.test(character)) {
+				inWord = false;
+				return;
+			}
+			if (!inWord) words.push([start, end]);
+			else words[words.length - 1][1] = end;
+			inWord = true;
+		});
+		offset += chunkEnd;
+	}
+	return words.map(([start, end]) => [Math.round(start) / 1000, Math.round(end) / 1000]);
+}

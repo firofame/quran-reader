@@ -7,6 +7,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Icon } from "./components/Icon";
 import { useNow } from "./hooks/use-now";
 import { useVerseAudio } from "./hooks/use-verse-audio";
+import { useSpokenWord } from "./hooks/use-spoken-word";
 import {
 	DEFAULT_PRAYER_TIMES,
 	findRuku,
@@ -123,6 +124,7 @@ export function App() {
 	}, []);
 
 	const { audioRef, status: audioStatus, toggle: toggleAudio, stop: stopAudio } = useVerseAudio(notify);
+	const spokenWord = useSpokenWord(audioRef, audioStatus);
 
 	// Every committed state change is written back to browser storage.
 	useEffect(() => {
@@ -511,6 +513,7 @@ export function App() {
 							onMove={moveAyah}
 							onRetry={() => setLoadAttempt(attempt => attempt + 1)}
 							audioStatus={audioStatus}
+							spokenWord={spokenWord}
 							onToggleAudio={(verse, source) => toggleAudio({ chapter: verse.chapter, verse: verse.verse }, source)}
 						/>
 					</div>

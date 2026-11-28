@@ -1,7 +1,9 @@
 /**
  * Reads an ayah's English translation aloud with ElevenLabs Eleven v4 Turbo.
  *
- * The reader asks for `GET /api/speech/<chapter>/<verse>`. The Worker looks the
+ * The reader asks for `GET /api/speech/<chapter>/<verse>` (the MP3) and
+ * `GET /api/speech/<chapter>/<verse>/words` (when each word is spoken, so the
+ * reader can highlight it). The Worker looks the
  * text up in its own copy of the translation, so it only ever reads the Quran
  * and never text a caller made up. The key stays in the ELEVENLABS_API_KEY
  * binding: the browser only ever receives the MP3.
@@ -12,13 +14,14 @@
  */
 
 import { QuranData } from "../src/lib/quran-data.ts";
-import { READER_MODEL_ID, READER_VOICE_ID, pacedText } from "./pacing.ts";
+import { READER_MODEL_ID, READER_VOICE_ID, pacedText, wordTimings } from "./pacing.ts";
+import type { AlignmentChunk } from "./pacing.ts";
 
 const OUTPUT_FORMAT = "mp3_44100_128";
 /** Bump this when the voice, model or pacing changes, so old cached audio is not served. */
-const SPEECH_VERSION = "1";
+const SPEECH_VERSION = "2";
 const TRANSLATION_FILE = "/en.hilali.txt";
-const DIALOGUE_URL = `https://api.elevenlabs.io/v1/text-to-dialogue/stream-input?model_id=${READER_MODEL_ID}&output_format=${OUTPUT_FORMAT}`;
+const DIALOGUE_URL = `https://api.elevenlabs.io/v1/text-to-dialogue/stream-input?model_id=${READER_MODEL_ID}&output_format=${OUTPUT_FORMAT}&sync_alignment=true`;
 /** Give up on a reading that takes longer than this. */
 const SPEECH_TIMEOUT_MS = 60_000;
 
@@ -42,15 +45,24 @@ function loadTranslation(env: Env, origin: string): Promise<Map<string, string>>
 	return translation;
 }
 
-/** Reads the text with Eleven v4 Turbo over the Text to Dialogue WebSocket and returns the MP3. */
-async function synthesize(text: string, apiKey: string): Promise<Uint8Array<ArrayBuffer>> {
+interface Reading {
+	audio: Uint8Array<ArrayBuffer>;
+	words: [number, number][];
+}
+
+/** Readings being made right now, so the audio and its timings are paid for once. */
+const pendingReadings = new Map<string, Promise<Reading>>();
+
+/** Reads the text with Eleven v4 Turbo over the Text to Dialogue WebSocket. */
+async function synthesize(text: string, apiKey: string): Promise<Reading> {
 	const upgrade = await fetch(DIALOGUE_URL, { headers: { Upgrade: "websocket" } });
 	const socket = upgrade.webSocket;
 	if (!socket) throw new Error(`ElevenLabs refused the WebSocket (${upgrade.status}).`);
 	socket.accept();
 
-	return new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) => {
+	return new Promise<Reading>((resolve, reject) => {
 		const chunks: Uint8Array<ArrayBuffer>[] = [];
+		const alignment: AlignmentChunk[] = [];
 		let settled = false;
 		const finish = (error?: unknown) => {
 			if (settled) return;
@@ -75,12 +87,12 @@ async function synthesize(text: string, apiKey: string): Promise<Uint8Array<Arra
 				audio.set(chunk, offset);
 				offset += chunk.length;
 			}
-			resolve(audio);
+			resolve({ audio, words: wordTimings(alignment) });
 		};
 		const timer = setTimeout(() => finish(new Error("The reading timed out.")), SPEECH_TIMEOUT_MS);
 
 		socket.addEventListener("message", event => {
-			let message: { audio?: string; is_final?: boolean; error?: unknown };
+			let message: { audio?: string; alignment?: AlignmentChunk; is_final?: boolean; error?: unknown };
 			try {
 				message = JSON.parse(typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data));
 			} catch {
@@ -91,6 +103,7 @@ async function synthesize(text: string, apiKey: string): Promise<Uint8Array<Arra
 				return;
 			}
 			if (message.audio) chunks.push(Uint8Array.from(atob(message.audio), c => c.charCodeAt(0)));
+			if (message.alignment?.chars?.length) alignment.push(message.alignment);
 			if (message.is_final) finish();
 		});
 		socket.addEventListener("close", () => finish());
@@ -104,19 +117,41 @@ async function synthesize(text: string, apiKey: string): Promise<Uint8Array<Arra
 	});
 }
 
-/** Answers `GET /api/speech/<chapter>/<verse>` with the reading as MP3. */
+const CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+function audioResponse(audio: BodyInit): Response {
+	return new Response(audio, { headers: { "content-type": "audio/mpeg", "cache-control": CACHE_CONTROL } });
+}
+
+function wordsResponse(words: [number, number][]): Response {
+	return Response.json({ words }, { headers: { "cache-control": CACHE_CONTROL } });
+}
+
+/**
+ * Answers `GET /api/speech/<chapter>/<verse>` with the reading as MP3, and
+ * `GET /api/speech/<chapter>/<verse>/words` with when each word is spoken.
+ */
 export async function handleSpeech(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 	if (request.method !== "GET") {
 		return Response.json({ error: "Use GET to ask for a reading." }, { status: 405 });
 	}
 	const url = new URL(request.url);
-	const match = /^\/api\/speech\/(\d{1,3})\/(\d{1,3})$/.exec(url.pathname);
+	const match = /^\/api\/speech\/(\d{1,3})\/(\d{1,3})(\/words)?$/.exec(url.pathname);
 	if (!match) return Response.json({ error: "Not found" }, { status: 404 });
 	const chapter = Number(match[1]);
 	const verse = Number(match[2]);
+	const wantsWords = Boolean(match[3]);
 	// Index 0 of the Tanzil table is empty, so chapters are one-based.
 	const verseCount = chapter >= 1 && chapter <= 114 ? QuranData.Sura[chapter]?.[1] ?? 0 : 0;
 	if (verse < 1 || verse > verseCount) return Response.json({ error: "Not found" }, { status: 404 });
+
+	// Each ayah is only paid for once: the audio and its timings are kept in the edge cache.
+	const base = `${url.origin}/api/speech/v${SPEECH_VERSION}/${chapter}/${verse}`;
+	const audioKey = new Request(`${base}.mp3`);
+	const wordsKey = new Request(`${base}.json`);
+	const cache = caches.default;
+	const cached = await cache.match(wantsWords ? wordsKey : audioKey);
+	if (cached) return cached;
 
 	const key = `${chapter}:${verse}`;
 	let text: string | undefined;
@@ -130,25 +165,25 @@ export async function handleSpeech(request: Request, env: Env, ctx: ExecutionCon
 		return Response.json({ error: "Reading aloud is not configured." }, { status: 503 });
 	}
 
-	// Each ayah is only paid for once: readings are kept in the edge cache.
-	const cacheKey = new Request(`${url.origin}/api/speech/v${SPEECH_VERSION}/${key.replace(":", "/")}`);
-	const cache = caches.default;
-	const cached = await cache.match(cacheKey);
-	if (cached) return cached;
-
-	let audio: Uint8Array<ArrayBuffer>;
+	let pending = pendingReadings.get(key);
+	if (!pending) {
+		pending = synthesize(pacedText(text), env.ELEVENLABS_API_KEY);
+		pendingReadings.set(key, pending);
+		const reading = pending;
+		ctx.waitUntil(reading.then(
+			({ audio, words }) => Promise.all([
+				cache.put(audioKey, audioResponse(audio)),
+				cache.put(wordsKey, wordsResponse(words)),
+			]),
+			() => undefined,
+		).finally(() => pendingReadings.delete(key)));
+	}
+	let reading: Reading;
 	try {
-		audio = await synthesize(pacedText(text), env.ELEVENLABS_API_KEY);
+		reading = await pending;
 	} catch (error) {
 		console.error("Unable to read the translation aloud:", error);
 		return Response.json({ error: "The translation could not be read aloud." }, { status: 502 });
 	}
-	const response = new Response(audio, {
-		headers: {
-			"content-type": "audio/mpeg",
-			"cache-control": "public, max-age=31536000, immutable",
-		},
-	});
-	ctx.waitUntil(cache.put(cacheKey, response.clone()));
-	return response;
+	return wantsWords ? wordsResponse(reading.words) : audioResponse(reading.audio.slice());
 }

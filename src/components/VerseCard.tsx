@@ -1,5 +1,8 @@
 import { Icon } from "./Icon";
+import { useMemo } from "react";
 import { splitTranslationGlosses, splitTranslationParagraphs } from "../lib/reader";
+import { wordIndexes, wordPieces } from "../lib/words";
+import type { WordPiece } from "../lib/words";
 import { TRANSLATIONS } from "../lib/reader";
 import { verseAudioLabel } from "../hooks/use-verse-audio";
 import type { VerseAudioSource, VerseAudioStatus } from "../hooks/use-verse-audio";
@@ -10,12 +13,33 @@ interface VerseCardProps {
 	totalVerses: number;
 	audioStatus: VerseAudioStatus | null;
 	onToggleAudio: (verse: Verse, source: VerseAudioSource) => void;
+	/** The word of this ayah being read aloud, or null. */
+	spokenWord: number | null;
 }
 
-export function VerseCard({ verse, totalVerses, audioStatus, onToggleAudio }: VerseCardProps) {
+export function VerseCard({ verse, totalVerses, audioStatus, onToggleAudio, spokenWord }: VerseCardProps) {
 	const language = TRANSLATIONS["en.hilali"].language;
 	const recitation = verseAudioLabel(audioStatus, verse, "recitation");
 	const reading = verseAudioLabel(audioStatus, verse, "translation");
+	const indexes = useMemo(() => wordIndexes(verse.text), [verse.text]);
+	const paragraphs = useMemo(() => {
+		const result: { gloss: boolean; pieces: WordPiece[] }[][] = [];
+		let offset = 0;
+		for (const paragraph of splitTranslationParagraphs(verse.text, language)) {
+			const segments: { gloss: boolean; pieces: WordPiece[] }[] = [];
+			for (const segment of splitTranslationGlosses(paragraph)) {
+				segments.push({ gloss: segment.gloss, pieces: wordPieces(segment.text, offset, indexes) });
+				offset += segment.text.length;
+			}
+			result.push(segments);
+		}
+		return result;
+	}, [verse.text, language, indexes]);
+	const renderPieces = (pieces: WordPiece[]) => pieces.map((piece, index) => (
+		piece.word < 0
+			? piece.text
+			: <span key={index} className={piece.word === spokenWord ? "word speaking" : "word"}>{piece.text}</span>
+	));
 	return (
 		<article className="verse" id={`verse-${verse.chapter}-${verse.verse}`} data-chapter={verse.chapter} data-verse={verse.verse}>
 			<div className="verse-reference">
@@ -48,12 +72,12 @@ export function VerseCard({ verse, totalVerses, audioStatus, onToggleAudio }: Ve
 				</div>
 			</div>
 			<div className="verse-body">
-				{splitTranslationParagraphs(verse.text, language).map((paragraph, paragraphIndex) => (
+				{paragraphs.map((segments, paragraphIndex) => (
 					<p key={paragraphIndex} lang={language} dir="auto">
-						{splitTranslationGlosses(paragraph).map((segment, segmentIndex) => (
+						{segments.map((segment, segmentIndex) => (
 							segment.gloss
-								? <span key={segmentIndex} className="verse-gloss">{segment.text}</span>
-								: segment.text
+								? <span key={segmentIndex} className="verse-gloss">{renderPieces(segment.pieces)}</span>
+								: <span key={segmentIndex}>{renderPieces(segment.pieces)}</span>
 						))}
 					</p>
 				))}

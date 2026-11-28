@@ -8,7 +8,7 @@ import { findAyah, getRukuProgress, adjacentPosition } from "../lib/reader";
 import type { Position, Verse } from "../lib/reader";
 import { chapters, rukus } from "../lib/quran";
 import { QuranData } from "../lib/quran-data";
-import type { VerseAudioStatus } from "../hooks/use-verse-audio";
+import type { VerseAudioSource, VerseAudioStatus } from "../hooks/use-verse-audio";
 import type { PrayerCountdown } from "./DailyPanel";
 
 interface ReaderProps {
@@ -24,7 +24,7 @@ interface ReaderProps {
 	onMove: (direction: number) => void;
 	onRetry: () => void;
 	audioStatus: VerseAudioStatus | null;
-	onToggleAudio: (verse: Verse) => void;
+	onToggleAudio: (verse: Verse, source: VerseAudioSource) => void;
 }
 
 export function Reader({ position, verses, loading, loadError, today, countdown, shortcutsSeen, fontSize, onFontSizeAdjust, onMove, onRetry, audioStatus, onToggleAudio }: ReaderProps) {

@@ -1,20 +1,29 @@
 import { useCallback, useRef, useState } from "react";
-import { recitationUrl } from "../lib/audio";
+import { TRANSLATION_PLAYBACK_RATE, recitationUrl, translationSpeechUrl } from "../lib/audio";
 import { chapters } from "../lib/quran";
 import type { Position } from "../lib/reader";
 
 export type VerseAudioState = "loading" | "playing" | "paused";
+/** The Arabic recitation, or the English translation read aloud. */
+export type VerseAudioSource = "recitation" | "translation";
 
 export interface VerseAudioStatus {
 	position: Position;
+	source: VerseAudioSource;
 	state: VerseAudioState;
+}
+
+function sameAudio(status: VerseAudioStatus | null, position: Position, source: VerseAudioSource): status is VerseAudioStatus {
+	return !!status && status.source === source && status.position.chapter === position.chapter && status.position.verse === position.verse;
 }
 
 type RecitationLabel = "play" | "pause" | "loading";
 
 /**
- * Plays the one-ayah recitation from the Al Quran Cloud CDN. Playback starts
- * only after the direct user action that called `toggle`.
+ * Plays one ayah: the recitation from the Al Quran Cloud CDN, or the English
+ * translation read aloud by the Worker. Both share one audio element, so they
+ * never talk over each other. Playback starts only after the direct user
+ * action that called `toggle`.
  */
 export function useVerseAudio(onError: (message: string) => void) {
 	const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -42,36 +51,41 @@ export function useVerseAudio(onError: (message: string) => void) {
 		applyStatus(null);
 	}, [applyStatus]);
 
-	const play = useCallback((position: Position) => {
+	const play = useCallback((position: Position, source: VerseAudioSource) => {
 		const audio = audioRef.current;
 		if (!audio) return;
 		stop();
 		const request = ++requestRef.current;
-		applyStatus({ position, state: "loading" });
-		audio.src = recitationUrl(position, chapters);
+		applyStatus({ position, source, state: "loading" });
+		audio.src = source === "translation" ? translationSpeechUrl(position) : recitationUrl(position, chapters);
+		// The translation is played slower, so each phrase has time to settle.
+		const rate = source === "translation" ? TRANSLATION_PLAYBACK_RATE : 1;
+		audio.defaultPlaybackRate = rate;
+		audio.playbackRate = rate;
+		audio.preservesPitch = true;
 		audio.currentTime = 0;
 		audio.onended = () => finish(request);
 		audio.onerror = () => finish(request);
 		audio.play().then(() => {
 			if (request !== requestRef.current) return;
 			const active = statusRef.current;
-			if (active && active.position.chapter === position.chapter && active.position.verse === position.verse) {
+			if (sameAudio(active, position, source)) {
 				applyStatus({ ...active, state: "playing" });
 			}
 		}).catch(error => {
 			if (request !== requestRef.current) return;
-			console.warn("Unable to play the selected recitation:", error);
+			console.warn(`Unable to play the selected ${source}:`, error);
 			finish(request);
-			onError("The recitation could not be opened. Check your connection and try again.");
+			onError(openError(source));
 		});
 	}, [applyStatus, finish, onError, stop]);
 
-	const toggle = useCallback((position: Position) => {
+	const toggle = useCallback((position: Position, source: VerseAudioSource = "recitation") => {
 		const audio = audioRef.current;
 		if (!audio) return;
 		const current = statusRef.current;
-		if (!current || current.position.chapter !== position.chapter || current.position.verse !== position.verse) {
-			play(position);
+		if (!sameAudio(current, position, source)) {
+			play(position, source);
 			return;
 		}
 		if (current.state !== "paused") {
@@ -84,23 +98,33 @@ export function useVerseAudio(onError: (message: string) => void) {
 		audio.play().then(() => {
 			if (request !== requestRef.current) return;
 			const active = statusRef.current;
-			if (active && active.position.chapter === position.chapter && active.position.verse === position.verse) {
+			if (sameAudio(active, position, source)) {
 				applyStatus({ ...active, state: "playing" });
 			}
 		}).catch(error => {
 			if (request !== requestRef.current) return;
-			console.warn("Unable to resume the selected recitation:", error);
+			console.warn(`Unable to resume the selected ${source}:`, error);
 			finish(request);
-			onError("The recitation could not be opened. Check your connection and try again.");
+			onError(openError(source));
 		});
 	}, [applyStatus, finish, onError, play]);
 
 	return { audioRef, status, toggle, stop };
 }
 
-export function verseAudioLabel(status: VerseAudioStatus): { kind: RecitationLabel; text: string } {
-	const verse = `${status.position.chapter}:${status.position.verse}`;
-	if (status.state === "loading") return { kind: "loading", text: `Loading recitation for verse ${verse}` };
-	if (status.state === "playing") return { kind: "pause", text: `Pause recitation for verse ${verse}` };
-	return { kind: "play", text: `Play recitation for verse ${verse}` };
+function openError(source: VerseAudioSource): string {
+	return source === "translation"
+		? "The translation could not be read aloud. Check your connection and try again."
+		: "The recitation could not be opened. Check your connection and try again.";
+}
+
+/** The button state for one ayah's recitation or translation reading. */
+export function verseAudioLabel(status: VerseAudioStatus | null, position: Position, source: VerseAudioSource): { kind: RecitationLabel; text: string } {
+	const verse = `${position.chapter}:${position.verse}`;
+	const what = source === "translation" ? "translation reading" : "recitation";
+	if (sameAudio(status, position, source)) {
+		if (status.state === "loading") return { kind: "loading", text: `Loading ${what} for verse ${verse}` };
+		if (status.state === "playing") return { kind: "pause", text: `Pause ${what} for verse ${verse}` };
+	}
+	return { kind: "play", text: `Play ${what} for verse ${verse}` };
 }

@@ -20,13 +20,20 @@ describe("routing", () => {
 		expect((await readJson(response)).error).toBe("Not found");
 	});
 
-	it("no longer answers a request for a reading", async () => {
-		const response = await SELF.fetch(new Request("https://quran.example.com/api/speech", {
+	it("does not read text a caller sends", async () => {
+		const response = await SELF.fetch(new Request("https://quran.example.com/api/speech/1/1", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ text: "In the name of Allah, the Entirely Merciful." }),
+			body: JSON.stringify({ text: "Anything at all." }),
 		}));
-		expect(response.status).toBe(404);
-		expect((await readJson(response)).error).toBe("Not found");
+		expect(response.status).toBe(405);
+	});
+
+	it("answers an ayah that does not exist with not found", async () => {
+		for (const path of ["/api/speech/1/8", "/api/speech/115/1", "/api/speech/one/1", "/api/speech"]) {
+			const response = await SELF.fetch(new Request(`https://quran.example.com${path}`));
+			expect(response.status, path).toBe(404);
+			expect((await readJson(response)).error, path).toBe("Not found");
+		}
 	});
 });

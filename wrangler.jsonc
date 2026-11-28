@@ -14,8 +14,15 @@
 	 * https://developers.cloudflare.com/workers/vite-plugin/
 	 */
 	"assets": {
-		"not_found_handling": "single-page-application"
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		// The reading aloud route is always answered by the Worker, never by the SPA fallback.
+		"run_worker_first": ["/api/*"]
 	},
+	/**
+	 * Secrets: ELEVENLABS_API_KEY reads the translation aloud. Locally it comes
+	 * from .env; in production set it with `wrangler secret put ELEVENLABS_API_KEY`.
+	 */
 	/**
 	 * The sync feature has been removed. These migrations keep the deployment
 	 * history intact and delete the retired Durable Object class and its stored

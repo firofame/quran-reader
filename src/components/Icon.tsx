@@ -9,6 +9,7 @@ const STROKE_ICONS = {
 	close: <path d="m6 6 12 12M6 18 18 6" />,
 	left: <path d="m14 6-6 6 6 6M8 12h12" />,
 	right: <path d="m10 6 6 6-6 6M16 12H4" />,
+	speaker: <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4ZM15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10" />,
 } satisfies Record<string, ReactElement>;
 
 const FILL_ICONS = {

@@ -3,8 +3,8 @@ import { READER_MODEL_ID, pacedText } from "../../worker/pacing.ts";
 import { TRANSLATION_PLAYBACK_RATE, translationSpeechUrl } from "../../src/lib/audio";
 
 describe("translation reading", () => {
-	it("uses Eleven v4 Turbo", () => {
-		expect(READER_MODEL_ID).toBe("eleven_v4_turbo");
+	it("uses Eleven v4", () => {
+		expect(READER_MODEL_ID).toBe("eleven_v4");
 	});
 
 	it("lengthens the pause after each sentence and clause", () => {

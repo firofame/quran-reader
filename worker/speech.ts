@@ -1,5 +1,5 @@
 /**
- * Reads an ayah's English translation aloud with ElevenLabs Eleven v4 Turbo.
+ * Reads an ayah's English translation aloud with ElevenLabs Eleven v4.
  *
  * The reader asks for `GET /api/speech/<chapter>/<verse>` (the MP3) and
  * `GET /api/speech/<chapter>/<verse>/words` (when each word is spoken, so the
@@ -8,7 +8,7 @@
  * and never text a caller made up. The key stays in the ELEVENLABS_API_KEY
  * binding: the browser only ever receives the MP3.
  *
- * Eleven v4 Turbo is served over the Text to Dialogue WebSocket only, and v4
+^ * Eleven v4 is read over the Text to Dialogue WebSocket, and v4
  * has no speed setting. The reading is slowed with longer pauses written into
  * the text here, and with a slower playback rate in the reader.
  */
@@ -19,7 +19,7 @@ import type { AlignmentChunk } from "./pacing.ts";
 
 const OUTPUT_FORMAT = "mp3_44100_128";
 /** Bump this when the voice, model or pacing changes, so old cached audio is not served. */
-const SPEECH_VERSION = "2";
+const SPEECH_VERSION = "3";
 const TRANSLATION_FILE = "/en.hilali.txt";
 const DIALOGUE_URL = `https://api.elevenlabs.io/v1/text-to-dialogue/stream-input?model_id=${READER_MODEL_ID}&output_format=${OUTPUT_FORMAT}&sync_alignment=true`;
 /** Give up on a reading that takes longer than this. */
@@ -53,7 +53,7 @@ interface Reading {
 /** Readings being made right now, so the audio and its timings are paid for once. */
 const pendingReadings = new Map<string, Promise<Reading>>();
 
-/** Reads the text with Eleven v4 Turbo over the Text to Dialogue WebSocket. */
+/** Reads the text with Eleven v4 over the Text to Dialogue WebSocket. */
 async function synthesize(text: string, apiKey: string): Promise<Reading> {
 	const upgrade = await fetch(DIALOGUE_URL, { headers: { Upgrade: "websocket" } });
 	const socket = upgrade.webSocket;

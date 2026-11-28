@@ -139,10 +139,10 @@ describe("reading history", () => {
 		expect(PRAYERS.map(prayer => prayer.name)).toEqual(["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]);
 		expect(DEFAULT_PRAYER_TIMES).toEqual({
 			fajr: { adhan: "05:02", iqama: "05:47" },
-			dhuhr: { adhan: "12:13", iqama: "13:15" },
-			asr: { adhan: "15:35", iqama: "17:00" },
-			maghrib: { adhan: "18:04", iqama: "18:07" },
-			isha: { adhan: "19:24", iqama: "19:39" },
+			dhuhr: { adhan: "12:14", iqama: "13:15" },
+			asr: { adhan: "15:36", iqama: "17:00" },
+			maghrib: { adhan: "18:05", iqama: "18:08" },
+			isha: { adhan: "19:25", iqama: "19:40" },
 		});
 	});
 
@@ -191,7 +191,7 @@ describe("reading history", () => {
 		expect(migrated.settings.prayerTimes.maghrib).toEqual(DEFAULT_PRAYER_TIMES.maghrib);
 		expect(migrated.settings.prayerTimes.isha).toEqual(DEFAULT_PRAYER_TIMES.isha);
 		// Custom times are kept field by field.
-		expect(migrated.settings.prayerTimes.dhuhr).toEqual({ adhan: "12:13", iqama: "12:45" });
+		expect(migrated.settings.prayerTimes.dhuhr).toEqual({ adhan: "12:14", iqama: "12:45" });
 		expect(migrated.settings.prayerTimes.asr).toEqual({ adhan: "16:10", iqama: "17:00" });
 	});
 
@@ -206,6 +206,25 @@ describe("reading history", () => {
 						asr: { adhan: "15:34", iqama: "17:00" },
 						maghrib: { adhan: "18:03", iqama: "18:06" },
 						isha: { adhan: "19:23", iqama: "19:38" },
+					},
+				},
+			},
+			chapters,
+		);
+		expect(migrated.settings.prayerTimes).toEqual(DEFAULT_PRAYER_TIMES);
+	});
+
+	it("moves the saved times of the musalla's November schedule to the current defaults", () => {
+		const migrated = normalizeReadingData(
+			{
+				version: 11,
+				settings: {
+					prayerTimes: {
+						fajr: { adhan: "05:02", iqama: "05:47" },
+						dhuhr: { adhan: "12:13", iqama: "13:15" },
+						asr: { adhan: "15:35", iqama: "17:00" },
+						maghrib: { adhan: "18:04", iqama: "18:07" },
+						isha: { adhan: "19:24", iqama: "19:39" },
 					},
 				},
 			},
